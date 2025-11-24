@@ -1,21 +1,36 @@
+// src/app/login/page.tsx
 'use client'
 
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
-  // Verifica se já existe uma sessão ativa
+  const router = useRouter()
+  const [checkingSession, setCheckingSession] = useState(true)
+
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        window.location.href = '/dashboard'
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        // Se já tem sessão, redireciona para dashboard
+        if (session) {
+          console.log('✅ Login: Já está autenticado, redirecionando...')
+          router.push('/dashboard')
+          return
+        }
+      } catch (error) {
+        console.error('❌ Erro ao verificar sessão:', error)
+      } finally {
+        setCheckingSession(false)
       }
     }
+
     checkSession()
-  }, [])
+  }, [router])
 
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -31,7 +46,17 @@ export default function LoginPage() {
 
     if (error) {
       console.error('❌ Erro no login:', error)
+    } else {
+      console.log('✅ Login iniciado - redirecionando...')
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-900 via-zinc-900 to-black">
+        <div className="text-white text-xl">Verificando autenticação...</div>
+      </div>
+    )
   }
 
   return (

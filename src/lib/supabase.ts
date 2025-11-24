@@ -6,7 +6,7 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
-    detectSessionInUrl: true, // ← MUDE PARA TRUE
+    detectSessionInUrl: true, // ← DEVE SER TRUE
     autoRefreshToken: true,
     persistSession: true,
     flowType: 'pkce' // ← RECOMENDADO para Next.js

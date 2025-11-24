@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [team, setTeam] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
+  const [sessionChecked, setSessionChecked] = useState(false)
 
   useEffect(() => {
     console.log('🏠 Dashboard Page Mounted')
@@ -36,14 +37,14 @@ export default function Dashboard() {
         
         if (sessionError) {
           console.error('❌ Erro ao verificar sessão:', sessionError)
-          router.push('/login')
-          return
+          setSessionChecked(true)
+          return // Middleware vai lidar com o redirecionamento
         }
 
         if (!session) {
-          console.log('❌ No session, redirecting to login...')
-          router.push('/login')
-          return
+          console.log('❌ No session, waiting for middleware...')
+          setSessionChecked(true)
+          return // Middleware vai redirecionar
         }
 
         console.log('✅ User authenticated:', session.user.email)
@@ -75,12 +76,14 @@ export default function Dashboard() {
 
             if (createError) {
               console.error('❌ Erro ao criar perfil:', createError)
+              setSessionChecked(true)
               return
             }
 
             profile = newProfile
             console.log('✅ New profile created:', profile)
           } else {
+            setSessionChecked(true)
             return
           }
         }
@@ -92,6 +95,7 @@ export default function Dashboard() {
         console.error('💥 Erro inesperado:', error)
       } finally {
         setLoading(false)
+        setSessionChecked(true)
         console.log('✅ Dashboard loaded successfully')
       }
     }
@@ -103,11 +107,17 @@ export default function Dashboard() {
       console.log('🔄 Auth state changed:', event)
       
       if (event === 'SIGNED_OUT') {
+        console.log('🚪 User signed out, redirecting to login...')
         router.push('/login')
       }
       
       if (event === 'USER_UPDATED') {
+        console.log('👤 User updated, refreshing data...')
         setUser(session?.user || null)
+      }
+
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('🔄 Token refreshed')
       }
     })
 
@@ -120,15 +130,15 @@ export default function Dashboard() {
       const { error } = await supabase.auth.signOut()
       if (error) {
         console.error('❌ Erro ao fazer logout:', error)
-      } else {
-        router.push('/login')
       }
+      // O onAuthStateChange vai lidar com o redirecionamento
     } catch (error) {
       console.error('💥 Erro inesperado no logout:', error)
     }
   }
 
-  if (loading) {
+  // Mostrar loading apenas se ainda estiver carregando E não tiver verificado a sessão
+  if (loading && !sessionChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
         <div className="text-center space-y-4">
@@ -139,11 +149,13 @@ export default function Dashboard() {
     )
   }
 
-  if (!user) {
+  // Se não tem usuário mas a sessão já foi verificada, mostrar estado vazio
+  if (!user && sessionChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <div className="text-center space-y-4">
-          <div className="text-2xl font-semibold text-white">Redirecionando para login...</div>
+        <div className="text-center space-y-6">
+          <div className="text-2xl font-semibold text-white">Aguardando autenticação...</div>
+          <div className="text-zinc-400">Se você não for redirecionado automaticamente</div>
           <Button onClick={() => router.push('/login')} className="bg-purple-600 hover:bg-purple-700">
             Ir para Login
           </Button>
