@@ -9,32 +9,18 @@ export default function LoginPage() {
   const supabase = createClient()
 
   const handleGoogleLogin = async () => {
+    // Use signInWithOAuth do jeito SIMPLES
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${location.origin}/auth/callback`,
       },
     })
 
     if (error) {
-      console.error('Erro no login:', error)
+      console.error('Login error:', error)
     }
-
-    const handleGoogleLogin = async () => {
-  console.log('Iniciando login...')
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-    },
-  })
-
-  console.log('Data:', data)
-  console.log('Error:', error)
-}
   }
-
-  
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-purple-900 via-zinc-900 to-black">
@@ -58,4 +44,3 @@ export default function LoginPage() {
     </div>
   )
 }
-
