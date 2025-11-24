@@ -1,6 +1,7 @@
-import { createServerClient } from '@/lib/supabase'
-import { NextResponse } from 'next/server'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
+import { NextResponse } from 'next/server'
+import type { Database } from '@/types/database'
 
 export async function GET(request: Request) {
   console.log('🔄 Auth Callback Triggered')
@@ -11,8 +12,8 @@ export async function GET(request: Request) {
   console.log('📥 Callback Code:', code ? '✅ Received' : '❌ Missing')
 
   if (code) {
-    // ✅ Use o SERVER client aqui, não o client component
-    const supabase = createServerClient()
+    // ✅ Crie o SERVER client diretamente aqui
+    const supabase = createServerComponentClient<Database>({ cookies })
     
     console.log('🔄 Exchanging code for session...')
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
