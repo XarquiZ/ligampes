@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase'
 import { 
   Gavel, 
   Clock, 
@@ -233,7 +233,7 @@ const useSaldoReservado = (teamId: string | null) => {
 }
 
 export default function PaginaLeilao() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [team, setTeam] = useState<Team | null>(null)

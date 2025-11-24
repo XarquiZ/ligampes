@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -19,7 +19,7 @@ function formatBalance(value: number): string {
 }
 
 export default function Dashboard() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [team, setTeam] = useState<any>(null)

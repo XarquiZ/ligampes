@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from '@/lib/supabase'
 import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -51,7 +51,7 @@ function formatDate(dateString: string) {
 }
 
 export default function PaginaSaldo() {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [team, setTeam] = useState<Team | null>(null)
   const [transactions, setTransactions] = useState<BalanceTransaction[]>([])
   const [allTeams, setAllTeams] = useState<Team[]>([])

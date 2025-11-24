@@ -1,11 +1,12 @@
 // src/components/providers.tsx
 'use client'
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+// ✅ CORRETO - em TODOS os arquivos
+import { createClient } from '@/lib/supabase'
 import { SessionContextProvider } from '@supabase/auth-helpers-react'
 import { useState } from 'react'
 
-const supabase = createClientComponentClient()
+const supabase = createClient()
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
