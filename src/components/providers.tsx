@@ -1,10 +1,8 @@
-// src/components/providers.tsx
+// /src/components/providers.tsx
 'use client'
 
-// ✅ CORRETO - em TODOS os arquivos
-import { supabase } from '@/lib/supabase'
 import { SessionContextProvider } from '@supabase/auth-helpers-react'
-import { useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (

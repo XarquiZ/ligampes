@@ -1,4 +1,4 @@
-// components/auth-protected-route.tsx
+// /components/auth-protected-route.tsx
 'use client'
 
 import { useEffect } from 'react'
@@ -11,7 +11,7 @@ export default function AuthProtectedRoute({ children }: { children: React.React
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      
+
       if (!session) {
         router.push('/login')
       }
@@ -19,12 +19,14 @@ export default function AuthProtectedRoute({ children }: { children: React.React
 
     checkAuth()
 
-    // Ouvir mudanças na autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session) {
-        router.push('/login')
+    // Ouve logout automático
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_, session) => {
+        if (!session) {
+          router.push('/login')
+        }
       }
-    })
+    )
 
     return () => subscription.unsubscribe()
   }, [router])

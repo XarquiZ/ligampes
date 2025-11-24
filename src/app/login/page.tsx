@@ -1,6 +1,6 @@
 'use client'
 
-import { supabase } from '@/lib/supabase'
+import { supabase } from "@/lib/supabase"
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useEffect, useState } from 'react'
@@ -27,14 +27,14 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
         queryParams: {
-          access_type: 'offline',
-          prompt: 'consent'
-        }
-      }
+          access_type: "offline",
+          prompt: "consent",
+        },
+      },
     })
   }
 
@@ -51,6 +51,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md p-10">
         <div className="text-center space-y-8">
           <h1 className="text-4xl font-black text-white">LIGA MPES</h1>
+
           <Button
             onClick={handleGoogleLogin}
             size="lg"

@@ -250,6 +250,7 @@ const MultiSelect = ({ control, name, label, options, placeholder, Icon }: any) 
 // ===========================================================================
 
 export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJogadorFormProps) {
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
