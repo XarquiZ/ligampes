@@ -27,13 +27,19 @@ export default function Dashboard() {
   const [expandedTile, setExpandedTile] = useState<string | null>(null) // ← controla qual tile tá expandido
 
   useEffect(() => {
+    console.log('🏠 Dashboard Page Mounted')
+    
     const load = async () => {
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('👤 Dashboard - Session:', session)
+      
       if (!session) {
+        console.log('❌ No session, redirecting to login...')
         router.push('/login')
         return
       }
 
+      console.log('✅ User authenticated:', session.user.email)
       setUser(session.user)
 
       let { data: profile } = await supabase
@@ -42,7 +48,10 @@ export default function Dashboard() {
         .eq('id', session.user.id)
         .single()
 
+      console.log('📊 Profile data:', profile)
+
       if (!profile) {
+        console.log('🆕 Creating new profile...')
         const isAdmin = session.user.email === 'wellinton.sbatista@gmail.com'
         const { data: newProfile } = await supabase
           .from('profiles')
@@ -54,10 +63,12 @@ export default function Dashboard() {
           .select('*, teams(*)')
           .single()
         profile = newProfile
+        console.log('✅ New profile created:', profile)
       }
 
       setTeam(profile?.teams || null)
       setLoading(false)
+      console.log('✅ Dashboard loaded successfully')
     }
     load()
   }, [supabase, router])
@@ -157,7 +168,11 @@ export default function Dashboard() {
               </Avatar>
             )}
 
-            <Button variant="ghost" size="sm" onClick={async () => { await supabase.auth.signOut(); router.push('/login') }} className="text-red-400 hover:text-red-300">
+            <Button variant="ghost" size="sm" onClick={async () => { 
+              console.log('🚪 Logging out...')
+              await supabase.auth.signOut(); 
+              router.push('/login') 
+            }} className="text-red-400 hover:text-red-300">
               <LogOut className="h-5 w-5" />
             </Button>
           </div>

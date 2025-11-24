@@ -3,19 +3,42 @@
 import { createClient } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { useEffect } from 'react'
 
 export default function LoginPage() {
   const supabase = createClient()
-  const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`,
-      },
-    })
 
-    if (error) {
-      console.error('Error:', error)
+  useEffect(() => {
+    console.log('🔐 Login Page Mounted')
+    console.log('Window location:', window.location.origin)
+    console.log('Redirect URL will be:', `${window.location.origin}/dashboard`)
+  }, [])
+
+  const handleGoogleLogin = async () => {
+    console.log('🔄 Starting Google OAuth...')
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      })
+
+      console.log('📤 OAuth Response:')
+      console.log('Data:', data)
+      console.log('Error:', error)
+
+      if (error) {
+        console.error('❌ OAuth Error:', error.message)
+        console.error('Error details:', error)
+      } else if (data?.url) {
+        console.log('✅ OAuth URL generated:', data.url)
+      } else {
+        console.log('⚠️ No URL returned from OAuth')
+      }
+    } catch (catchError) {
+      console.error('💥 Unexpected error in OAuth:', catchError)
     }
   }
 
