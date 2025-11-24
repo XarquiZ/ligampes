@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/card'
 
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
+    console.log('🔄 Iniciando login Google...')
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -14,7 +16,9 @@ export default function LoginPage() {
     })
 
     if (error) {
-      console.error('Login error:', error)
+      console.error('❌ Erro no login:', error)
+    } else {
+      console.log('✅ Login iniciado - redirecionando...')
     }
   }
 
