@@ -1,25 +1,43 @@
 // app/api/auth/callback/route.ts
 import { NextResponse } from "next/server";
-import { createServerClientInstance } from "@/lib/server";
+import { createServerClient } from "@supabase/ssr";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
 
-  // Se não tiver código, manda de volta pro login com erro
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=no_code`);
   }
 
-  const supabase = createServerClientInstance();
+  const response = new NextResponse(null, {
+    status: 302,
+    headers: { Location: `${origin}/dashboard` },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name, value, options) {
+          response.cookies.set(name, value, options);
+        },
+        remove(name, options) {
+          response.cookies.delete(name);
+        },
+      },
+    }
+  );
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    console.error("Erro no exchangeCodeForSession:", error);
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+    return NextResponse.redirect(`${origin}/login?error=${error.message}`);
   }
 
-  // Tudo certo → vai pro dashboard
-  return NextResponse.redirect(`${origin}/dashboard`);
+  return response;
 }
