@@ -8,19 +8,21 @@ import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [checkingSession, setCheckingSession] = useState(true)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const checkSession = async () => {
+    const check = async () => {
       const { data: { session } } = await supabase.auth.getSession()
+
       if (session) {
         router.push('/dashboard')
         return
       }
-      setCheckingSession(false)
+
+      setLoading(false)
     }
 
-    checkSession()
+    check()
   }, [router])
 
   const handleGoogleLogin = async () => {
@@ -36,7 +38,7 @@ export default function LoginPage() {
     })
   }
 
-  if (checkingSession) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-white text-xl">
         Verificando autenticação...
@@ -49,7 +51,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-md p-10">
         <div className="text-center space-y-8">
           <h1 className="text-4xl font-black text-white">LIGA MPES</h1>
-          <Button onClick={handleGoogleLogin} size="lg" className="w-full text-lg font-bold">
+          <Button
+            onClick={handleGoogleLogin}
+            size="lg"
+            className="w-full text-lg font-bold"
+          >
             Entrar com Google
           </Button>
         </div>

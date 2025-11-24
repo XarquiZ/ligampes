@@ -1,15 +1,16 @@
 // /src/lib/supabase.ts
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/types/database'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
-  auth: {
-    detectSessionInUrl: true,
-    autoRefreshToken: true,
-    persistSession: true,
-    flowType: 'pkce'
+export const supabase = createBrowserClient<Database>(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      detectSessionInUrl: true,
+      autoRefreshToken: true,
+      persistSession: false, // 👈 IMPORTANTÍSSIMO
+      flowType: 'pkce'
+    }
   }
-})
+)
