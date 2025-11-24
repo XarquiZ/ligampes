@@ -36,7 +36,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase } from "@/lib/supabase"
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
 
