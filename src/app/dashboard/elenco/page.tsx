@@ -93,6 +93,7 @@ interface TransferModalProps {
   teams: Team[]
 }
 
+const supabase = createClient()
 // Componente do Modal de Transferência ATUALIZADO
 const TransferModal: React.FC<TransferModalProps> = ({ 
   player, 
@@ -113,7 +114,6 @@ const TransferModal: React.FC<TransferModalProps> = ({
   const [teamPlayers, setTeamPlayers] = useState<Player[]>([])
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
 
-  const supabase = createClient()
 
   // Resetar form quando modal abrir
   useEffect(() => {
@@ -573,7 +573,6 @@ const TransferModal: React.FC<TransferModalProps> = ({
 }
 
 export default function ElencoPage() {
-  const supabase = createClient()
   const [players, setPlayers] = useState<Player[]>([])
   const [filteredPlayers, setFilteredPlayers] = useState<Player[]>([])
   const [team, setTeam] = useState<Team | null>(null)

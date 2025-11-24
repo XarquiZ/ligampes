@@ -1,4 +1,3 @@
-// src/app/login/page.tsx
 'use client'
 
 import { createClient } from '@/lib/supabase'
@@ -7,18 +6,16 @@ import { Card } from '@/components/ui/card'
 
 export default function LoginPage() {
   const supabase = createClient()
-
   const handleGoogleLogin = async () => {
-    // Use signInWithOAuth do jeito SIMPLES
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/dashboard`,
       },
     })
 
     if (error) {
-      console.error('Login error:', error)
+      console.error('Error:', error)
     }
   }
 

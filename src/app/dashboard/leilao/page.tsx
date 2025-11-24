@@ -70,6 +70,8 @@ interface Team {
 
 type TabType = 'active' | 'pending' | 'finished'
 
+const supabase = createClient()
+
 // Hook CORRIGIDO para saldo reservado específico por time
 const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
@@ -233,7 +235,6 @@ const useSaldoReservado = (teamId: string | null) => {
 }
 
 export default function PaginaLeilao() {
-  const supabase = createClient()
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [team, setTeam] = useState<Team | null>(null)

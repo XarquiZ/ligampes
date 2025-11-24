@@ -77,8 +77,9 @@ interface Team {
   logo_url: string | null
 }
 
+const supabase = createClient()
+
 export default function ListaJogadores() {
-  const supabase = createClient()
   const [jogadores, setJogadores] = useState<Player[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
