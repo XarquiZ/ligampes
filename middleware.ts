@@ -1,45 +1,31 @@
 // middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClientInstance } from "@/lib/server";
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
+  const response = NextResponse.next();
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return req.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: any) {
-          res.cookies.set(name, value, options);
-        },
-        remove(name: string, options: any) {
-          res.cookies.set(name, "", { ...options, maxAge: 0 });
-        },
-      },
-    }
-  );
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const supabase = createServerClientInstance();
+  const { data: { session } } = await supabase.auth.getSession();
 
   const path = req.nextUrl.pathname;
-  const publicPaths = ["/login", "/auth/callback"];
 
-  if (!session && !publicPaths.includes(path)) {
+  // Rotas públicas (não precisam de login)
+  const publicPaths = ["/login", "/api/auth/callback"];
+  const isPublic = publicPaths.includes(path) || path.startsWith("/api/auth/callback");
+
+  // Não logado e tentando acessar rota protegida
+  if (!session && !isPublic) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
+  // Logado e tentando ir pro login
   if (session && path === "/login") {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  return res;
+  return response;
 }
 
 export const config = {

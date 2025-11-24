@@ -1,4 +1,4 @@
-// /src/lib/supabase.ts
+// src/lib/supabase.ts
 import { createBrowserClient } from "@supabase/ssr";
 
 export const supabase = createBrowserClient(
@@ -8,7 +8,7 @@ export const supabase = createBrowserClient(
     auth: {
       detectSessionInUrl: true,
       autoRefreshToken: true,
-      persistSession: true,     // 🔥 Mantém cookies funcionando com middleware
+      persistSession: true,
       flowType: "pkce",
     },
   }
