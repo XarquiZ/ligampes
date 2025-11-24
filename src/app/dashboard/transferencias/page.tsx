@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, Calendar, Users, ArrowRightLeft, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -27,7 +27,6 @@ function formatDateTime(dateString: string) {
 }
 
 export default function PaginaTransferencias() {
-  const supabase = createClient()
   const [transfers, setTransfers] = useState<any[]>([])
   const [allTransfers, setAllTransfers] = useState<any[]>([])
   const [userTeamId, setUserTeamId] = useState<string | null>(null)

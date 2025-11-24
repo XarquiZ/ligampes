@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useCallback, useMemo } from "react"
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -93,7 +93,6 @@ interface TransferModalProps {
   teams: Team[]
 }
 
-const supabase = createClient()
 // Componente do Modal de Transferência ATUALIZADO
 const TransferModal: React.FC<TransferModalProps> = ({ 
   player, 

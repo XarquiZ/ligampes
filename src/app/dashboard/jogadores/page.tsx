@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -77,7 +77,6 @@ interface Team {
   logo_url: string | null
 }
 
-const supabase = createClient()
 
 export default function ListaJogadores() {
   const [jogadores, setJogadores] = useState<Player[]>([])

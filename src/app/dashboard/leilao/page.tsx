@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { 
   Gavel, 
   Clock, 
@@ -70,7 +70,6 @@ interface Team {
 
 type TabType = 'active' | 'pending' | 'finished'
 
-const supabase = createClient()
 
 // Hook CORRIGIDO para saldo reservado específico por time
 const useSaldoReservado = (teamId: string | null) => {
