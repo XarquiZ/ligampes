@@ -1,7 +1,6 @@
 // /app/auth/callback/route.ts
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -11,21 +10,22 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${url.origin}/login?error=missing_code`);
   }
 
-  const cookieStore = cookies();
+  // Criamos a resposta ANTES para permitir setCookie
+  const res = NextResponse.redirect(`${url.origin}/dashboard`);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name) {
-          return cookieStore.get(name)?.value;
+        get(name: string) {
+          return req.headers.get("cookie") ?? null;
         },
-        set(name, value, options) {
-          cookieStore.set(name, value, { ...options, path: "/" });
+        set(name: string, value: string, options: any) {
+          res.cookies.set(name, value, options);
         },
-        remove(name, options) {
-          cookieStore.set(name, "", { ...options, maxAge: 0, path: "/" });
+        remove(name: string, options: any) {
+          res.cookies.set(name, "", { ...options, maxAge: 0 });
         },
       },
     }
@@ -34,8 +34,8 @@ export async function GET(req: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return NextResponse.redirect(`${url.origin}/login?error=oauth_error`);
+    return NextResponse.redirect(`${url.origin}/login?error=session_exchange_failed`);
   }
 
-  return NextResponse.redirect(`${url.origin}/dashboard`);
+  return res;
 }
