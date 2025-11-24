@@ -36,7 +36,7 @@ import {
   Check,
   Loader2,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
 
@@ -250,7 +250,6 @@ const MultiSelect = ({ control, name, label, options, placeholder, Icon }: any) 
 // ===========================================================================
 
 export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJogadorFormProps) {
-  const supabase = createClient()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
