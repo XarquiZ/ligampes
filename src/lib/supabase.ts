@@ -1,3 +1,4 @@
+// /src/lib/supabase.ts
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
 
@@ -6,9 +7,9 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
-    detectSessionInUrl: true, // ← DEVE SER TRUE
+    detectSessionInUrl: true,
     autoRefreshToken: true,
     persistSession: true,
-    flowType: 'pkce' // ← RECOMENDADO para Next.js
+    flowType: 'pkce'
   }
 })
