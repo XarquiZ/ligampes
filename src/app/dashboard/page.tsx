@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx ← DASHBOARD COM 3 ESTÁGIOS: NORMAL → EXPANDIDO → PÁGINA COMPLETA
+// src/app/dashboard/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -23,59 +23,131 @@ export default function Dashboard() {
   const [user, setUser] = useState<any>(null)
   const [team, setTeam] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [expandedTile, setExpandedTile] = useState<string | null>(null) // ← controla qual tile tá expandido
+  const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
   useEffect(() => {
     console.log('🏠 Dashboard Page Mounted')
     
-    const load = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      console.log('👤 Dashboard - Session:', session)
-      
-      if (!session) {
-        console.log('❌ No session, redirecting to login...')
-        router.push('/login')
-        return
-      }
+    const loadData = async () => {
+      try {
+        // Verificar sessão primeiro
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        console.log('👤 Dashboard - Session:', session)
+        
+        if (sessionError) {
+          console.error('❌ Erro ao verificar sessão:', sessionError)
+          router.push('/login')
+          return
+        }
 
-      console.log('✅ User authenticated:', session.user.email)
-      setUser(session.user)
+        if (!session) {
+          console.log('❌ No session, redirecting to login...')
+          router.push('/login')
+          return
+        }
 
-      let { data: profile } = await supabase
-        .from('profiles')
-        .select('*, teams(*)')
-        .eq('id', session.user.id)
-        .single()
+        console.log('✅ User authenticated:', session.user.email)
+        setUser(session.user)
 
-      console.log('📊 Profile data:', profile)
-
-      if (!profile) {
-        console.log('🆕 Creating new profile...')
-        const isAdmin = session.user.email === 'wellinton.sbatista@gmail.com'
-        const { data: newProfile } = await supabase
+        // Carregar perfil do usuário
+        let { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .insert({
-            id: session.user.id,
-            full_name: session.user.user_metadata.full_name || session.user.email,
-            role: isAdmin ? 'admin' : 'coach'
-          })
           .select('*, teams(*)')
+          .eq('id', session.user.id)
           .single()
-        profile = newProfile
-        console.log('✅ New profile created:', profile)
-      }
 
-      setTeam(profile?.teams || null)
-      setLoading(false)
-      console.log('✅ Dashboard loaded successfully')
+        if (profileError) {
+          console.error('❌ Erro ao carregar perfil:', profileError)
+          
+          // Se o perfil não existe, criar um novo
+          if (profileError.code === 'PGRST116') {
+            console.log('🆕 Creating new profile...')
+            const isAdmin = session.user.email === 'wellinton.sbatista@gmail.com'
+            const { data: newProfile, error: createError } = await supabase
+              .from('profiles')
+              .insert({
+                id: session.user.id,
+                full_name: session.user.user_metadata.full_name || session.user.email,
+                role: isAdmin ? 'admin' : 'coach'
+              })
+              .select('*, teams(*)')
+              .single()
+
+            if (createError) {
+              console.error('❌ Erro ao criar perfil:', createError)
+              return
+            }
+
+            profile = newProfile
+            console.log('✅ New profile created:', profile)
+          } else {
+            return
+          }
+        }
+
+        console.log('📊 Profile data:', profile)
+        setTeam(profile?.teams || null)
+        
+      } catch (error) {
+        console.error('💥 Erro inesperado:', error)
+      } finally {
+        setLoading(false)
+        console.log('✅ Dashboard loaded successfully')
+      }
     }
-    load()
-  }, [supabase, router])
+
+    loadData()
+
+    // Ouvir mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('🔄 Auth state changed:', event)
+      
+      if (event === 'SIGNED_OUT') {
+        router.push('/login')
+      }
+      
+      if (event === 'USER_UPDATED') {
+        setUser(session?.user || null)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [router])
+
+  const handleLogout = async () => {
+    console.log('🚪 Logging out...')
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('❌ Erro ao fazer logout:', error)
+      } else {
+        router.push('/login')
+      }
+    } catch (error) {
+      console.error('💥 Erro inesperado no logout:', error)
+    }
+  }
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <div className="text-2xl font-semibold text-white animate-pulse">Carregando seu império...</div>
+        <div className="text-center space-y-4">
+          <div className="text-2xl font-semibold text-white animate-pulse">Carregando seu império...</div>
+          <div className="text-zinc-400">Preparando tudo para você dominar o jogo</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="text-center space-y-4">
+          <div className="text-2xl font-semibold text-white">Redirecionando para login...</div>
+          <Button onClick={() => router.push('/login')} className="bg-purple-600 hover:bg-purple-700">
+            Ir para Login
+          </Button>
+        </div>
       </div>
     )
   }
@@ -139,9 +211,22 @@ export default function Dashboard() {
     },
   ]
 
+  // Função para obter classe de cor dinâmica
+  const getColorClass = (color: string) => {
+    const colorMap: { [key: string]: string } = {
+      green: 'text-green-400',
+      blue: 'text-blue-400',
+      yellow: 'text-yellow-400',
+      red: 'text-red-400',
+      purple: 'text-purple-400',
+      pink: 'text-pink-400'
+    }
+    return colorMap[color] || 'text-gray-400'
+  }
+
   return (
     <>
-      {/* HEADER (igual antes) */}
+      {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <h1 className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-3xl font-black text-transparent">
@@ -152,26 +237,33 @@ export default function Dashboard() {
             <div className="hidden text-right md:block">
               <p className="text-xs text-zinc-500 uppercase tracking-wider">Dono do jogo</p>
               <p className="text-lg font-bold text-white flex items-center gap-2">
-                {user?.user_metadata.full_name || user?.email}
+                {user?.user_metadata?.full_name || user?.email}
                 {isAdmin && <Crown className="h-5 w-5 text-yellow-500" />}
               </p>
             </div>
 
             {team?.logo_url ? (
-              <Image src={team.logo_url} alt={team.name} width={64} height={64} className="rounded-full border-4 border-purple-600/50 shadow-xl object-cover" />
+              <Image 
+                src={team.logo_url} 
+                alt={team.name} 
+                width={64} 
+                height={64} 
+                className="rounded-full border-4 border-purple-600/50 shadow-xl object-cover" 
+              />
             ) : (
               <Avatar className="h-16 w-16">
                 <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-2xl font-bold">
-                  {user?.user_metadata.full_name?.[0] || user?.email[0].toUpperCase()}
+                  {user?.user_metadata?.full_name?.[0] || user?.email?.[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             )}
 
-            <Button variant="ghost" size="sm" onClick={async () => { 
-              console.log('🚪 Logging out...')
-              await supabase.auth.signOut(); 
-              router.push('/login') 
-            }} className="text-red-400 hover:text-red-300">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleLogout}
+              className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+            >
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
@@ -182,20 +274,26 @@ export default function Dashboard() {
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
         <div className="mx-auto max-w-7xl space-y-12">
 
-          {/* PERFIL (igual antes) */}
+          {/* PERFIL */}
           <div className="flex flex-col md:flex-row items-center gap-8">
             {team?.logo_url ? (
-              <Image src={team.logo_url} alt={team.name} width={160} height={160} className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" />
+              <Image 
+                src={team.logo_url} 
+                alt={team.name} 
+                width={160} 
+                height={160} 
+                className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" 
+              />
             ) : (
               <Avatar className="h-40 w-40 border-8 border-purple-600/30">
                 <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-7xl font-black">
-                  {user?.user_metadata.full_name?.[0] || user?.email[0].toUpperCase()}
+                  {user?.user_metadata?.full_name?.[0] || user?.email?.[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             )}
 
             <div className="text-center md:text-left">
-              <h2 className="text-5xl font-black text-white">{user?.user_metadata.full_name || user?.email}</h2>
+              <h2 className="text-5xl font-black text-white">{user?.user_metadata?.full_name || user?.email}</h2>
               <p className="mt-3 text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                 {team?.name || 'Sem time'}
               </p>
@@ -227,7 +325,7 @@ export default function Dashboard() {
                 <CardHeader className="pb-4 relative z-10">
                   <CardTitle className="text-2xl font-bold text-white flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <tile.icon className={`h-12 w-12 text-${tile.color}-400 drop-shadow-lg`} />
+                      <tile.icon className={`h-12 w-12 ${getColorClass(tile.color)} drop-shadow-lg`} />
                       {tile.title}
                     </div>
                     {expandedTile === tile.title ? <ChevronUp className="h-8 w-8" /> : <ChevronDown className="h-8 w-8" />}
@@ -240,7 +338,7 @@ export default function Dashboard() {
                     <p className={`font-black text-white ${expandedTile === tile.title ? 'text-6xl' : 'text-5xl'}`}>
                       {tile.value}
                     </p>
-                    <p className={`font-medium text-${tile.color}-400 ${expandedTile === tile.title ? 'text-2xl mt-4' : 'text-lg'}`}>
+                    <p className={`font-medium ${getColorClass(tile.color)} ${expandedTile === tile.title ? 'text-2xl mt-4' : 'text-lg'}`}>
                       {tile.subtitle}
                     </p>
                   </div>

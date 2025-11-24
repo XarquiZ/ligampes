@@ -3,20 +3,34 @@
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { useEffect } from 'react'
 
 export default function LoginPage() {
+  // Verifica se já existe uma sessão ativa
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        window.location.href = '/dashboard'
+      }
+    }
+    checkSession()
+  }, [])
+
   const handleGoogleLogin = async () => {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`, // ← MUDE PARA CALLBACK
-    },
-  })
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
+      }
+    })
 
     if (error) {
       console.error('❌ Erro no login:', error)
-    } else {
-      console.log('✅ Login iniciado - redirecionando...')
     }
   }
 

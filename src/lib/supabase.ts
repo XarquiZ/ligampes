@@ -6,10 +6,9 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
-    // ⬇️ DESABILITA verificação de tempo que causa o erro
-    detectSessionInUrl: false,
+    detectSessionInUrl: true, // ← MUDE PARA TRUE
     autoRefreshToken: true,
     persistSession: true,
-    flowType: 'implicit' // ← Use implicit flow para simplificar
+    flowType: 'pkce' // ← RECOMENDADO para Next.js
   }
 })
