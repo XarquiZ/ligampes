@@ -74,6 +74,51 @@ export default function Dashboard() {
 
   const tiles = [
     {
+      title: 'SALDO',
+      icon: DollarSign,
+      color: 'green',
+      value: formatBalance(team?.balance || 0),
+      subtitle: 'disponível para gastar',
+      expanded: 'Últimas 3 transações aqui (em breve)',
+      link: '/dashboard/saldo'
+    },
+    {
+      title: 'MEU ELENCO',
+      icon: Shirt,
+      color: 'blue',
+      value: '0/25',
+      subtitle: 'meus jogadores',
+      expanded: 'Top 5 jogadores mais valiosos do seu time',
+      link: '/dashboard/elenco'
+    },
+    {
+      title: 'CLASSIFICAÇÃO',
+      icon: Trophy,
+      color: 'yellow',
+      value: '—',
+      subtitle: 'posição atual',
+      expanded: 'Top 3 times + sua posição destacada',
+      link: '/dashboard/classificacao'
+    },
+    {
+      title: 'LEILÃO',
+      icon: Calendar,
+      color: 'red',
+      value: 'EM BREVE',
+      subtitle: 'próximo evento',
+      expanded: 'Contagem regressiva + último arremate',
+      link: '/dashboard/leilao'
+    },
+    {
+      title: 'TRANSFERÊNCIAS',
+      icon: ArrowLeftRight,
+      color: 'purple',
+      value: 'Mercado',
+      subtitle: 'negociações ativas',
+      expanded: 'Últimas 2 negociações pendentes',
+      link: '/dashboard/transferencias'
+    },
+    {
       title: 'JOGADORES',
       icon: Users,
       color: 'pink',

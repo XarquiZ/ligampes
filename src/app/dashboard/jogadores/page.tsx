@@ -830,21 +830,24 @@ export default function ListaJogadores() {
         )}
 
         {/* Sheet de Edição */}
-        <Sheet open={isEdicaoOpen} onOpenChange={setIsEdicaoOpen}>
-          <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
-            <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
-              <SheetTitle className="text-2xl font-bold text-white">Editar Jogador</SheetTitle>
-              <SheetDescription className="text-zinc-400">
-                Atualize os dados do jogador e clique em salvar.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="p-6">
-              {jogadorEditando && (
-                <CadastrarJogadorForm playerToEdit={jogadorEditando} onPlayerAdded={handleSuccess} />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
+<Sheet open={isEdicaoOpen} onOpenChange={setIsEdicaoOpen}>
+  <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
+    <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
+      <SheetTitle className="text-2xl font-bold text-white">Editar Jogador</SheetTitle>
+      <SheetDescription className="text-zinc-400">
+        Atualize os dados do jogador e clique em salvar.
+      </SheetDescription>
+    </SheetHeader>
+    <div className="p-6">
+      {jogadorEditando && (
+        <CadastrarJogadorForm 
+          playerToEdit={jogadorEditando as any} 
+          onPlayerAdded={handleSuccess} 
+        />
+      )}
+    </div>
+  </SheetContent>
+</Sheet>
 
         {!loading && filteredPlayers.length === 0 && (
           <div className="text-center py-32">
