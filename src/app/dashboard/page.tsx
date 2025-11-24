@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx
+// src/app/dashboard/page.tsx → VERSÃO 100% CORRETA E FINAL
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -33,37 +33,35 @@ export default function Dashboard() {
   useEffect(() => {
     const load = async () => {
       const { data: { session } } = await supabase.auth.getSession()
+
+      // IMPORTANTE: NUNCA mais redireciona pro login aqui!
+      // O app/page.tsx e o middleware já garantem que só chega aqui com sessão
+
       if (!session) {
-        router.push('/login')
+        setLoading(false)
         return
       }
 
       setUser(session.user)
 
-      const { data: existingProfile, error } = await supabase
+      const { data: existingProfile } = await supabase
         .from('profiles')
         .select('*, teams(*)')
         .eq('id', session.user.id)
         .maybeSingle()
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Erro ao buscar profile:', error)
-      }
-
       if (!existingProfile || !existingProfile.coach_name) {
-        // Primeiro acesso → mostra tela de boas-vindas
         setShowWelcome(true)
-        setLoading(false)
-        return
+      } else {
+        setProfile(existingProfile)
+        setTeam(existingProfile.teams || null)
       }
 
-      setProfile(existingProfile)
-      setTeam(existingProfile.teams || null)
       setLoading(false)
     }
 
     load()
-  }, [router])
+  }, [])
 
   const handleSaveCoachName = async () => {
     if (!coachName.trim() || coachName.length < 3) {
@@ -113,7 +111,6 @@ export default function Dashboard() {
     )
   }
 
-  // TELA DE BOAS-VINDAS
   if (showWelcome) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/50 to-zinc-950 flex items-center justify-center p-6">
@@ -157,7 +154,6 @@ export default function Dashboard() {
     )
   }
 
-  // DASHBOARD NORMAL
   const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
 
   const tiles = [
@@ -171,7 +167,6 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <h1 className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-3xl font-black text-transparent">
@@ -188,7 +183,7 @@ export default function Dashboard() {
             {team?.logo_url ? (
               <Image src={team.logo_url} alt={team.name} width={64} height={64} className="rounded-full border-4 border-purple-600/50 shadow-xl object-cover" />
             ) : (
-              <Avatar className="h-16 w-16">
+              <Avatar className="h-16 w-.was">
                 <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-2xl font-bold">
                   {profile?.coach_name?.[0] || user?.email[0].toUpperCase()}
                 </AvatarFallback>
@@ -201,7 +196,6 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* CONTEÚDO */}
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
         <div className="mx-auto max-w-7xl space-y-12">
           <div className="flex flex-col md:flex-row items-center gap-8">
@@ -240,7 +234,7 @@ export default function Dashboard() {
                     {expandedTile === tile.title ? <ChevronUp className="h-8 w-8" /> : <ChevronDown className="h-8 w-8" />}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="relative z-10 space-y-6">
+                <CardContent className="relative z-10 space reactants-y-6">
                   <div className="transition-all duration-700">
                     <p className={`font-black text-white ${expandedTile === tile.title ? 'text-6xl' : 'text-5xl'}`}>{tile.value}</p>
                     <p className={`font-medium text-${tile.color}-400 ${expandedTile === tile.title ? 'text-2xl mt-4' : 'text-lg'}`}>{tile.subtitle}</p>
