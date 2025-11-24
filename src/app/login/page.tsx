@@ -1,60 +1,20 @@
 'use client'
 
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { useEffect } from 'react'
 
 export default function LoginPage() {
-  const supabase = createClient()
-
-  useEffect(() => {
-    console.log('🔐 Login Page Mounted')
-    console.log('Window location:', window.location.origin)
-    console.log('Redirect URL will be:', `${window.location.origin}/auth/callback`)
-    
-    // Verifica se já está logado
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('🔐 Current session on mount:', session ? `✅ Logged in as ${session.user.email}` : '❌ No session')
-    })
-  }, [supabase.auth])
-
   const handleGoogleLogin = async () => {
-    console.log('🔄 [DEBUG] Google Login Button CLICKED!')
-    console.log('📍 Current URL:', window.location.href)
-    console.log('🚀 Starting OAuth process...')
-    
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    })
 
-      console.log('📤 OAuth Response Received:')
-      console.log('Data:', data)
-      console.log('Error:', error)
-
-      if (error) {
-        console.error('❌ OAuth Error Details:', {
-          message: error.message,
-          status: error.status,
-          name: error.name
-        })
-        return
-      }
-
-      if (data?.url) {
-        console.log('🔗 OAuth URL:', data.url)
-        console.log('✅ OAuth initiated successfully - browser should redirect automatically')
-        // O redirect deve acontecer automaticamente
-      } else {
-        console.log('⚠️ No URL returned from OAuth')
-      }
-      
-    } catch (catchError) {
-      console.error('💥 UNEXPECTED ERROR:', catchError)
+    if (error) {
+      console.error('Login error:', error)
     }
   }
 
