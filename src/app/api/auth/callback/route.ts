@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=no_code`);
   }
 
+  // Response vazio com redirect
   const response = new NextResponse(null, {
     status: 302,
     headers: { Location: `${origin}/dashboard` },
@@ -24,10 +25,16 @@ export async function GET(request: Request) {
           return request.cookies.get(name)?.value;
         },
         set(name, value, options) {
-          response.cookies.set(name, value, options);
+          response.cookies.set(name, value, {
+            ...options,
+            secure: process.env.NODE_ENV === 'production',  // ← true no Vercel
+            sameSite: 'lax',  // ← essencial para redirects cross-site (Google OAuth)
+            httpOnly: true,
+            path: '/',
+          });
         },
         remove(name, options) {
-          response.cookies.delete(name);
+          response.cookies.delete({ name, ...options });
         },
       },
     }
@@ -36,7 +43,8 @@ export async function GET(request: Request) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
-    return NextResponse.redirect(`${origin}/login?error=${error.message}`);
+    console.error("Erro no callback:", error);
+    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
   }
 
   return response;
