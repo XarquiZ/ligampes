@@ -1,18 +1,13 @@
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createBrowserClient } from '@supabase/ssr'
 import type { Database } from '@/types/database'
 
-let client: ReturnType<typeof createClientComponentClient<Database>> | undefined
-
 export function createClient() {
-  if (typeof window === 'undefined') {
-    // No servidor, sempre cria novo cliente
-    return createClientComponentClient<Database>()
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase environment variables')
   }
 
-  if (!client) {
-    // No cliente, cria apenas uma vez
-    client = createClientComponentClient<Database>()
-  }
-
-  return client
+  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
 }
