@@ -1,53 +1,110 @@
-// app/login/page.tsx → VERSÃO COM LOGS PARA DEBUG
+// app/login/page.tsx - VERSÃO FINAL CORRIGIDA
 'use client'
 
 import { supabase } from "@/lib/supabase"
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-
-console.log('LoginPage renderizando...')
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    console.log('useEffect do login rodando...')
-    supabase.auth.getUser().then(({ data: { user }, error }) => {
-      console.log('getUser no login:', { user: user ? user.email : 'null', error: error?.message })
-      if (user) {
-        console.log('Usuário encontrado no login → redirecionando pro dashboard')
-        router.replace('/dashboard')
-      } else {
-        console.log('Sem usuário no login → continua na tela')
+    const checkAuth = async () => {
+      try {
+        console.log('[Login] Verificando se usuário já está autenticado...')
+        
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('[Login] Erro ao verificar sessão:', error)
+          setLoading(false)
+          return
+        }
+
+        if (session) {
+          console.log('[Login] Usuário já autenticado → redirecionando para dashboard')
+          const redirectedFrom = searchParams.get('redirectedFrom') || '/dashboard'
+          router.replace(redirectedFrom)
+        } else {
+          console.log('[Login] Usuário não autenticado → mostrando tela de login')
+          setLoading(false)
+        }
+      } catch (error) {
+        console.error('[Login] Erro geral:', error)
+        setLoading(false)
       }
-    }).catch(err => {
-      console.error('Erro no getUser do login:', err)
-    })
-  }, [router])
+    }
+
+    checkAuth()
+
+    // Escuta mudanças de autenticação (caso login aconteça em outra aba)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[Login] Auth state changed:', event)
+        
+        if (event === 'SIGNED_IN' && session) {
+          console.log('[Login] Login detectado → redirecionando para dashboard')
+          router.replace('/dashboard')
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [router, searchParams])
 
   const handleGoogleLogin = async () => {
-    console.log('Botão Google clicado')
+    console.log('[Login] Iniciando login com Google...')
     try {
-      await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/api/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         },
       })
-      console.log('signInWithOAuth chamado com sucesso')
+
+      if (error) {
+        console.error('[Login] Erro no login com Google:', error)
+      } else {
+        console.log('[Login] Redirecionamento OAuth iniciado')
+      }
     } catch (error) {
-      console.error('Erro no signInWithOAuth:', error)
+      console.error('[Login] Erro geral no login:', error)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-black">
+        <div className="text-2xl font-semibold text-white animate-pulse">
+          Verificando autenticação...
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black">
-      <Card className="w-full max-w-md p-10">
+      <Card className="w-full max-w-md p-10 border-white/10 bg-zinc-900/50 backdrop-blur-xl">
         <div className="text-center space-y-8">
-          <h1 className="text-4xl font-black text-white">LIGA MPES</h1>
-          <Button onClick={handleGoogleLogin} size="lg" className="w-full text-lg font-bold">
+          <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
+            LIGA MPES
+          </h1>
+          <p className="text-zinc-400 text-lg">
+            Faça login para gerenciar seu time
+          </p>
+          <Button 
+            onClick={handleGoogleLogin} 
+            size="lg" 
+            className="w-full text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+          >
             Entrar com Google
           </Button>
         </div>

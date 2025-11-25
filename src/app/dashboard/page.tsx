@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx → VERSÃO COM LOGS PARA DEBUG
+// src/app/dashboard/page.tsx - VERSÃO FINAL CORRIGIDA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -10,10 +10,6 @@ import { Button } from '@/components/ui/button'
 import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-
-let hasInitialized = false
-
-console.log('DashboardPage renderizando...')
 
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
@@ -28,82 +24,114 @@ export default function Dashboard() {
   const [team, setTeam] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
-useEffect(() => {
-    if (hasInitialized) return
-    hasInitialized = true
+  useEffect(() => {
+    const checkAuthAndLoadData = async () => {
+      try {
+        console.log('[Dashboard] Verificando autenticação...')
+        
+        // Verifica se está autenticado
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error('[Dashboard] Erro na sessão:', error)
+          router.replace('/login')
+          return
+        }
 
-    const checkAuth = async () => {
-      // MUDANÇA FINAL: use getSession() com persistSession: false
-      const { data: { session }, error } = await supabase.auth.getSession()
+        if (!session) {
+          console.log('[Dashboard] Sem sessão → redirecionando para login')
+          router.replace('/login')
+          return
+        }
 
-      if (error || !session?.user) {
-        console.log('Sem sessão válida → indo pro login')
-        router.replace('/login')
-        return
-      }
+        console.log('[Dashboard] Usuário autenticado:', session.user.email)
+        setUser(session.user)
 
-      console.log('Sessão encontrada → usuário logado:', session.user.email)
-      setUser(session.user)
-
-      // Busca profile (igual antes)
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*, teams(*)')
-        .eq('id', session.user.id)
-        .single()
-
-      if (!profileData) {
-        // cria profile se não existir (igual antes)
-        const isAdmin = session.user.email === 'wellinton.sbatista@gmail.com'
-        const defaultName = session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'Técnico'
-
-        const { data: newProfile } = await supabase
+        // Busca ou cria profile
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .insert({
-            id: session.user.id,
-            email: session.user.email!,
-            full_name: session.user.user_metadata.full_name || session.user.email,
-            coach_name: defaultName,
-            role: isAdmin ? 'admin' : 'coach',
-          })
           .select('*, teams(*)')
+          .eq('id', session.user.id)
           .single()
 
-        setProfile(newProfile)
-        setTeam(newProfile?.teams || null)
-      } else {
-        setProfile(profileData)
-        setTeam(profileData?.teams || null)
-      }
+        if (profileError) {
+          console.log('[Dashboard] Profile não encontrado, criando...')
+          
+          const isAdmin = session.user.email === 'wellinton.sbatista@gmail.com'
+          const defaultName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Técnico'
 
-      setLoading(false)
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert({
+              id: session.user.id,
+              email: session.user.email!,
+              full_name: session.user.user_metadata?.full_name || session.user.email,
+              coach_name: defaultName,
+              role: isAdmin ? 'admin' : 'coach',
+            })
+            .select('*, teams(*)')
+            .single()
+
+          if (createError) {
+            console.error('[Dashboard] Erro ao criar profile:', createError)
+          } else {
+            setProfile(newProfile)
+            setTeam(newProfile?.teams || null)
+          }
+        } else {
+          console.log('[Dashboard] Profile encontrado:', profileData)
+          setProfile(profileData)
+          setTeam(profileData?.teams || null)
+        }
+
+      } catch (error) {
+        console.error('[Dashboard] Erro geral:', error)
+        router.replace('/login')
+      } finally {
+        setLoading(false)
+      }
     }
 
-    checkAuth()
+    checkAuthAndLoadData()
+
+    // Escuta mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[Dashboard] Auth state changed:', event)
+        
+        if (event === 'SIGNED_OUT') {
+          router.replace('/login')
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
   }, [router])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut({ scope: 'global' })
-    document.cookie.split(";").forEach(c => {
-      document.cookie = c.trim().split('=')[0] + '=;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT'
-    })
-    localStorage.clear()
-    router.replace('/login')
-    router.refresh()
+    try {
+      console.log('[Dashboard] Fazendo logout...')
+      await supabase.auth.signOut()
+      // O listener onAuthStateChange vai redirecionar para /login
+    } catch (error) {
+      console.error('[Dashboard] Erro no logout:', error)
+    }
   }
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <div className="text-2xl font-semibold text-white animate-pulse">Carregando seu império...</div>
+        <div className="text-2xl font-semibold text-white animate-pulse">
+          Carregando seu império...
+        </div>
       </div>
     )
   }
 
   const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
-  const displayName = profile?.coach_name || user?.user_metadata.full_name || user?.email || 'Técnico'
+  const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
+  const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
   const tiles = [
     { title: 'SALDO', icon: DollarSign, color: 'green', value: formatBalance(team?.balance || 0), subtitle: 'disponível para gastar', link: '/dashboard/saldo' },
@@ -132,7 +160,13 @@ useEffect(() => {
             </div>
 
             {team?.logo_url ? (
-              <Image src={team.logo_url} alt={team.name} width={64} height={64} className="rounded-full border-4 border-purple-600/50 shadow-xl object-cover" />
+              <Image 
+                src={team.logo_url} 
+                alt={team.name} 
+                width={64} 
+                height={64} 
+                className="rounded-full border-4 border-purple-600/50 shadow-xl object-cover" 
+              />
             ) : (
               <Avatar className="h-16 w-16">
                 <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-2xl font-bold">
@@ -141,7 +175,12 @@ useEffect(() => {
               </Avatar>
             )}
 
-            <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-red-400 hover:text-red-300">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleSignOut} 
+              className="text-red-400 hover:text-red-300"
+            >
               <LogOut className="h-5 w-5" />
             </Button>
           </div>
@@ -152,7 +191,13 @@ useEffect(() => {
         <div className="mx-auto max-w-7xl space-y-12">
           <div className="flex flex-col md:flex-row items-center gap-8">
             {team?.logo_url ? (
-              <Image src={team.logo_url} alt={team.name} width={160} height={160} className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" />
+              <Image 
+                src={team.logo_url} 
+                alt={team.name} 
+                width={160} 
+                height={160} 
+                className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" 
+              />
             ) : (
               <Avatar className="h-40 w-40 border-8 border-purple-600/30">
                 <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-7xl font-black">

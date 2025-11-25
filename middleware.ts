@@ -1,4 +1,4 @@
-// middleware.ts → VERSÃO FINAL E PERFEITA COM @supabase/ssr (2025)
+// middleware.ts - VERSÃO CORRIGIDA
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -6,7 +6,6 @@ import type { NextRequest } from 'next/server'
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
 
-  // Cria o cliente Supabase com cookies da requisição
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -25,7 +24,6 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // Pega a sessão (isso já atualiza os cookies automaticamente)
   const {
     data: { session },
   } = await supabase.auth.getSession()
@@ -33,24 +31,27 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   const url = req.nextUrl.clone()
 
-  // 1. Logado tentando ir pro /login → manda pro dashboard
-  if (session && pathname === '/login') {
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
-  }
+  console.log(`[Middleware] Path: ${pathname}, Session: ${!!session}`)
 
-  // 2. Não logado tentando acessar /dashboard → manda pro login
+  // 🔥 MUDANÇA CRÍTICA: Não force redirecionamento para /dashboard
+  // Deixe o cliente decidir para onde ir quando logado
+  
+  // 1. Não logado tentando acessar /dashboard → manda pro login
   if (!session && pathname.startsWith('/dashboard')) {
+    console.log('[Middleware] Não logado → redirecionando para /login')
     url.pathname = '/login'
     url.searchParams.set('redirectedFrom', pathname)
     return NextResponse.redirect(url)
   }
 
-  // 3. Raiz (/) → SEMPRE pro login (nunca pro dashboard)
+  // 2. Raiz (/) → vai para login (deixe o cliente decidir após login)
   if (pathname === '/') {
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
+
+  // ❌ REMOVIDO: Redirecionamento automático de /login para /dashboard
+  // Deixe o componente de login/dashboard decidir com base na sessão
 
   return res
 }
@@ -58,8 +59,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     '/',
-    '/login',
     '/dashboard/:path*',
-    '/api/auth/callback', // essencial pro OAuth funcionar
+    '/api/auth/callback',
   ],
 }

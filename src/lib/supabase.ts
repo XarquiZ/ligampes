@@ -1,4 +1,4 @@
-// src/lib/supabase.ts → VERSÃO FINAL — NUNCA MAIS LOGIN AUTOMÁTICO (2025)
+// src/lib/supabase.ts - VERSÃO CORRIGIDA
 import { createBrowserClient } from '@supabase/ssr'
 
 export const supabase = createBrowserClient(
@@ -7,42 +7,47 @@ export const supabase = createBrowserClient(
   {
     auth: {
       flowType: 'pkce',
-      persistSession: false,
-      autoRefreshToken: false,
+      persistSession: true, // 🔥 Mude para true
+      autoRefreshToken: true,
       detectSessionInUrl: true,
-      // FORÇA O SUPABASE A NUNCA USAR LOCALSTORAGE
       storage: {
-        async getItem() { return null },
-        async setItem() { },
-        async removeItem() { },
-      },
-    },
-    cookies: {
-      // Junta cookies quebrados (.0, .1, etc)
-      get(name: string) {
-        const cookies = document.cookie
-          .split(';')
-          .map(c => c.trim())
-          .filter(c => c.startsWith(name + '=') || c.startsWith(name + '.'))
-          .sort((a, b) => {
-            const aNum = parseInt(a.match(/\.(\d+)/)?.[1] || '0')
-            const bNum = parseInt(b.match(/\.(\d+)/)?.[1] || '0')
-            return aNum - bNum
-          })
-          .map(c => c.split('=').slice(1).join('='))
-          .join('')
-
-        return cookies || null
-      },
-      set(name: string, value: string) {
-        document.cookie = `${name}=${value}; path=/; Secure; SameSite=Lax`
-      },
-      remove(name: string) {
-        document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=Lax`
-        // Remove todos os pedaços possíveis
-        for (let i = 0; i < 20; i++) {
-          document.cookie = `${name}.${i}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=Lax`
-        }
+        // Mantenha a implementação customizada se necessário
+        async getItem(key: string) {
+          if (typeof window === 'undefined') return null
+          // Tenta localStorage primeiro, depois cookies como fallback
+          try {
+            return localStorage.getItem(key)
+          } catch {
+            const cookies = document.cookie
+              .split(';')
+              .map(c => c.trim())
+              .filter(c => c.startsWith(key + '=') || c.startsWith(key + '.'))
+              .sort((a, b) => {
+                const aNum = parseInt(a.match(/\.(\d+)/)?.[1] || '0')
+                const bNum = parseInt(b.match(/\.(\d+)/)?.[1] || '0')
+                return aNum - bNum
+              })
+              .map(c => c.split('=').slice(1).join('='))
+              .join('')
+            return cookies || null
+          }
+        },
+        async setItem(key: string, value: string) {
+          if (typeof window === 'undefined') return
+          try {
+            localStorage.setItem(key, value)
+          } catch {
+            document.cookie = `${key}=${value}; path=/; Secure; SameSite=Lax`
+          }
+        },
+        async removeItem(key: string) {
+          if (typeof window === 'undefined') return
+          try {
+            localStorage.removeItem(key)
+          } catch {
+            document.cookie = `${key}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+          }
+        },
       },
     },
   }
