@@ -1,4 +1,4 @@
-// app/login/page.tsx - VERSÃO FINAL (já corrigida)
+// app/login/page.tsx - VERSÃO ATUALIZADA
 'use client'
 
 import { supabase } from "@/lib/supabase"
@@ -14,7 +14,10 @@ export default function LoginPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log('[Login] Verificando autenticação...')
+        console.log('[Login] Verificando se usuário já está autenticado...')
+        
+        // Aguarda um pouco para garantir estabilidade
+        await new Promise(resolve => setTimeout(resolve, 300))
         
         const { data: { session }, error } = await supabase.auth.getSession()
         
@@ -38,19 +41,6 @@ export default function LoginPage() {
     }
 
     checkAuth()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[Login] Auth state changed:', event)
-        
-        if (event === 'SIGNED_IN' && session) {
-          console.log('[Login] Login detectado → redirecionando para dashboard')
-          router.replace('/dashboard')
-        }
-      }
-    )
-
-    return () => subscription.unsubscribe()
   }, [router])
 
   const handleGoogleLogin = async () => {
@@ -60,17 +50,11 @@ export default function LoginPage() {
         provider: "google",
         options: {
           redirectTo: `${window.location.origin}/api/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
         },
       })
 
       if (error) {
         console.error('[Login] Erro no login com Google:', error)
-      } else {
-        console.log('[Login] Redirecionamento OAuth iniciado')
       }
     } catch (error) {
       console.error('[Login] Erro geral no login:', error)

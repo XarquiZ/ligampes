@@ -1,9 +1,10 @@
-// src/app/dashboard/page.tsx - VERSÃO FINAL ESTÁVEL
+// src/app/dashboard/page.tsx - VERSÃO COM HOOK
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -20,58 +21,19 @@ function formatBalance(value: number): string {
 
 export default function Dashboard() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const { user, loading: authLoading } = useAuth()
   const [team, setTeam] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
   useEffect(() => {
-    let mounted = true
+    if (!user) return
 
-    const checkAuthAndLoadData = async () => {
+    const loadUserData = async () => {
       try {
-        console.log('[Dashboard] Verificando autenticação...')
+        console.log('[Dashboard] Carregando dados do usuário...')
         
-        // Aguarda um pouco para garantir que os cookies estão disponíveis
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        console.log('[Dashboard] Resultado da sessão:', { 
-          hasSession: !!session, 
-          error: error?.message,
-          user: session?.user?.email 
-        })
-
-        if (error) {
-          console.error('[Dashboard] Erro na sessão:', error)
-          if (mounted) router.replace('/login')
-          return
-        }
-
-        if (!session) {
-          console.log('[Dashboard] Sem sessão → redirecionando para login')
-          if (mounted) router.replace('/login')
-          return
-        }
-
-        if (mounted) {
-          console.log('[Dashboard] Usuário autenticado:', session.user.email)
-          setUser(session.user)
-          await loadUserData(session.user)
-          setLoading(false)
-        }
-
-      } catch (error) {
-        console.error('[Dashboard] Erro geral:', error)
-        if (mounted) router.replace('/login')
-      }
-    }
-
-    const loadUserData = async (user: any) => {
-      try {
-        // Busca profile
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*, teams(*)')
@@ -79,7 +41,7 @@ export default function Dashboard() {
           .single()
 
         if (profileError) {
-          console.log('[Dashboard] Profile não encontrado, criando...')
+          console.log('[Dashboard] Criando novo profile...')
           
           const isAdmin = user.email === 'wellinton.sbatista@gmail.com'
           const defaultName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Técnico'
@@ -98,61 +60,34 @@ export default function Dashboard() {
 
           if (createError) {
             console.error('[Dashboard] Erro ao criar profile:', createError)
-          } else if (mounted) {
+          } else {
             setProfile(newProfile)
             setTeam(newProfile?.teams || null)
           }
-        } else if (mounted) {
-          console.log('[Dashboard] Profile encontrado:', profileData)
+        } else {
           setProfile(profileData)
           setTeam(profileData?.teams || null)
         }
       } catch (error) {
         console.error('[Dashboard] Erro ao carregar dados:', error)
+      } finally {
+        setDataLoading(false)
       }
     }
 
-    checkAuthAndLoadData()
-
-    // Escuta mudanças de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[Dashboard] Auth state changed:', event)
-        
-        if (!mounted) return
-        
-        if (event === 'SIGNED_OUT') {
-          console.log('[Dashboard] Usuário deslogado → redirecionando')
-          router.replace('/login')
-        } else if (event === 'SIGNED_IN' && session) {
-          console.log('[Dashboard] Novo login detectado')
-          setUser(session.user)
-          await loadUserData(session.user)
-          setLoading(false)
-        } else if (event === 'INITIAL_SESSION') {
-          console.log('[Dashboard] Sessão inicial processada')
-          // Não faz nada, já estamos processando a sessão inicial
-        }
-      }
-    )
-
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
-  }, [router])
+    loadUserData()
+  }, [user])
 
   const handleSignOut = async () => {
     try {
       console.log('[Dashboard] Fazendo logout...')
       await supabase.auth.signOut()
-      // O listener onAuthStateChange vai redirecionar para /login
     } catch (error) {
       console.error('[Dashboard] Erro no logout:', error)
     }
   }
 
-  if (loading) {
+  if (authLoading || dataLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
         <div className="text-2xl font-semibold text-white animate-pulse">
