@@ -1,19 +1,20 @@
 'use client'
 
-import { supabase } from "@/lib/supabase"  // ← esse é o bom!
+import { supabase } from "@/lib/supabase"
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.push('/dashboard')
-      else setLoading(false)
+    // COM persistSession: false → SEMPRE use getUser(), NUNCA getSession()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        router.replace('/dashboard')
+      }
     })
   }, [router])
 
@@ -21,12 +22,10 @@ export default function LoginPage() {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/api/auth/callback`, // CORRIGIDO!
+        redirectTo: `${window.location.origin}/api/auth/callback`,
       },
     })
   }
-
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-xl">Verificando...</div>
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-black">

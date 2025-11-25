@@ -1,4 +1,4 @@
-// src/lib/supabase.ts → VERSÃO PERFEITA, SEM ERRO NO VS CODE (2025)
+// src/lib/supabase.ts → VERSÃO FINAL E IMBATÍVEL (2025)
 import { createBrowserClient } from '@supabase/ssr'
 
 export const supabase = createBrowserClient(
@@ -6,11 +6,12 @@ export const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   {
     auth: {
-      flowType: 'pkce' as const,
+      flowType: 'pkce',
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: true,
-      // MATA O CACHE DO PKCE E LOCALSTORAGE PRA SEMPRE (sem erro no TS)
+      // ESSAS 3 LINHAS SÃO OBRIGATÓRIAS COM persistSession: false
+      storageKey: 'sb-ligampes-auth-token',
       storage: {
         getItem: () => null,
         setItem: () => null,
