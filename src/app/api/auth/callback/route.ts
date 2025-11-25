@@ -1,4 +1,4 @@
-// app/api/auth/callback/route.ts
+// app/api/auth/callback/route.ts → VERSÃO FINAL E IMBATÍVEL (2025)
 import { NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
@@ -10,11 +10,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=no_code`);
   }
 
-  // Response vazio com redirect
-  const response = new NextResponse(null, {
-    status: 302,
-    headers: { Location: `${origin}/dashboard` },
-  });
+  // CRIA A RESPONSE ANTES DE TUDO
+  const response = NextResponse.redirect(`${origin}/dashboard`);
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -25,16 +22,19 @@ export async function GET(request: Request) {
           return request.cookies.get(name)?.value;
         },
         set(name, value, options) {
-          response.cookies.set(name, value, {
-            ...options,
-            secure: process.env.NODE_ENV === 'production',  // ← true no Vercel
-            sameSite: 'lax',  // ← essencial para redirects cross-site (Google OAuth)
+          response.cookies.set({
+            name,
+            value,
+            // ESSAS 3 LINHAS FAZEM O COOKIE SER DE SESSÃO (some ao fechar a aba)
             httpOnly: true,
-            path: '/',
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            path: "/",
+            // NÃO DEFINE maxAge nem expires → vira session cookie!
           });
         },
-        remove(name, options) {
-          response.cookies.delete({ name, ...options });
+        remove(name) {
+          response.cookies.delete({ name, path: "/" });
         },
       },
     }

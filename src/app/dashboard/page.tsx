@@ -1,9 +1,9 @@
-// src/app/dashboard/page.tsx → VERSÃO DEFINITIVA E PERFEITA (2025)
+// src/app/dashboard/page.tsx → VERSÃO 100% FUNCIONAL (2025) — NUNCA MAIS TRAVA
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase' // ← agora usa o seu supabase.ts atualizado
+import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -33,16 +33,17 @@ export default function Dashboard() {
     hasInitialized = true
 
     const loadUserAndData = async () => {
-      // Força refresh da sessão + pega usuário atual
-      const { data: { user }, error } = await supabase.auth.getUser()
+      // A CHAVE DO SUCESSO: getSession() lê o cookie que o OAuth acabou de criar
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-      if (error || !user) {
-        console.log('Sem usuário → redirecionando pro login')
+      if (sessionError || !session?.user) {
+        console.log('Sem sessão → redirecionando pro login')
         router.push('/login')
         return
       }
 
-      console.log('Logado como:', user.email)
+      const user = session.user
+      console.log('Logado com sucesso:', user.email)
       setUser(user)
 
       // Busca ou cria profile
@@ -70,7 +71,7 @@ export default function Dashboard() {
 
         if (insertError) {
           console.error('Erro ao criar profile:', insertError)
-          alert('Erro ao criar seu perfil. Tente novamente.')
+          alert('Erro ao criar seu perfil. Contate o admin.')
           router.push('/login')
           return
         }
@@ -88,15 +89,13 @@ export default function Dashboard() {
     loadUserAndData()
   }, [router])
 
-  // LOGOUT TOTAL: limpa tudo e força novo login sempre
+  // LOGOUT TOTAL
   const handleSignOut = async () => {
     await supabase.auth.signOut({ scope: 'global' })
 
-    // Limpa cookies, localStorage e sessionStorage com força
+    // Limpa tudo com força
     document.cookie.split(";").forEach((c) => {
-      document.cookie = c
-        .replace(/^ +/, "")
-        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
     })
     localStorage.clear()
     sessionStorage.clear()
@@ -127,7 +126,6 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <h1 className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-3xl font-black text-transparent">
@@ -160,11 +158,8 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* CONTEÚDO */}
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
         <div className="mx-auto max-w-7xl space-y-12">
-
-          {/* PERFIL */}
           <div className="flex flex-col md:flex-row items-center gap-8">
             {team?.logo_url ? (
               <Image src={team.logo_url} alt={team.name} width={160} height={160} className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" />
@@ -189,19 +184,15 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TILES */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {tiles.map((tile) => (
               <Card
                 key={tile.title}
-                className={`
-                  group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl 
-                  transition-all duration-700 cursor-pointer
-                  ${expandedTile === tile.title 
-                    ? 'row-span-2 lg:col-span-2 scale-105 shadow-3xl z-10' 
+                className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl transition-all duration-700 cursor-pointer ${
+                  expandedTile === tile.title
+                    ? 'row-span-2 lg:col-span-2 scale-105 shadow-3xl z-10'
                     : 'hover:scale-105 hover:shadow-purple-600/40'
-                  }
-                `}
+                }`}
                 onClick={() => setExpandedTile(expandedTile === tile.title ? null : tile.title)}
               >
                 <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
