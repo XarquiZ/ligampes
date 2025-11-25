@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx → VERSÃO 100% FUNCIONAL E FINAL (2025)
+// src/app/dashboard/page.tsx → VERSÃO COM LOGS PARA DEBUG
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -12,6 +12,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 let hasInitialized = false
+
+console.log('DashboardPage renderizando...')
 
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
@@ -29,39 +31,96 @@ export default function Dashboard() {
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
   useEffect(() => {
-  if (hasInitialized) return
-  hasInitialized = true
-
-  const loadUserAndData = async () => {
-    // SEMPRE use getUser() com persistSession: false
-    const { data: { user }, error } = await supabase.auth.getUser()
-
-    if (error || !user) {
-      console.log('Sem usuário → indo pro login')
-      router.replace('/login')
+    if (hasInitialized) {
+      console.log('Dashboard useEffect pulado (já inicializado)')
       return
     }
+    hasInitialized = true
+    console.log('Dashboard useEffect rodando pela primeira vez')
 
-    console.log('Logado como:', user.email)
-    setUser(user)
+    const loadUserAndData = async () => {
+      console.log('loadUserAndData iniciado')
+      // getUser() é o mais confiável com persistSession: false
+      const { data: { user }, error } = await supabase.auth.getUser()
 
-    // resto do código igual (busca profile, etc)
-    // ... (mantém tudo que já tinha)
-  }
+      console.log('getUser result:', { user: user ? user.email : 'null', error: error?.message })
 
-  loadUserAndData()
-}, [router])
+      if (error || !user) {
+        console.log('Sem usuário → indo pro login')
+        router.replace('/login')
+        return
+      }
+
+      console.log('Logado como:', user.email)
+      setUser(user)
+
+      // Busca ou cria profile
+      console.log('Buscando profile...')
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*, teams(*)')
+        .eq('id', user.id)
+        .single()
+
+      console.log('Profile query result:', { profileData: profileData ? 'encontrado' : 'null', profileError: profileError?.message })
+
+      if (profileError?.code === 'PGRST116' || !profileData) {
+        console.log('Profile não existe → criando novo')
+        const isAdmin = user.email === 'wellinton.sbatista@gmail.com'
+        const defaultCoachName = user.user_metadata.full_name || user.email?.split('@')[0] || 'Técnico'
+
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: user.id,
+            email: user.email!,
+            full_name: user.user_metadata.full_name || user.email,
+            coach_name: defaultCoachName,
+            role: isAdmin ? 'admin' : 'coach',
+          })
+          .select('*, teams(*)')
+          .single()
+
+        console.log('Profile insert result:', { newProfile: newProfile ? 'criado' : 'falha', insertError: insertError?.message })
+
+        if (insertError) {
+          console.error('Erro ao criar profile:', insertError)
+          alert('Erro ao criar seu perfil. Tente novamente.')
+          router.replace('/login')
+          return
+        }
+
+        setProfile(newProfile)
+        setTeam(newProfile?.teams || null)
+      } else {
+        console.log('Profile encontrado → carregando dados')
+        setProfile(profileData)
+        setTeam(profileData?.teams || null)
+      }
+
+      console.log('Dashboard carregado com sucesso')
+      setLoading(false)
+    }
+
+    loadUserAndData().catch(err => {
+      console.error('Erro fatal no loadUserAndData:', err)
+      setLoading(false)
+    })
+  }, [router])
 
   const handleSignOut = async () => {
+    console.log('Logout iniciado')
     await supabase.auth.signOut({ scope: 'global' })
 
     // Limpeza total
+    console.log('Limpando cookies e storage')
     document.cookie.split(";").forEach((c) => {
       document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/")
     })
     localStorage.clear()
     sessionStorage.clear()
 
+    console.log('Logout concluído → indo pro login')
     router.replace('/login')
     router.refresh()
   }
