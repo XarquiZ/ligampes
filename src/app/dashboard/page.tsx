@@ -24,13 +24,13 @@ export default function Dashboard() {
   const [team, setTeam] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [expandedTile, setExpandedTile] = useState<string | null>(null) // MOVIDO PARA CIMA
 
   useEffect(() => {
     const checkAuthAndLoadData = async () => {
       try {
         console.log('[Dashboard] Verificando autenticação...')
         
-        // Verifica se está autenticado
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
@@ -113,12 +113,12 @@ export default function Dashboard() {
     try {
       console.log('[Dashboard] Fazendo logout...')
       await supabase.auth.signOut()
-      // O listener onAuthStateChange vai redirecionar para /login
     } catch (error) {
       console.error('[Dashboard] Erro no logout:', error)
     }
   }
 
+  // ⚠️ MOVER TODOS OS HOOKS PARA O TOPO - SEM CONDIÇÕES
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -129,9 +129,9 @@ export default function Dashboard() {
     )
   }
 
+  // ⚠️ AGORA SÓ DEPOIS DO LOADING PODEMOS USAR OS DADOS
   const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
-  const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
   const tiles = [
     { title: 'SALDO', icon: DollarSign, color: 'green', value: formatBalance(team?.balance || 0), subtitle: 'disponível para gastar', link: '/dashboard/saldo' },
