@@ -20,25 +20,16 @@ export default function LoginPage() {
       setError(`Erro no login: ${errorParam}`)
     }
 
-    const signIn = async () => {
-  console.log('URL de redirecionamento:', `${window.location.origin}/api/auth/callback`)
-  // Resto do código...
-}
-
     const checkAuth = async () => {
       try {
         console.log('[Login] Verificando autenticação...')
-        
         await new Promise(resolve => setTimeout(resolve, 500))
-        
         const { data: { session }, error } = await supabase.auth.getSession()
-        
         if (error) {
           console.error('[Login] Erro ao verificar sessão:', error)
           setLoading(false)
           return
         }
-
         if (session) {
           console.log('[Login] Usuário já autenticado → redirecionando')
           router.replace('/dashboard')
@@ -58,11 +49,9 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     console.log('[Login] Iniciando login com Google...')
     setError(null)
-    
     try {
       // Limpa estado anterior
       await supabase.auth.signOut()
-      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
@@ -101,17 +90,14 @@ export default function LoginPage() {
           <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent">
             LIGA MPES
           </h1>
-          
           {error && (
             <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
               <p className="text-red-300 text-sm">{error}</p>
             </div>
           )}
-          
           <p className="text-zinc-400 text-lg">
             Faça login para gerenciar seu time
           </p>
-          
           <Button 
             onClick={handleGoogleLogin} 
             size="lg" 

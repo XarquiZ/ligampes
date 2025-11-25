@@ -27,26 +27,20 @@ export default function Dashboard() {
   const [dataLoading, setDataLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
-
-useEffect(() => {
-  // Debug: verifica se há session storage
-  console.log('Session storage:', {
-    hasSupabaseKey: !!sessionStorage.getItem('supabase.auth.token'),
-    allKeys: Object.keys(sessionStorage)
-  })
-  
-  // Debug: verifica cookies
-  console.log('Cookies:', document.cookie)
-}, [])
-
-
+  // Redirecionar se não autenticado
   useEffect(() => {
-    if (!user) return
+    if (!authLoading && !user) {
+      router.replace('/login')
+    }
+  }, [authLoading, user, router])
+
+  // Carrega dados profile/team
+  useEffect(() => {
+    if (authLoading || !user) return
 
     const loadUserData = async () => {
       try {
         console.log('[Dashboard] Carregando dados do usuário...')
-        
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*, teams(*)')
@@ -55,7 +49,7 @@ useEffect(() => {
 
         if (profileError) {
           console.log('[Dashboard] Criando novo profile...')
-          
+
           const isAdmin = user.email === 'wellinton.sbatista@gmail.com'
           const defaultName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Técnico'
 
@@ -89,7 +83,7 @@ useEffect(() => {
     }
 
     loadUserData()
-  }, [user])
+  }, [authLoading, user])
 
   const handleSignOut = async () => {
     try {
