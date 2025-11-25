@@ -30,104 +30,69 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (hasInitialized) {
-      console.log('Dashboard useEffect pulado (já inicializado)')
-      return
-    }
+useEffect(() => {
+    if (hasInitialized) return
     hasInitialized = true
-    console.log('Dashboard useEffect rodando pela primeira vez')
 
-    const loadUserAndData = async () => {
-      console.log('loadUserAndData iniciado')
-      // getUser() é o mais confiável com persistSession: false
-      const { data: { user }, error } = await supabase.auth.getUser()
+    const checkAuth = async () => {
+      // MUDANÇA FINAL: use getSession() com persistSession: false
+      const { data: { session }, error } = await supabase.auth.getSession()
 
-      console.log('getUser result:', { user: user ? user.email : 'null', error: error?.message })
-
-      if (error || !user) {
-        console.log('Sem usuário → indo pro login')
+      if (error || !session?.user) {
+        console.log('Sem sessão válida → indo pro login')
         router.replace('/login')
         return
       }
 
-      console.log('Logado como:', user.email)
-      setUser(user)
+      console.log('Sessão encontrada → usuário logado:', session.user.email)
+      setUser(session.user)
 
-      // Busca ou cria profile
-      console.log('Buscando profile...')
-      const { data: profileData, error: profileError } = await supabase
+      // Busca profile (igual antes)
+      const { data: profileData } = await supabase
         .from('profiles')
         .select('*, teams(*)')
-        .eq('id', user.id)
+        .eq('id', session.user.id)
         .single()
 
-      console.log('Profile query result:', { profileData: profileData ? 'encontrado' : 'null', profileError: profileError?.message })
+      if (!profileData) {
+        // cria profile se não existir (igual antes)
+        const isAdmin = session.user.email === 'wellinton.sbatista@gmail.com'
+        const defaultName = session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'Técnico'
 
-      if (profileError?.code === 'PGRST116' || !profileData) {
-        console.log('Profile não existe → criando novo')
-        const isAdmin = user.email === 'wellinton.sbatista@gmail.com'
-        const defaultCoachName = user.user_metadata.full_name || user.email?.split('@')[0] || 'Técnico'
-
-        const { data: newProfile, error: insertError } = await supabase
+        const { data: newProfile } = await supabase
           .from('profiles')
           .insert({
-            id: user.id,
-            email: user.email!,
-            full_name: user.user_metadata.full_name || user.email,
-            coach_name: defaultCoachName,
+            id: session.user.id,
+            email: session.user.email!,
+            full_name: session.user.user_metadata.full_name || session.user.email,
+            coach_name: defaultName,
             role: isAdmin ? 'admin' : 'coach',
           })
           .select('*, teams(*)')
           .single()
 
-        console.log('Profile insert result:', { newProfile: newProfile ? 'criado' : 'falha', insertError: insertError?.message })
-
-        if (insertError) {
-          console.error('Erro ao criar profile:', insertError)
-          alert('Erro ao criar seu perfil. Tente novamente.')
-          router.replace('/login')
-          return
-        }
-
         setProfile(newProfile)
         setTeam(newProfile?.teams || null)
       } else {
-        console.log('Profile encontrado → carregando dados')
         setProfile(profileData)
         setTeam(profileData?.teams || null)
       }
 
-      console.log('Dashboard carregado com sucesso')
       setLoading(false)
     }
 
-    loadUserAndData().catch(err => {
-      console.error('Erro fatal no loadUserAndData:', err)
-      setLoading(false)
-    })
+    checkAuth()
   }, [router])
 
   const handleSignOut = async () => {
-  console.log('Logout iniciado — limpando tudo')
-  await supabase.auth.signOut({ scope: 'global' })
-
-  // LIMPEZA TOTAL ABSOLUTA
-  document.cookie.split(";").forEach(c => {
-    const name = c.trim().split('=')[0]
-    document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
-  })
-
-  // Remove qualquer coisa que tenha ficado no localStorage
-  Object.keys(localStorage).forEach(key => {
-    if (key.includes('supabase') || key.includes('sb-')) {
-      localStorage.removeItem(key)
-    }
-  })
-
-  router.replace('/login')
-  router.refresh()
-}
+    await supabase.auth.signOut({ scope: 'global' })
+    document.cookie.split(";").forEach(c => {
+      document.cookie = c.trim().split('=')[0] + '=;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT'
+    })
+    localStorage.clear()
+    router.replace('/login')
+    router.refresh()
+  }
 
   if (loading) {
     return (
