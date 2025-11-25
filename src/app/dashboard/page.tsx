@@ -109,21 +109,25 @@ export default function Dashboard() {
   }, [router])
 
   const handleSignOut = async () => {
-    console.log('Logout iniciado')
-    await supabase.auth.signOut({ scope: 'global' })
+  console.log('Logout iniciado — limpando tudo')
+  await supabase.auth.signOut({ scope: 'global' })
 
-    // Limpeza total
-    console.log('Limpando cookies e storage')
-    document.cookie.split(";").forEach((c) => {
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/")
-    })
-    localStorage.clear()
-    sessionStorage.clear()
+  // LIMPEZA TOTAL ABSOLUTA
+  document.cookie.split(";").forEach(c => {
+    const name = c.trim().split('=')[0]
+    document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+  })
 
-    console.log('Logout concluído → indo pro login')
-    router.replace('/login')
-    router.refresh()
-  }
+  // Remove qualquer coisa que tenha ficado no localStorage
+  Object.keys(localStorage).forEach(key => {
+    if (key.includes('supabase') || key.includes('sb-')) {
+      localStorage.removeItem(key)
+    }
+  })
+
+  router.replace('/login')
+  router.refresh()
+}
 
   if (loading) {
     return (
