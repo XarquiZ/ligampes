@@ -20,6 +20,11 @@ export default function LoginPage() {
       setError(`Erro no login: ${errorParam}`)
     }
 
+    const signIn = async () => {
+  console.log('URL de redirecionamento:', `${window.location.origin}/api/auth/callback`)
+  // Resto do código...
+}
+
     const checkAuth = async () => {
       try {
         console.log('[Login] Verificando autenticação...')
