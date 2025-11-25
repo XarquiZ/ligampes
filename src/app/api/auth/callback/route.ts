@@ -24,14 +24,18 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
       }
 
-      // Definir manualmente o cookie de session como HttpOnly para o domínio base
+      // Definir manualmente o cookie de session como HttpOnly
       const session = data?.session;
-      if (session?.access_token) {
+      if (session) {
         const cookieName = `sb-${process.env.NEXT_PUBLIC_SUPABASE_URL?.split(".supabase.co")[0]?.split('//')[1]}-auth-token`;
+        
+        // Serializar a session completa como base64 (formato esperado pelo Supabase)
+        const sessionString = btoa(JSON.stringify(session));
+        
         const response = NextResponse.redirect(`${requestUrl.origin}/dashboard`)
         response.cookies.set(
           cookieName,
-          session.access_token,
+          sessionString,
           {
             httpOnly: true,
             secure: true,
