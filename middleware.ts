@@ -1,14 +1,14 @@
-// middleware.ts
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+// middleware.ts → VERSÃO FINAL E CORRETA (sem erro de sintaxe)
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
+  const response = NextResponse.next({
     request: {
       headers: request.headers,
     },
-  });
+  })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,46 +16,52 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         get(name: string) {
-          return request.cookies.get(name)?.value;
+          return request.cookies.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          // Não podemos mais usar cookies().set() no middleware
-          // Então setamos manualmente no response
-          response.cookies.set(name, value, options);
+          response.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: any) {
-          response.cookies.delete({ name, ...options });
+          response.cookies.delete({ name, ...options })
         },
       },
     }
-  );
+  )
 
-  // Pega a sessão
-  const { data: { session } } = await supabase.auth.getSession();
+  // Atualiza a sessão automaticamente
+  await supabase.auth.getSession()
 
-  const path = request.nextUrl.pathname;
+  // Pega o usuário (mais rápido que getSession)
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // Rotas públicas
-  const isPublic = ["/login", "/api/auth/callback"].includes(path);
+  const { pathname } = request.nextUrl
 
-  // Protege rotas (não logado)
-  if (!session && !isPublic && !path.startsWith("/_next") && !path.includes(".")) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  // 1. Logado tentando ir pro login → manda pro dashboard
+  if (user && pathname === '/login') {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // Evita login quando já está logado
-  if (session && path === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  // 2. Não logado tentando acessar dashboard → manda pro login
+  if (!user && pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  return response;
+  // 3. Raiz (/) → redireciona de acordo com o status
+  if (pathname === '/') {
+    return user
+      ? NextResponse.redirect(new URL('/dashboard', request.url))
+      : NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Tudo certo → continua
+  return response
 }
 
 export const config = {
   matcher: [
-    /*
-     * Roda em tudo EXCETO arquivos estáticos
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    '/',
+    '/login',
+    '/dashboard/:path*',
+    '/api/auth/callback', // importante pro Google OAuth
   ],
-};
+}
