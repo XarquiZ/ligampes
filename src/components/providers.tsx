@@ -1,4 +1,4 @@
-// src/components/providers.tsx
+// src/components/providers.tsx - JÁ ESTÁ CORRETO
 'use client'
 
 import { Toaster } from "sonner"

@@ -1,21 +1,20 @@
-// app/login/page.tsx - VERSÃO FINAL CORRIGIDA
+// app/login/page.tsx - VERSÃO FINAL (já corrigida)
 'use client'
 
 import { supabase } from "@/lib/supabase"
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log('[Login] Verificando se usuário já está autenticado...')
+        console.log('[Login] Verificando autenticação...')
         
         const { data: { session }, error } = await supabase.auth.getSession()
         
@@ -27,8 +26,7 @@ export default function LoginPage() {
 
         if (session) {
           console.log('[Login] Usuário já autenticado → redirecionando para dashboard')
-          const redirectedFrom = searchParams.get('redirectedFrom') || '/dashboard'
-          router.replace(redirectedFrom)
+          router.replace('/dashboard')
         } else {
           console.log('[Login] Usuário não autenticado → mostrando tela de login')
           setLoading(false)
@@ -41,7 +39,6 @@ export default function LoginPage() {
 
     checkAuth()
 
-    // Escuta mudanças de autenticação (caso login aconteça em outra aba)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[Login] Auth state changed:', event)
@@ -54,7 +51,7 @@ export default function LoginPage() {
     )
 
     return () => subscription.unsubscribe()
-  }, [router, searchParams])
+  }, [router])
 
   const handleGoogleLogin = async () => {
     console.log('[Login] Iniciando login com Google...')
