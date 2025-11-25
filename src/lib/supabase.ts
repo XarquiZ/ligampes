@@ -1,7 +1,5 @@
-// src/lib/supabase.ts → VERSÃO COM LOGS PARA DEBUG (2025)
+// src/lib/supabase.ts → VERSÃO QUE FUNCIONA COM COOKIES GRANDES (2025)
 import { createBrowserClient } from '@supabase/ssr'
-
-console.log('Supabase client inicializando...')
 
 export const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,38 +11,44 @@ export const supabase = createBrowserClient(
       autoRefreshToken: false,
       detectSessionInUrl: true,
       storage: {
-        getItem: () => {
-          console.log('getItem chamado no storage (deveria retornar null)')
-          return null
-        },
-        setItem: () => {
-          console.log('setItem chamado no storage (deveria ignorar)')
-        },
-        removeItem: () => {
-          console.log('removeItem chamado no storage (deveria ignorar)')
-        },
+        getItem: () => null,
+        setItem: () => null,
+        removeItem: () => null,
       },
     },
     cookies: {
+      // ESSA É A LINHA QUE RESOLVE TUDO
+      getAll(name: string) {
+        const cookies = document.cookie
+          .split(';')
+          .map(c => c.trim())
+          .filter(c => c.startsWith(name) || c.startsWith(`${name}.`))
+          .map(c => c.split('=')[1])
+          .join('')
+        return cookies || null
+      },
       get(name: string) {
-        console.log(`Cookie get chamado para: ${name}`)
-        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'))
-        const value = match ? match[2] : null
-        console.log(`Cookie ${name}:`, value ? 'encontrado' : 'não encontrado')
-        return value
+        // Primeiro tenta pegar direto
+        const direct = document.cookie
+          .split(';')
+          .find(c => c.trim().startsWith(`${name}=`))
+          ?.split('=')[1]
+
+        if (direct) return direct
+
+        // Se não achou, tenta juntar os pedaços (.0, .1, etc)
+        return this.getAll(name)
       },
       set(name: string, value: string) {
-        console.log(`Cookie set chamado para ${name}`)
         document.cookie = `${name}=${value}; path=/; Secure; SameSite=Lax`
-        console.log(`Cookie ${name} setado`)
       },
       remove(name: string) {
-        console.log(`Cookie remove chamado para ${name}`)
         document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT; Secure; SameSite=Lax`
-        console.log(`Cookie ${name} removido`)
+        // Remove também os pedaços
+        for (let i = 0; i < 10; i++) {
+          document.cookie = `${name}.${i}=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT; Secure; SameSite=Lax`
+        }
       },
     },
   }
 )
-
-console.log('Supabase client inicializado com sucesso')
