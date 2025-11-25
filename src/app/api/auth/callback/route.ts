@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
   if (code) {
     try {
-      const supabase = createClient() // <- CORRIGIDO: não precisa de await
+      const supabase = await createClient() // <- AGORA await!
 
       const { error: authError } = await supabase.auth.exchangeCodeForSession(code)
 
@@ -29,7 +29,6 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
 
     } catch (error) {
-      // log detalhado para PKCE/debug
       console.error('[Callback] Erro inesperado:', error)
       return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
     }
