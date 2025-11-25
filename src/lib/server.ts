@@ -10,8 +10,20 @@ export const createClient = async () => {
     {
       cookies: {
         get: (key) => cookieStore.get(key)?.value,
-        set: () => {},
-        remove: () => {},
+        set: (key, value, options) => {
+          try {
+            cookieStore.set({ name: key, value, ...options })
+          } catch (error) {
+            // Em contextos read-only (middleware), set pode falhar
+          }
+        },
+        remove: (key, options) => {
+          try {
+            cookieStore.set({ name: key, value: '', ...options })
+          } catch (error) {
+            // Em contextos read-only (middleware), remove pode falhar
+          }
+        },
       }
     }
   )

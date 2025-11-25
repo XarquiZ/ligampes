@@ -17,38 +17,15 @@ export async function GET(request: Request) {
   if (code) {
     try {
       const supabase = await createClient()
-      const { data, error: authError } = await supabase.auth.exchangeCodeForSession(code)
+      const { error: authError } = await supabase.auth.exchangeCodeForSession(code)
 
       if (authError) {
         console.error('[Callback] Erro ao trocar código por sessão:', authError)
         return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
       }
 
-      // Definir manualmente o cookie de session como HttpOnly
-      const session = data?.session;
-      if (session) {
-        const cookieName = `sb-${process.env.NEXT_PUBLIC_SUPABASE_URL?.split(".supabase.co")[0]?.split('//')[1]}-auth-token`;
-        
-        // Serializar a session completa como base64 (formato esperado pelo Supabase)
-        const sessionString = btoa(JSON.stringify(session));
-        
-        const response = NextResponse.redirect(`${requestUrl.origin}/dashboard`)
-        response.cookies.set(
-          cookieName,
-          sessionString,
-          {
-            httpOnly: true,
-            secure: true,
-            path: '/',
-            sameSite: 'lax',
-            maxAge: session.expires_in || 60 * 60 * 8, // fallback 8h
-          }
-        )
-        console.log('[Callback] Cookie de sessão setado manualmente:', cookieName)
-        return response
-      }
-
-      console.log('[Callback] Autenticação bem-sucedida (mas sem sessao retornada)')
+      console.log('[Callback] Autenticação bem-sucedida')
+      // O Supabase já setou os cookies automaticamente via helpers
       return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
 
     } catch (error) {
