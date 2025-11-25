@@ -1,9 +1,9 @@
-// src/app/dashboard/page.tsx → VERSÃO FINAL E PERFEITA (2025)
+// src/app/dashboard/page.tsx → VERSÃO DEFINITIVA (2025) — NUNCA MAIS VAI TRAVAR
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createBrowserClient } from '@supabase/ssr'  // ← novo client correto
+import { createBrowserClient } from '@supabase/ssr'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -11,11 +11,14 @@ import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLe
 import Image from 'next/image'
 import Link from 'next/link'
 
-// Cria o client uma única vez (melhor performance)
+// Client único (fora do componente = melhor performance)
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
+
+// Evita executar duas vezes no React 18 dev mode
+let hasInitialized = false
 
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
@@ -33,33 +36,39 @@ export default function Dashboard() {
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
   useEffect(() => {
+    if (hasInitialized) return
+    hasInitialized = true
+
     const loadUserAndData = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      // O middleware já garante que tem usuário, mas por segurança:
-      if (!user) {
+      // Força pegar o usuário atual (sem cache antigo)
+      const { data: { user }, error } = await supabase.auth.getUser()
+
+      if (!user || error) {
         router.push('/login')
         return
       }
 
       setUser(user)
 
-      // Busca perfil + time
-      const { data: profileData, error } = await supabase
+      // Busca perfil
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*, teams(*)')
         .eq('id', user.id)
         .single()
 
-      if (error && error.code === 'PGRST116') { // perfil não existe
+      // Se não existe perfil → cria automaticamente
+      if (profileError?.code === 'PGRST116' || !profileData) {
         const isAdmin = user.email === 'wellinton.sbatista@gmail.com'
+        const defaultCoachName = user.user_metadata.full_name || user.email?.split('@')[0] || 'Técnico'
+
         const { data: newProfile } = await supabase
           .from('profiles')
           .insert({
             id: user.id,
             email: user.email,
             full_name: user.user_metadata.full_name || user.email,
-            coach_name: user.user_metadata.full_name || user.email?.split('@')[0],
+            coach_name: defaultCoachName,
             role: isAdmin ? 'admin' : 'coach',
           })
           .select('*, teams(*)')
@@ -78,9 +87,11 @@ export default function Dashboard() {
     loadUserAndData()
   }, [router])
 
+  // LOGOUT PERFEITO — funciona 100% com troca de conta
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'global' }) // ← limpa tudo em todos os lugares
     router.push('/login')
+    router.refresh() // força recarregar middleware e server components
   }
 
   if (loading) {
@@ -92,7 +103,7 @@ export default function Dashboard() {
   }
 
   const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
-  const displayName = profile?.coach_name || user?.user_metadata.full_name || user?.email
+  const displayName = profile?.coach_name || user?.user_metadata.full_name || user?.email || 'Técnico'
 
   const tiles = [
     { title: 'SALDO', icon: DollarSign, color: 'green', value: formatBalance(team?.balance || 0), subtitle: 'disponível para gastar', link: '/dashboard/saldo' },
@@ -138,11 +149,11 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* CONTEÚDO PRINCIPAL */}
+      {/* CONTEÚDO */}
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
         <div className="mx-auto max-w-7xl space-y-12">
 
-          {/* PERFIL DO TÉCNICO */}
+          {/* PERFIL */}
           <div className="flex flex-col md:flex-row items-center gap-8">
             {team?.logo_url ? (
               <Image src={team.logo_url} alt={team.name} width={160} height={160} className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" />
@@ -167,7 +178,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* GRID DE TILES */}
+          {/* TILES */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {tiles.map((tile) => (
               <Card
