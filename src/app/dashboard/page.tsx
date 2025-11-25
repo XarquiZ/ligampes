@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx → VERSÃO 100% FUNCIONAL (2025) — NUNCA MAIS TRAVA
+// src/app/dashboard/page.tsx → VERSÃO 100% FUNCIONAL E FINAL (2025)
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -33,17 +33,16 @@ export default function Dashboard() {
     hasInitialized = true
 
     const loadUserAndData = async () => {
-      // A CHAVE DO SUCESSO: getSession() lê o cookie que o OAuth acabou de criar
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      // getUser() é o mais confiável com persistSession: false + PKCE
+      const { data: { user }, error } = await supabase.auth.getUser()
 
-      if (sessionError || !session?.user) {
-        console.log('Sem sessão → redirecionando pro login')
-        router.push('/login')
+      if (error || !user) {
+        console.log('Sem usuário → indo pro login')
+        router.replace('/login')
         return
       }
 
-      const user = session.user
-      console.log('Logado com sucesso:', user.email)
+      console.log('Logado como:', user.email)
       setUser(user)
 
       // Busca ou cria profile
@@ -71,8 +70,8 @@ export default function Dashboard() {
 
         if (insertError) {
           console.error('Erro ao criar profile:', insertError)
-          alert('Erro ao criar seu perfil. Contate o admin.')
-          router.push('/login')
+          alert('Erro ao criar seu perfil. Tente novamente.')
+          router.replace('/login')
           return
         }
 
@@ -89,18 +88,17 @@ export default function Dashboard() {
     loadUserAndData()
   }, [router])
 
-  // LOGOUT TOTAL
   const handleSignOut = async () => {
     await supabase.auth.signOut({ scope: 'global' })
 
-    // Limpa tudo com força
+    // Limpeza total
     document.cookie.split(";").forEach((c) => {
-      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/")
     })
     localStorage.clear()
     sessionStorage.clear()
 
-    router.push('/login')
+    router.replace('/login')
     router.refresh()
   }
 
