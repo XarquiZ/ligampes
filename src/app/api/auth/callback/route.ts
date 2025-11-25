@@ -1,43 +1,46 @@
-// app/api/auth/callback/route.ts
-import { createClient } from '@supabase/supabase-js'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
-  try {
-    const requestUrl = new URL(request.url)
-    const code = requestUrl.searchParams.get('code')
+  const requestUrl = new URL(request.url)
+  const code = requestUrl.searchParams.get('code')
+  const error = requestUrl.searchParams.get('error')
 
-    console.log('🔐 [AUTH CALLBACK] Code:', code ? '✅ Recebido' : '❌ Não recebido')
+  console.log('[Callback] Code:', code)
+  console.log('[Callback] Error:', error)
 
-    if (!code) {
-      return NextResponse.redirect(new URL('/login?error=no_code', request.url))
-    }
-
-    // Cria o cliente diretamente aqui
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        }
-      }
-    )
-
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
-
-    if (error) {
-      console.error('❌ Erro no exchange:', error)
-      return NextResponse.redirect(new URL('/login?error=auth_failed', request.url))
-    }
-
-    console.log('✅ Login realizado para:', data.session?.user?.email)
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-
-  } catch (error) {
-    console.error('💥 Erro inesperado:', error)
-    return NextResponse.redirect(new URL('/login?error=unexpected_error', request.url))
+  if (error) {
+    console.error('[Callback] Erro do OAuth:', error)
+    return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
   }
+
+  if (code) {
+    try {
+      const cookieStore = cookies()
+
+      // ... após const cookieStore = cookies()
+console.log('[Callback] Cookies recebidos:', JSON.stringify([...cookieStore]));
+      const supabase = createRouteHandlerClient({ 
+        cookies: () => cookieStore 
+      })
+      
+      const { error: authError } = await supabase.auth.exchangeCodeForSession(code)
+      
+      if (authError) {
+        console.error('[Callback] Erro ao trocar código por sessão:', authError)
+        return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
+      }
+
+      console.log('[Callback] Autenticação bem-sucedida')
+      return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
+      
+    } catch (error) {
+      console.error('[Callback] Erro inesperado:', error)
+      return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
+    }
+  }
+
+  // Se não há código nem erro específico, redireciona para login
+  return NextResponse.redirect(`${requestUrl.origin}/login`)
 }
