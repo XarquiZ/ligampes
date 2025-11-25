@@ -1,60 +1,58 @@
-// middleware.ts → VERSÃO FINAL E CORRETA (sem erro de sintaxe)
+// middleware.ts → VERSÃO FINAL E PERFEITA COM @supabase/ssr (2025)
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+export async function middleware(req: NextRequest) {
+  const res = NextResponse.next()
 
+  // Cria o cliente Supabase com cookies da requisição
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
-          return request.cookies.get(name)?.value
+          return req.cookies.get(name)?.value
         },
         set(name: string, value: string, options: any) {
-          response.cookies.set({ name, value, ...options })
+          res.cookies.set({ name, value, ...options })
         },
         remove(name: string, options: any) {
-          response.cookies.delete({ name, ...options })
+          res.cookies.delete({ name, ...options })
         },
       },
     }
   )
 
-  // Atualiza a sessão automaticamente
-  await supabase.auth.getSession()
+  // Pega a sessão (isso já atualiza os cookies automaticamente)
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
-  // Pega o usuário (mais rápido que getSession)
-  const { data: { user } } = await supabase.auth.getUser()
+  const { pathname } = req.nextUrl
+  const url = req.nextUrl.clone()
 
-  const { pathname } = request.nextUrl
-
-  // 1. Logado tentando ir pro login → manda pro dashboard
-  if (user && pathname === '/login') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  // 1. Logado tentando ir pro /login → manda pro dashboard
+  if (session && pathname === '/login') {
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
   }
 
-  // 2. Não logado tentando acessar dashboard → manda pro login
-  if (!user && pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // 2. Não logado tentando acessar /dashboard → manda pro login
+  if (!session && pathname.startsWith('/dashboard')) {
+    url.pathname = '/login'
+    url.searchParams.set('redirectedFrom', pathname)
+    return NextResponse.redirect(url)
   }
 
-  // 3. Raiz (/) → redireciona de acordo com o status
+  // 3. Raiz (/) → SEMPRE pro login (nunca pro dashboard)
   if (pathname === '/') {
-    return user
-      ? NextResponse.redirect(new URL('/dashboard', request.url))
-      : NextResponse.redirect(new URL('/login', request.url))
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
-  // Tudo certo → continua
-  return response
+  return res
 }
 
 export const config = {
@@ -62,6 +60,6 @@ export const config = {
     '/',
     '/login',
     '/dashboard/:path*',
-    '/api/auth/callback', // importante pro Google OAuth
+    '/api/auth/callback', // essencial pro OAuth funcionar
   ],
 }
