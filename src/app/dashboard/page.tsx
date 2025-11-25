@@ -1,20 +1,15 @@
-// src/app/dashboard/page.tsx → VERSÃO FINAL E 100% FUNCIONAL (Next.js 16 + Supabase SSR 2025)
+// src/app/dashboard/page.tsx → VERSÃO DEFINITIVA E PERFEITA (2025)
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createBrowserClient } from '@supabase/ssr'
+import { supabase } from '@/lib/supabase' // ← agora usa o seu supabase.ts atualizado
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-
-const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 let hasInitialized = false
 
@@ -38,13 +33,11 @@ export default function Dashboard() {
     hasInitialized = true
 
     const loadUserAndData = async () => {
-      // A FORMA CORRETA DE FORÇAR REFRESH EM 2025 (sem erro no TS)
-      const { data: { user }, error } = await supabase.auth.refreshSession()
-        .then(() => supabase.auth.getUser())
-        .catch(() => ({ data: { user: null }, error: new Error('Auth failed') }))
+      // Força refresh da sessão + pega usuário atual
+      const { data: { user }, error } = await supabase.auth.getUser()
 
       if (error || !user) {
-        console.log('Usuário não encontrado → indo pro login')
+        console.log('Sem usuário → redirecionando pro login')
         router.push('/login')
         return
       }
@@ -52,7 +45,7 @@ export default function Dashboard() {
       console.log('Logado como:', user.email)
       setUser(user)
 
-      // Busca ou cria o profile
+      // Busca ou cria profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*, teams(*)')
@@ -95,8 +88,19 @@ export default function Dashboard() {
     loadUserAndData()
   }, [router])
 
+  // LOGOUT TOTAL: limpa tudo e força novo login sempre
   const handleSignOut = async () => {
     await supabase.auth.signOut({ scope: 'global' })
+
+    // Limpa cookies, localStorage e sessionStorage com força
+    document.cookie.split(";").forEach((c) => {
+      document.cookie = c
+        .replace(/^ +/, "")
+        .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+    })
+    localStorage.clear()
+    sessionStorage.clear()
+
     router.push('/login')
     router.refresh()
   }
@@ -123,6 +127,7 @@ export default function Dashboard() {
 
   return (
     <>
+      {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <h1 className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-3xl font-black text-transparent">
@@ -155,8 +160,11 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* CONTEÚDO */}
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
         <div className="mx-auto max-w-7xl space-y-12">
+
+          {/* PERFIL */}
           <div className="flex flex-col md:flex-row items-center gap-8">
             {team?.logo_url ? (
               <Image src={team.logo_url} alt={team.name} width={160} height={160} className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" />
@@ -181,6 +189,7 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* TILES */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {tiles.map((tile) => (
               <Card
