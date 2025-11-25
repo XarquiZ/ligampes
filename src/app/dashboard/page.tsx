@@ -108,11 +108,6 @@ export default function Dashboard() {
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
 
   const tiles = [
-    { title: 'SALDO', icon: DollarSign, color: 'green', value: formatBalance(team?.balance || 0), subtitle: 'disponível para gastar', link: '/dashboard/saldo' },
-    { title: 'MEU ELENCO', icon: Shirt, color: 'blue', value: '0/25', subtitle: 'meus jogadores', link: '/dashboard/elenco' },
-    { title: 'CLASSIFICAÇÃO', icon: Trophy, color: 'yellow', value: '—', subtitle: 'posição atual', link: '/dashboard/classificacao' },
-    { title: 'LEILÃO', icon: Calendar, color: 'red', value: 'EM BREVE', subtitle: 'próximo evento', link: '/dashboard/leilao' },
-    { title: 'TRANSFERÊNCIAS', icon: ArrowLeftRight, color: 'purple', value: 'Mercado', subtitle: 'negociações ativas', link: '/dashboard/transferencias' },
     { title: 'JOGADORES', icon: Users, color: 'pink', value: 'Pool', subtitle: 'todos os atletas', link: '/dashboard/jogadores' },
   ]
 
