@@ -1,4 +1,4 @@
-// src/lib/supabase.ts - VERSÃO SUPER SIMPLIFICADA
+// src/lib/supabase.ts - VERSÃO DEFINITIVA
 import { createBrowserClient } from '@supabase/ssr'
 
 export const supabase = createBrowserClient(
@@ -10,8 +10,7 @@ export const supabase = createBrowserClient(
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      // REMOVA completamente a configuração de storage personalizada
-      // Deixe o Supabase gerenciar automaticamente
+      storageKey: 'supabase.auth.token',
     },
   }
 )

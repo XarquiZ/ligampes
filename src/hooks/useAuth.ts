@@ -1,4 +1,4 @@
-// src/hooks/useAuth.ts - HOOK NOVO E ROBUSTO
+// src/hooks/useAuth.ts - VERSÃO DEFINITIVA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -12,54 +12,53 @@ export function useAuth() {
 
   useEffect(() => {
     let mounted = true
-    let retryCount = 0
-    const maxRetries = 3
 
-    const checkAuth = async () => {
+    const checkAuth = async (retryCount = 0) => {
       try {
         if (!mounted) return
 
         console.log(`[useAuth] Verificando autenticação (tentativa ${retryCount + 1})...`)
         
-        // Aguarda um pouco para cookies ficarem disponíveis
+        // Aguarda mais tempo nas tentativas seguintes
         if (retryCount > 0) {
-          await new Promise(resolve => setTimeout(resolve, 500 * retryCount))
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount))
         }
 
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
           console.error('[useAuth] Erro ao verificar sessão:', error)
-          if (mounted && retryCount < maxRetries) {
-            retryCount++
-            setTimeout(checkAuth, 1000)
-            return
-          }
+          throw error
         }
 
         if (!mounted) return
 
+        console.log('[useAuth] Resultado da sessão:', { 
+          hasSession: !!session, 
+          user: session?.user?.email 
+        })
+
         if (!session) {
-          console.log('[useAuth] Nenhuma sessão encontrada')
-          if (retryCount < maxRetries) {
-            retryCount++
-            setTimeout(checkAuth, 1000)
+          // Tenta novamente se for uma das primeiras tentativas
+          if (retryCount < 2) {
+            console.log(`[useAuth] Tentando novamente em ${retryCount + 1} segundos...`)
+            setTimeout(() => checkAuth(retryCount + 1), 1000 * (retryCount + 1))
             return
           }
-          setLoading(false)
+          
+          console.log('[useAuth] Nenhuma sessão encontrada após tentativas → redirecionando')
           router.replace('/login')
           return
         }
 
-        console.log('[useAuth] Sessão encontrada:', session.user.email)
+        console.log('[useAuth] Sessão encontrada!', session.user.email)
         setUser(session.user)
         setLoading(false)
 
       } catch (error) {
         console.error('[useAuth] Erro geral:', error)
-        if (mounted && retryCount < maxRetries) {
-          retryCount++
-          setTimeout(checkAuth, 1000)
+        if (mounted && retryCount < 2) {
+          setTimeout(() => checkAuth(retryCount + 1), 1000 * (retryCount + 1))
           return
         }
         if (mounted) {
@@ -82,9 +81,11 @@ export function useAuth() {
           setUser(null)
           router.replace('/login')
         } else if (event === 'SIGNED_IN' && session) {
+          console.log('[useAuth] Login detectado via onAuthStateChange')
           setUser(session.user)
           setLoading(false)
         } else if (event === 'INITIAL_SESSION') {
+          console.log('[useAuth] Sessão inicial recebida')
           // Não faz nada - já estamos lidando com getSession()
         }
       }

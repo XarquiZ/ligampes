@@ -27,6 +27,19 @@ export default function Dashboard() {
   const [dataLoading, setDataLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
+
+useEffect(() => {
+  // Debug: verifica se há session storage
+  console.log('Session storage:', {
+    hasSupabaseKey: !!sessionStorage.getItem('supabase.auth.token'),
+    allKeys: Object.keys(sessionStorage)
+  })
+  
+  // Debug: verifica cookies
+  console.log('Cookies:', document.cookie)
+}, [])
+
+
   useEffect(() => {
     if (!user) return
 
