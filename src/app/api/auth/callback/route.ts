@@ -1,6 +1,5 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase-server'
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -17,13 +16,7 @@ export async function GET(request: Request) {
 
   if (code) {
     try {
-      const cookieStore = cookies()
-
-      // ... após const cookieStore = cookies()
-console.log('[Callback] Cookies recebidos:', JSON.stringify([...cookieStore]));
-      const supabase = createRouteHandlerClient({ 
-        cookies: () => cookieStore 
-      })
+      const supabase = await createClient()
       
       const { error: authError } = await supabase.auth.exchangeCodeForSession(code)
       
@@ -41,6 +34,5 @@ console.log('[Callback] Cookies recebidos:', JSON.stringify([...cookieStore]));
     }
   }
 
-  // Se não há código nem erro específico, redireciona para login
   return NextResponse.redirect(`${requestUrl.origin}/login`)
 }

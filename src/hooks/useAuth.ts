@@ -1,28 +1,27 @@
-const signIn = async () => {
-  try {
-    console.log('[Login] Iniciando OAuth...');
-    
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
-        skipBrowserRedirect: false, // Garante que redireciona
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
-      }
-    });
+import { useEffect, useState } from 'react'
+import { createBrowserClient } from '@supabase/ssr' // ← no seu supabase.ts
+import { User } from '@supabase/supabase-js'
 
-    if (error) {
-      console.error('[Login] Erro do Supabase:', error);
-      throw error;
-    }
+export function useAuth() { // ← DEVE exportar useAuth
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
-    console.log('[Login] OAuth iniciado com sucesso:', data);
-    
-  } catch (error) {
-    console.error('[Login] Erro no login:', error);
-    throw error;
+  useEffect(() => {
+    // ... resto do código
+  }, [])
+
+  const signIn = async () => {
+    // ... resto do código
   }
-};
+
+  const signOut = async () => {
+    // ... resto do código
+  }
+
+  return {
+    user,
+    loading,
+    signIn,
+    signOut,
+  }
+}

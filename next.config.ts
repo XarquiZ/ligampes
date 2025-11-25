@@ -1,4 +1,4 @@
-// next.config.js - VERSÃO FINAL CORRETA
+// next.config.js
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -12,10 +12,6 @@ const nextConfig = {
         hostname: '**',
       },
     ],
-  },
-  // CORREÇÃO CRÍTICA: reactCompiler não vai dentro de experimental
-  reactCompiler: {
-    compilationMode: 'annotation',
   },
   // Mantenha para garantir o deploy
   typescript: {
