@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start",
-  "lint": "eslint",
-  "clean": "rm -rf .next node_modules/.cache || del /s /q .next node_modules\\.cache",
-  "fresh": "npm run clean && npm install && npm run dev"
-},
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "clean": "rm -rf .next node_modules/.cache || del /s /q .next node_modules\\.cache",
+    "fresh": "npm run clean && npm install && npm run dev"
+  },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-avatar": "^1.1.11",
