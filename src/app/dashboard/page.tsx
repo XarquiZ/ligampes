@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO FINAL CORRIGIDA
+// src/app/dashboard/page.tsx - VERSÃO FINAL ESTÁVEL
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -24,49 +24,72 @@ export default function Dashboard() {
   const [team, setTeam] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [expandedTile, setExpandedTile] = useState<string | null>(null) // MOVIDO PARA CIMA
+  const [expandedTile, setExpandedTile] = useState<string | null>(null)
 
   useEffect(() => {
+    let mounted = true
+
     const checkAuthAndLoadData = async () => {
       try {
         console.log('[Dashboard] Verificando autenticação...')
         
+        // Aguarda um pouco para garantir que os cookies estão disponíveis
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
         const { data: { session }, error } = await supabase.auth.getSession()
         
+        console.log('[Dashboard] Resultado da sessão:', { 
+          hasSession: !!session, 
+          error: error?.message,
+          user: session?.user?.email 
+        })
+
         if (error) {
           console.error('[Dashboard] Erro na sessão:', error)
-          router.replace('/login')
+          if (mounted) router.replace('/login')
           return
         }
 
         if (!session) {
           console.log('[Dashboard] Sem sessão → redirecionando para login')
-          router.replace('/login')
+          if (mounted) router.replace('/login')
           return
         }
 
-        console.log('[Dashboard] Usuário autenticado:', session.user.email)
-        setUser(session.user)
+        if (mounted) {
+          console.log('[Dashboard] Usuário autenticado:', session.user.email)
+          setUser(session.user)
+          await loadUserData(session.user)
+          setLoading(false)
+        }
 
-        // Busca ou cria profile
+      } catch (error) {
+        console.error('[Dashboard] Erro geral:', error)
+        if (mounted) router.replace('/login')
+      }
+    }
+
+    const loadUserData = async (user: any) => {
+      try {
+        // Busca profile
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*, teams(*)')
-          .eq('id', session.user.id)
+          .eq('id', user.id)
           .single()
 
         if (profileError) {
           console.log('[Dashboard] Profile não encontrado, criando...')
           
-          const isAdmin = session.user.email === 'wellinton.sbatista@gmail.com'
-          const defaultName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Técnico'
+          const isAdmin = user.email === 'wellinton.sbatista@gmail.com'
+          const defaultName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Técnico'
 
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert({
-              id: session.user.id,
-              email: session.user.email!,
-              full_name: session.user.user_metadata?.full_name || session.user.email,
+              id: user.id,
+              email: user.email!,
+              full_name: user.user_metadata?.full_name || user.email,
               coach_name: defaultName,
               role: isAdmin ? 'admin' : 'coach',
             })
@@ -75,21 +98,17 @@ export default function Dashboard() {
 
           if (createError) {
             console.error('[Dashboard] Erro ao criar profile:', createError)
-          } else {
+          } else if (mounted) {
             setProfile(newProfile)
             setTeam(newProfile?.teams || null)
           }
-        } else {
+        } else if (mounted) {
           console.log('[Dashboard] Profile encontrado:', profileData)
           setProfile(profileData)
           setTeam(profileData?.teams || null)
         }
-
       } catch (error) {
-        console.error('[Dashboard] Erro geral:', error)
-        router.replace('/login')
-      } finally {
-        setLoading(false)
+        console.error('[Dashboard] Erro ao carregar dados:', error)
       }
     }
 
@@ -100,25 +119,39 @@ export default function Dashboard() {
       async (event, session) => {
         console.log('[Dashboard] Auth state changed:', event)
         
+        if (!mounted) return
+        
         if (event === 'SIGNED_OUT') {
+          console.log('[Dashboard] Usuário deslogado → redirecionando')
           router.replace('/login')
+        } else if (event === 'SIGNED_IN' && session) {
+          console.log('[Dashboard] Novo login detectado')
+          setUser(session.user)
+          await loadUserData(session.user)
+          setLoading(false)
+        } else if (event === 'INITIAL_SESSION') {
+          console.log('[Dashboard] Sessão inicial processada')
+          // Não faz nada, já estamos processando a sessão inicial
         }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
   }, [router])
 
   const handleSignOut = async () => {
     try {
       console.log('[Dashboard] Fazendo logout...')
       await supabase.auth.signOut()
+      // O listener onAuthStateChange vai redirecionar para /login
     } catch (error) {
       console.error('[Dashboard] Erro no logout:', error)
     }
   }
 
-  // ⚠️ MOVER TODOS OS HOOKS PARA O TOPO - SEM CONDIÇÕES
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -129,7 +162,6 @@ export default function Dashboard() {
     )
   }
 
-  // ⚠️ AGORA SÓ DEPOIS DO LOADING PODEMOS USAR OS DADOS
   const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
 
