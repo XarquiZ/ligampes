@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx → VERSÃO DEFINITIVA (2025) — NUNCA MAIS VAI TRAVAR
+// src/app/dashboard/page.tsx → VERSÃO FINAL E 100% FUNCIONAL (Next.js 16 + Supabase SSR 2025)
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,13 +11,11 @@ import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLe
 import Image from 'next/image'
 import Link from 'next/link'
 
-// Client único (fora do componente = melhor performance)
 const supabase = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Evita executar duas vezes no React 18 dev mode
 let hasInitialized = false
 
 function formatBalance(value: number): string {
@@ -40,39 +38,49 @@ export default function Dashboard() {
     hasInitialized = true
 
     const loadUserAndData = async () => {
-      // Força pegar o usuário atual (sem cache antigo)
-      const { data: { user }, error } = await supabase.auth.getUser()
+      // A FORMA CORRETA DE FORÇAR REFRESH EM 2025 (sem erro no TS)
+      const { data: { user }, error } = await supabase.auth.refreshSession()
+        .then(() => supabase.auth.getUser())
+        .catch(() => ({ data: { user: null }, error: new Error('Auth failed') }))
 
-      if (!user || error) {
+      if (error || !user) {
+        console.log('Usuário não encontrado → indo pro login')
         router.push('/login')
         return
       }
 
+      console.log('Logado como:', user.email)
       setUser(user)
 
-      // Busca perfil
+      // Busca ou cria o profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*, teams(*)')
         .eq('id', user.id)
         .single()
 
-      // Se não existe perfil → cria automaticamente
       if (profileError?.code === 'PGRST116' || !profileData) {
         const isAdmin = user.email === 'wellinton.sbatista@gmail.com'
         const defaultCoachName = user.user_metadata.full_name || user.email?.split('@')[0] || 'Técnico'
 
-        const { data: newProfile } = await supabase
+        const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
             id: user.id,
-            email: user.email,
+            email: user.email!,
             full_name: user.user_metadata.full_name || user.email,
             coach_name: defaultCoachName,
             role: isAdmin ? 'admin' : 'coach',
           })
           .select('*, teams(*)')
           .single()
+
+        if (insertError) {
+          console.error('Erro ao criar profile:', insertError)
+          alert('Erro ao criar seu perfil. Tente novamente.')
+          router.push('/login')
+          return
+        }
 
         setProfile(newProfile)
         setTeam(newProfile?.teams || null)
@@ -87,11 +95,10 @@ export default function Dashboard() {
     loadUserAndData()
   }, [router])
 
-  // LOGOUT PERFEITO — funciona 100% com troca de conta
   const handleSignOut = async () => {
-    await supabase.auth.signOut({ scope: 'global' }) // ← limpa tudo em todos os lugares
+    await supabase.auth.signOut({ scope: 'global' })
     router.push('/login')
-    router.refresh() // força recarregar middleware e server components
+    router.refresh()
   }
 
   if (loading) {
@@ -116,7 +123,6 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
           <h1 className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-3xl font-black text-transparent">
@@ -149,11 +155,8 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* CONTEÚDO */}
       <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
         <div className="mx-auto max-w-7xl space-y-12">
-
-          {/* PERFIL */}
           <div className="flex flex-col md:flex-row items-center gap-8">
             {team?.logo_url ? (
               <Image src={team.logo_url} alt={team.name} width={160} height={160} className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" />
@@ -178,7 +181,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* TILES */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {tiles.map((tile) => (
               <Card
