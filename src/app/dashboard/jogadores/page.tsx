@@ -723,7 +723,7 @@ export default function ListaJogadores() {
                       )}
                     </div>
 
-                    <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-6 text-sm">
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
                       <div>
                         <p className="text-zinc-500">Nome</p>
                         <p className="font-bold text-lg">{j.name}</p>
@@ -744,13 +744,12 @@ export default function ListaJogadores() {
                         </div>
                       </div>
                       <div>
-                        <div className="flex items-center gap-3">
-                          <p className="text-zinc-500">Overall</p>
-                          <p className="text-3xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
-                        </div>
+                        <p className="text-zinc-500">Overall</p>
+                        <p className="text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
                       </div>
-                      <div className="flex items-center justify-end">
-                        <p className="text-emerald-400 font-bold text-xl">
+                      <div className="flex flex-col items-end min-w-[180px]">
+                        <p className="text-zinc-500 text-right">Valor Base</p>
+                        <p className="text-emerald-400 font-bold text-xl whitespace-nowrap">
                           R$ {Number(j.base_price).toLocaleString('pt-BR')}
                         </p>
                       </div>
@@ -791,9 +790,8 @@ export default function ListaJogadores() {
                           <div>
                             <span className="text-zinc-500 flex items-center gap-2">
                               <Ruler className="w-4 h-4" />
-                              Altura:
+                              Altura: <strong className="ml-2">{formatHeight(j.height)}</strong>
                             </span> 
-                            <strong className="ml-6">{formatHeight(j.height)}</strong>
                           </div>
                           <div>
                             <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
