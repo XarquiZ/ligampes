@@ -36,8 +36,8 @@ interface Player {
   playstyle?: string | null
   alternative_positions?: string[] | null
   age?: number | null
-  height?: number | null // NOVO CAMPO
-  is_penalty_specialist?: boolean | null // NOVO CAMPO
+  height?: number | null
+  is_penalty_specialist?: boolean | null
   offensive_talent?: number
   ball_control?: number
   dribbling?: number
@@ -79,7 +79,6 @@ interface Team {
   logo_url: string | null
 }
 
-
 export default function ListaJogadores() {
   const [jogadores, setJogadores] = useState<Player[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -92,23 +91,30 @@ export default function ListaJogadores() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  // NOVO: estados para filtros de altura e especialista em pênaltis
-  const [filterHeight, setFilterHeight] = useState<string>('Todas')
+  // Estados para filtros
+  const [filterMinHeight, setFilterMinHeight] = useState<string>('')
   const [filterPenaltySpecialist, setFilterPenaltySpecialist] = useState<string>('Todos')
 
-  // NOVO: estados para controle de transição
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
 
-  // NOVO: função para lidar com o clique no card grid
+  // Opções de altura (140cm até 230cm)
+  const HEIGHT_OPTIONS = useMemo(() => 
+    Array.from({ length: 91 }, (_, i) => {
+      const height = 140 + i;
+      return {
+        value: String(height),
+        label: `${height}cm (${(height / 100).toFixed(2)}m)`
+      };
+    }), []
+  );
+
   const handleGridCardClick = (playerId: string) => {
     setIsTransitioning(true)
     setViewMode('list')
     
     setTimeout(() => {
       setOpenedPlayers([playerId])
-      
-      // Rola a página para o jogador selecionado
       const element = document.getElementById(`player-${playerId}`)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -142,8 +148,6 @@ export default function ListaJogadores() {
 
   const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'PTE', 'PTD', 'CA']
   const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
-  // NOVO: opções para filtros de altura e especialista em pênaltis
-  const HEIGHT_OPTIONS = ['Todas', 'Baixo (<170cm)', 'Médio (170-185cm)', 'Alto (>185cm)']
   const PENALTY_OPTIONS = ['Todos', 'Sim', 'Não']
 
   const SKILLS_OPTIONS = [
@@ -166,34 +170,19 @@ export default function ListaJogadores() {
     { name: 'Goleiro', attributes: ['gk_awareness', 'gk_catching', 'gk_clearing', 'gk_reflexes', 'gk_reach'] },
   ]
 
-  // === Helpers: cores dos atributos conforme mapa do usuário ===
   const getAttrColorHex = (value: number) => {
-    // mapping provided by user:
-    // 0-74 vermelho
-    // 75-84 laranja
-    // 85-94 verde claro
-    // 95-99 azul claro
-    if (value >= 95) return '#4FC3F7' // azul claro
-    if (value >= 85) return '#8BC34A' // verde claro
-    if (value >= 75) return '#FB8C00' // laranja
-    return '#E53935' // vermelho
+    if (value >= 95) return '#4FC3F7'
+    if (value >= 85) return '#8BC34A'
+    if (value >= 75) return '#FB8C00'
+    return '#E53935'
   }
 
-  // NOVO: função para formatar altura
+  // Função para formatar altura
   const formatHeight = (height: number | null | undefined) => {
-    if (!height) return '-'
+    if (height === null || height === undefined) return '-'
     return `${height}cm (${(height / 100).toFixed(2)}m)`
   }
 
-  // NOVO: função para determinar categoria de altura
-  const getHeightCategory = (height: number | null | undefined) => {
-    if (!height) return 'unknown'
-    if (height < 170) return 'low'
-    if (height <= 185) return 'medium'
-    return 'high'
-  }
-  
-  // Componente de Barrinhas (LevelBars) para usar em pé fraco / forma
   function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null; max?: number; size?: 'sm' | 'md' }) {
     const v = Math.max(0, Math.min(max, value ?? 0))
     const w = size === 'sm' ? 'w-4 h-2' : 'w-6 h-2.5'
@@ -231,7 +220,7 @@ export default function ListaJogadores() {
     try {
       const [{ data: teamsData }, { data: playersData }] = await Promise.all([
         supabase.from('teams').select('id, name, logo_url').order('name'),
-        supabase.from('players').select('*'),
+        supabase.from('players').select('*').order('overall', { ascending: false }), // ORDENAÇÃO POR OVR (maior para menor)
       ])
 
       const teamMap = Object.fromEntries((teamsData || []).map(t => [t.id, t]))
@@ -246,8 +235,8 @@ export default function ListaJogadores() {
         playstyle: p.playstyle || null,
         alternative_positions: p.alternative_positions || [],
         nationality: p.nationality || 'Desconhecida',
-        height: p.height || null, // NOVO
-        is_penalty_specialist: p.is_penalty_specialist || false, // NOVO
+        height: p.height || null,
+        is_penalty_specialist: p.is_penalty_specialist || false,
       }))
 
       setJogadores(mapped)
@@ -281,28 +270,25 @@ export default function ListaJogadores() {
       const skills = selectedSkills.length === 0 || selectedSkills.every(s => j.skills?.includes(s))
       const attrs = Object.entries(attrFilters).every(([k, min]) => min === null || (j[k as keyof Player] as number ?? 0) >= min)
       
-      // NOVO: filtro de altura
-      const height = filterHeight === 'Todas' || 
-        (filterHeight === 'Baixo (<170cm)' && j.height && j.height < 170) ||
-        (filterHeight === 'Médio (170-185cm)' && j.height && j.height >= 170 && j.height <= 185) ||
-        (filterHeight === 'Alto (>185cm)' && j.height && j.height > 185)
+      // Filtro de altura - "Maior que"
+      const height = !filterMinHeight || (j.height && j.height >= parseInt(filterMinHeight))
       
-      // NOVO: filtro de especialista em pênaltis
+      // Filtro de especialista em pênaltis
       const penalty = filterPenaltySpecialist === 'Todos' || 
         (filterPenaltySpecialist === 'Sim' && j.is_penalty_specialist) ||
         (filterPenaltySpecialist === 'Não' && !j.is_penalty_specialist)
       
       return name && pos && foot && team && skills && attrs && height && penalty
     })
-  }, [jogadores, searchName, filterPosition, filterFoot, filterTeam, selectedSkills, attrFilters, filterHeight, filterPenaltySpecialist])
+  }, [jogadores, searchName, filterPosition, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight, filterPenaltySpecialist])
 
   const activeAdvancedFilters = [
     filterFoot !== 'Todos',
     filterTeam !== 'Todos',
     selectedSkills.length > 0,
     Object.values(attrFilters).some(v => v !== null),
-    filterHeight !== 'Todas', // NOVO
-    filterPenaltySpecialist !== 'Todos' // NOVO
+    !!filterMinHeight,
+    filterPenaltySpecialist !== 'Todos'
   ].filter(Boolean).length
 
   const clearAllFilters = () => {
@@ -311,8 +297,8 @@ export default function ListaJogadores() {
     setFilterFoot('Todos')
     setFilterTeam('Todos')
     setSelectedSkills([])
-    setFilterHeight('Todas') // NOVO
-    setFilterPenaltySpecialist('Todos') // NOVO
+    setFilterMinHeight('')
+    setFilterPenaltySpecialist('Todos')
     setAttrFilters(Object.fromEntries(Object.keys(attrFilters).map(k => [k, null])))
   }
 
@@ -326,7 +312,6 @@ export default function ListaJogadores() {
       />
     ) : null
 
-  // label map (updated names requested)
   const ATTR_LABELS: Record<string, string> = {
     offensive_talent: 'Tal. Ofensivo',
     ball_control: 'Controle de bola',
@@ -453,25 +438,28 @@ export default function ListaJogadores() {
                     </Select>
                   </div>
 
-                  {/* NOVO: Filtro de Altura */}
+                  {/* Filtro de Altura - "Maior que" */}
                   <div>
                     <label className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
                       <Ruler className="w-4 h-4" />
-                      Altura
+                      Altura mínima
                     </label>
-                    <Select value={filterHeight} onValueChange={setFilterHeight}>
+                    <Select value={filterMinHeight} onValueChange={setFilterMinHeight}>
                       <SelectTrigger className="bg-zinc-900/70 border-zinc-700 text-white">
-                        <SelectValue />
+                        <SelectValue placeholder="Selecione a altura mínima" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {HEIGHT_OPTIONS.map(h => (
-                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                      <SelectContent className="max-h-60">
+                        <SelectItem value="">Qualquer altura</SelectItem>
+                        {HEIGHT_OPTIONS.map(({ value, label }) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* NOVO: Filtro de Especialista em Pênaltis */}
+                  {/* Filtro de Especialista em Pênaltis */}
                   <div>
                     <label className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
                       <Target className="w-4 h-4" />
@@ -620,7 +608,7 @@ export default function ListaJogadores() {
           </div>
         )}
 
-        {/* GRID VIEW (com clique para abrir na lista) */}
+        {/* GRID VIEW */}
         {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
             {filteredPlayers.map(j => (
@@ -629,7 +617,6 @@ export default function ListaJogadores() {
                 onClick={() => handleGridCardClick(j.id)}
                 className="group relative bg-zinc-900/90 rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer"
               >
-                {/* Botão admin */}
                 {userRole === 'admin' && (
                   <button
                     onClick={(e) => {
@@ -642,7 +629,6 @@ export default function ListaJogadores() {
                   </button>
                 )}
 
-                {/* FOTO MENOR + OVR DESTACADO SEM NOME EM CIMA */}
                 <div className="relative h-52 bg-zinc-800">
                   {j.photo_url ? (
                     <img
@@ -656,28 +642,21 @@ export default function ListaJogadores() {
                     </div>
                   )}
 
-                  {/* OVR estilo PES */}
                   <div className="absolute top-3 left-3 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg border border-zinc-700 flex flex-col items-center">
                     <span className="text-3xl font-black text-yellow-400">{j.overall}</span>
                     <span className="text-[10px] text-zinc-300 -mt-1">OVR</span>
                   </div>
                 </div>
 
-                {/* ÁREA DE INFORMAÇÕES FORA DA FOTO */}
                 <div className="p-4 space-y-3">
-
-                  {/* Nome */}
                   <h3 className="font-bold text-lg text-center leading-tight line-clamp-2">{j.name}</h3>
 
-                  {/* Posição */}
                   <div className="flex justify-center">
                     <Badge className="bg-purple-600 text-white text-xs font-bold px-4 py-1.5">{j.position}</Badge>
                   </div>
 
-                  {/* Estilo de jogo */}
                   <p className="text-xs text-zinc-400 text-center">{j.playstyle || 'Nenhum'}</p>
 
-                  {/* Clube */}
                   <div className="flex items-center justify-center gap-2.5 mt-1">
                     {j.logo_url ? (
                       <img
@@ -693,7 +672,6 @@ export default function ListaJogadores() {
                     <p className="text-sm text-zinc-300 truncate max-w-[150px] text-center">{j.club}</p>
                   </div>
 
-                  {/* Valor abaixo da posição */}
                   <p className="text-center text-xl font-black text-emerald-400 mt-2">
                     R$ {Number(j.base_price).toLocaleString('pt-BR')}
                   </p>
@@ -703,7 +681,7 @@ export default function ListaJogadores() {
           </div>
         )}
 
-        {/* LIST VIEW CORRIGIDA E ENRIQUECIDA */}
+        {/* LIST VIEW - ATUALIZADA (removidos altura e especialista em pênaltis do primeiro estágio) */}
         {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
           <div className="space-y-6">
             {filteredPlayers.map(j => {
@@ -715,7 +693,7 @@ export default function ListaJogadores() {
                   id={`player-${j.id}`}
                   className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-xl hover:shadow-purple-600/20"
                 >
-                  {/* Linha principal */}
+                  {/* Linha principal - ATUALIZADA: removidos altura e especialista em pênaltis */}
                   <div
                     className="p-6 flex items-center gap-8 cursor-pointer select-none"
                     onClick={() => togglePlayer(j.id)}
@@ -730,7 +708,7 @@ export default function ListaJogadores() {
                       )}
                     </div>
 
-                    <div className="flex-1 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-6 text-sm">
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
                       <div>
                         <p className="text-zinc-500">Nome</p>
                         <p className="font-bold text-lg">{j.name}</p>
@@ -758,31 +736,6 @@ export default function ListaJogadores() {
                       <div>
                         <p className="text-zinc-500">Preço</p>
                         <p className="text-2xl font-bold text-emerald-400">R$ {Number(j.base_price).toLocaleString('pt-BR')}</p>
-                      </div>
-                      
-                      {/* NOVO: Altura e Especialista em Pênaltis */}
-                      <div>
-                        <p className="text-zinc-500 flex items-center gap-1">
-                          <Ruler className="w-3 h-3" />
-                          Altura
-                        </p>
-                        <p className="font-bold">{formatHeight(j.height)}</p>
-                      </div>
-                      <div>
-                        <p className="text-zinc-500 flex items-center gap-1">
-                          <Target className="w-3 h-3" />
-                          Pênaltis
-                        </p>
-                        <div className="flex items-center gap-1">
-                          {j.is_penalty_specialist ? (
-                            <>
-                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                              <span className="font-bold text-yellow-400">Sim</span>
-                            </>
-                          ) : (
-                            <span className="font-bold text-zinc-400">Não</span>
-                          )}
-                        </div>
                       </div>
 
                       <div className="flex items-center justify-end gap-4">
@@ -813,7 +766,7 @@ export default function ListaJogadores() {
                   {isOpen && (
                     <div className="border-t border-zinc-800 bg-zinc-900/50 px-6 py-6">
                       <div className="space-y-6">
-                        {/* Linha 1: básicos - ATUALIZADO com altura e especialista em pênaltis */}
+                        {/* Linha 1: básicos */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                           <div>
                             <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
@@ -829,7 +782,7 @@ export default function ListaJogadores() {
                           </div>
                         </div>
 
-                        {/* Linha 2: Altura e Especialista em Pênaltis */}
+                        {/* Linha 2: Altura e Especialista em Pênaltis (AGORA APENAS NOS DETALHES) */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                           <div>
                             <span className="text-zinc-500 flex items-center gap-2">
@@ -856,7 +809,7 @@ export default function ListaJogadores() {
                           </div>
                         </div>
 
-                        {/* Posições alternativas (título + tags em vermelho) */}
+                        {/* Posições alternativas */}
                         <div>
                           <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
                           <div className="flex gap-2 flex-wrap">
@@ -870,7 +823,7 @@ export default function ListaJogadores() {
                           </div>
                         </div>
 
-                        {/* Pé fraco e Frequência (com barrinhas) */}
+                        {/* Pé fraco e Frequência */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm items-center">
                           <div>
                             <p className="text-zinc-500">Pé Fraco (Uso)</p>
@@ -897,7 +850,7 @@ export default function ListaJogadores() {
                           </div>
                         </div>
 
-                        {/* Inspirador (mostrando 0-2 estrelas para cada categoria) */}
+                        {/* Inspirador */}
                         <div>
                           <p className="text-zinc-500 font-medium mb-2">Inspirador</p>
                           <div className="flex items-center gap-6">
@@ -945,7 +898,7 @@ export default function ListaJogadores() {
                           </div>
                         )}
 
-                        {/* Atributos - sempre mostramos (placeholder 40 quando null) e aplicamos cor por valor */}
+                        {/* Atributos */}
                         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-x-6 gap-y-4 text-xs">
                           {[
                             { k: 'offensive_talent', l: 'Tal. Ofensivo' },
@@ -975,7 +928,6 @@ export default function ListaJogadores() {
                             { k: 'gk_reach', l: 'Alcance de GO' },
                           ].map(({ k, l }) => {
                             const value = j[k as keyof Player] as number | null
-                            // sempre mostramos: se não existir, mostramos placeholder 40
                             const display = (value ?? 40)
                             const color = getAttrColorHex(display)
                             return (
@@ -996,24 +948,24 @@ export default function ListaJogadores() {
         )}
 
         {/* Sheet de Edição */}
-<Sheet open={isEdicaoOpen} onOpenChange={setIsEdicaoOpen}>
-  <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
-    <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
-      <SheetTitle className="text-2xl font-bold text-white">Editar Jogador</SheetTitle>
-      <SheetDescription className="text-zinc-400">
-        Atualize os dados do jogador e clique em salvar.
-      </SheetDescription>
-    </SheetHeader>
-    <div className="p-6">
-      {jogadorEditando && (
-        <CadastrarJogadorForm 
-          playerToEdit={jogadorEditando as any} 
-          onPlayerAdded={handleSuccess} 
-        />
-      )}
-    </div>
-  </SheetContent>
-</Sheet>
+        <Sheet open={isEdicaoOpen} onOpenChange={setIsEdicaoOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
+            <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
+              <SheetTitle className="text-2xl font-bold text-white">Editar Jogador</SheetTitle>
+              <SheetDescription className="text-zinc-400">
+                Atualize os dados do jogador e clique em salvar.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="p-6">
+              {jogadorEditando && (
+                <CadastrarJogadorForm 
+                  playerToEdit={jogadorEditando as any} 
+                  onPlayerAdded={handleSuccess} 
+                />
+              )}
+            </div>
+          </SheetContent>
+        </Sheet>
 
         {!loading && filteredPlayers.length === 0 && (
           <div className="text-center py-32">
