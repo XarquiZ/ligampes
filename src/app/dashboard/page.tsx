@@ -108,6 +108,7 @@ export default function Dashboard() {
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
 
   const tiles = [
+    { title: 'MEU ELENCO', icon: Shirt, color: 'blue', value: '0/25', subtitle: 'meus jogadores', link: '/dashboard/elenco' },
     { title: 'JOGADORES', icon: Users, color: 'pink', value: 'Pool', subtitle: 'todos os atletas', link: '/dashboard/jogadores' },
   ]
 
