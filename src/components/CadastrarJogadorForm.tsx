@@ -35,6 +35,8 @@ import {
   ChevronsUpDown,
   Check,
   Loader2,
+  Ruler,
+  Target,
 } from 'lucide-react'
 import { supabase } from "@/lib/supabase"
 
@@ -65,6 +67,15 @@ const PLAYSTYLES = ['Artilheiro', 'Puxa marcação', 'Homem de área', 'Pivô', 
 const SKILLS = ['Pedalada simples', 'Toque duplo', 'Elástico', '360 graus', 'Chapéu', 'Corte de calcanhar', 'Puxada de letra', 'Finta de letra', 'Controle de domínio', 'Cabeçada', 'Chute de longe', 'Controle da cavadinha', 'Precisão à distância', 'Chute com o peito do pé', 'Folha seca', 'Chute ascendente', 'Finalização acrobática', 'Toque de calcanhar', 'Chute de primeira', 'Passe de primeira', 'Passe em profundidade', 'Passe na medida', 'Cruzamento preciso', 'Curva para fora', 'De letra', 'Passe sem olhar', 'Passe aéreo baixo', 'Reposição baixa do GO', 'Reposição alta do GO', 'Arremesso lateral longo', 'Arremesso longo do GO', 'Pegador de pênaltis', 'Malícia', 'Marcação individual', 'Volta para marcar', 'Interceptação', 'Afastamento acrobático', 'Liderança', 'Super substituto', 'Espírito guerreiro'] as const
 const NATIONALITIES = ['Angola', 'Argentina', 'Bolívia', 'Brasil', 'Chile', 'Colômbia', 'Coreia do Sul', 'Costa do Marfim', 'Costa Rica', 'Dinamarca', 'Equador', 'Espanha', 'França', 'Gâmbia', 'Guiné', 'Holanda', 'Itália', 'México', 'Paraguai', 'Peru', 'Portugal', 'República do Congo', 'Senegal', 'Suíça', 'Uruguai', 'Venezuela', 'Desconhecida'] as const
 
+// Alturas de 1,40m até 2,30m (140cm até 230cm)
+const HEIGHT_OPTIONS = Array.from({ length: 91 }, (_, i) => {
+  const height = 140 + i;
+  return {
+    value: height,
+    label: `${height}cm (${(height / 100).toFixed(2)}m)`
+  };
+});
+
 // ===========================================================================
 // SCHEMA — NOME E POSIÇÃO OBRIGATÓRIOS
 // ===========================================================================
@@ -74,6 +85,7 @@ const formSchema = z.object({
   position: z.enum(POSITIONS, { required_error: "Selecione uma posição" }),
   overall: z.coerce.number().min(0).max(99),
   age: z.coerce.number().min(15).max(45).nullable().optional(),
+  height: z.coerce.number().min(140).max(230).nullable().optional(), // NOVO CAMPO
   nationality: z.string().nullable().optional(),
   team_id: z.string().uuid().nullable().optional(),
   photo_url: z.string().url().nullable().optional().or(z.literal('')),
@@ -117,6 +129,9 @@ const formSchema = z.object({
   inspiring_ball_carry: z.coerce.number().min(0).max(2).nullable().optional(),
   inspiring_low_pass: z.coerce.number().min(0).max(2).nullable().optional(),
   inspiring_lofted_pass: z.coerce.number().min(0).max(2).nullable().optional(),
+
+  // NOVO CAMPO
+  is_penalty_specialist: z.boolean().default(false).optional(),
 })
 
 type PlayerFormValues = z.infer<typeof formSchema>
@@ -269,16 +284,20 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
       playstyle: playerToEdit.playstyle || "Nenhum",
       nationality: playerToEdit.nationality || "Desconhecida",
       age: playerToEdit.age || null,
+      height: playerToEdit.height || null, // NOVO
+      is_penalty_specialist: playerToEdit.is_penalty_specialist || false, // NOVO
     } : {
       name: "",
       position: undefined as any, // obrigatório
       overall: 75,
       age: null,
+      height: null, // NOVO
       nationality: "Desconhecida",
       team_id: null,
       photo_url: "",
       preferred_foot: "Nenhum",
       playstyle: "Nenhum",
+      is_penalty_specialist: false, // NOVO
       weak_foot_usage: 2,
       weak_foot_accuracy: 2,
       form: 5,
@@ -317,6 +336,8 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
       preferred_foot: values.preferred_foot === 'Nenhum' ? null : values.preferred_foot,
       playstyle: values.playstyle === 'Nenhum' ? null : values.playstyle,
       nationality: values.nationality === 'Desconhecida' ? null : values.nationality,
+      height: clean(values.height), // NOVO
+      is_penalty_specialist: values.is_penalty_specialist, // NOVO
       base_price: basePrice,
     }
 
@@ -393,6 +414,33 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                   </FormItem>
                 )} />
 
+                {/* NOVO CAMPO - ALTURA */}
+                <FormField control={form.control} name="height" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-lg font-semibold text-white flex items-center gap-2">
+                      <Ruler className="w-5 h-5 text-purple-400" />
+                      Altura
+                    </FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(value ? Number(value) : null)} 
+                      value={field.value ? String(field.value) : ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white">
+                          <SelectValue placeholder="Selecione a altura" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-60">
+                        {HEIGHT_OPTIONS.map(({ value, label }) => (
+                          <SelectItem key={value} value={String(value)}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+
                 <FormField control={form.control} name="overall" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-lg font-semibold text-white">Overall</FormLabel>
@@ -402,7 +450,9 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                     </FormControl>
                   </FormItem>
                 )} />
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField control={form.control} name="age" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-lg font-semibold text-white">Idade</FormLabel>
@@ -412,14 +462,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                     </FormControl>
                   </FormItem>
                 )} />
-              </div>
 
-              <div className="p-6 bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-2xl border border-purple-700 text-center">
-                <p className="text-purple-300 text-lg">Valor Base Calculado</p>
-                <p className="text-4xl font-black text-white mt-2">R$ {basePrice.toLocaleString('pt-BR')}</p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="team_id" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-lg font-semibold text-white">Clube Atual</FormLabel>
@@ -451,6 +494,11 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                 )} />
               </div>
 
+              <div className="p-6 bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-2xl border border-purple-700 text-center">
+                <p className="text-purple-300 text-lg">Valor Base Calculado</p>
+                <p className="text-4xl font-black text-white mt-2">R$ {basePrice.toLocaleString('pt-BR')}</p>
+              </div>
+
               <FormField control={form.control} name="photo_url" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-lg font-semibold text-white">URL da Foto (opcional)</FormLabel>
@@ -463,7 +511,6 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
 
             {/* ATRIBUTOS */}
             <TabsContent value="attributes" className="space-y-12 mt-8">
-              {/* ... mesmo conteúdo de atributos que você já tinha ... */}
               <section>
                 <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Goal className="w-10 h-10" /> Ataque & Técnica</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -524,8 +571,48 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
 
             {/* DETALHES & SKILLS */}
             <TabsContent value="details" className="space-y-12 mt-8">
+              {/* NOVO CAMPO - ESPECIALISTA EM PÊNALTIS */}
+              <div className="p-6 bg-zinc-800/50 rounded-2xl border border-zinc-700">
+                <FormField
+                  control={form.control}
+                  name="is_penalty_specialist"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border border-zinc-700 p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-xl font-semibold text-white flex items-center gap-3">
+                          <Target className="w-6 h-6 text-green-400" />
+                          Especialista em Pênaltis
+                        </FormLabel>
+                        <div className="text-zinc-400 text-sm">
+                          Jogador possui habilidade especial para cobrança de pênaltis
+                        </div>
+                      </div>
+                      <FormControl>
+                        <div className="flex gap-4">
+                          <Button
+                            type="button"
+                            variant={field.value ? "default" : "outline"}
+                            className={`h-11 px-6 ${field.value ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'bg-zinc-700 hover:bg-zinc-600 border-zinc-600'}`}
+                            onClick={() => field.onChange(true)}
+                          >
+                            Sim
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={!field.value ? "default" : "outline"}
+                            className={`h-11 px-6 ${!field.value ? 'bg-red-600 hover:bg-red-700 border-red-600' : 'bg-zinc-700 hover:bg-zinc-600 border-zinc-600'}`}
+                            onClick={() => field.onChange(false)}
+                          >
+                            Não
+                          </Button>
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                {/* ... todos os campos de detalhes que você já tinha ... */}
                 <FormField control={form.control} name="preferred_foot" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-lg font-semibold text-white">Pé Preferido</FormLabel>
