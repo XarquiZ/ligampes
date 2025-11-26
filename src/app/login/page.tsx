@@ -2,6 +2,7 @@
 'use client'
 
 import { supabase } from "@/lib/supabase"
+import { getSiteUrl } from "@/lib/env"
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { useEffect, useState } from 'react'
@@ -52,16 +53,21 @@ export default function LoginPage() {
     try {
       // Limpa estado anterior
       await supabase.auth.signOut()
+      const siteUrl = getSiteUrl()
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/api/auth/callback`,
+          redirectTo: `${siteUrl}/api/auth/callback`,
+          // Força o Supabase a usar nossa URL como site_url
+          skipBrowserRedirect: false,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
           }
         },
       })
+      
+      console.log('[Login] Redirect URL configurada:', `${siteUrl}/api/auth/callback`)
 
       if (error) {
         console.error('[Login] Erro no OAuth:', error)
