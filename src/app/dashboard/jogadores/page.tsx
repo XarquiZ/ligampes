@@ -91,8 +91,8 @@ export default function ListaJogadores() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  // Estados para filtros
-  const [filterMinHeight, setFilterMinHeight] = useState<string>('')
+  // CORREÇÃO: usar 'all' em vez de string vazia
+  const [filterMinHeight, setFilterMinHeight] = useState<string>('all')
   const [filterPenaltySpecialist, setFilterPenaltySpecialist] = useState<string>('Todos')
 
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
@@ -220,7 +220,7 @@ export default function ListaJogadores() {
     try {
       const [{ data: teamsData }, { data: playersData }] = await Promise.all([
         supabase.from('teams').select('id, name, logo_url').order('name'),
-        supabase.from('players').select('*').order('overall', { ascending: false }), // ORDENAÇÃO POR OVR (maior para menor)
+        supabase.from('players').select('*').order('overall', { ascending: false }),
       ])
 
       const teamMap = Object.fromEntries((teamsData || []).map(t => [t.id, t]))
@@ -270,8 +270,8 @@ export default function ListaJogadores() {
       const skills = selectedSkills.length === 0 || selectedSkills.every(s => j.skills?.includes(s))
       const attrs = Object.entries(attrFilters).every(([k, min]) => min === null || (j[k as keyof Player] as number ?? 0) >= min)
       
-      // Filtro de altura - "Maior que"
-      const height = !filterMinHeight || (j.height && j.height >= parseInt(filterMinHeight))
+      // CORREÇÃO: usar 'all' em vez de string vazia
+      const height = filterMinHeight === 'all' || (j.height && j.height >= parseInt(filterMinHeight))
       
       // Filtro de especialista em pênaltis
       const penalty = filterPenaltySpecialist === 'Todos' || 
@@ -287,7 +287,7 @@ export default function ListaJogadores() {
     filterTeam !== 'Todos',
     selectedSkills.length > 0,
     Object.values(attrFilters).some(v => v !== null),
-    !!filterMinHeight,
+    filterMinHeight !== 'all', // CORREÇÃO: usar 'all' em vez de string vazia
     filterPenaltySpecialist !== 'Todos'
   ].filter(Boolean).length
 
@@ -297,7 +297,7 @@ export default function ListaJogadores() {
     setFilterFoot('Todos')
     setFilterTeam('Todos')
     setSelectedSkills([])
-    setFilterMinHeight('')
+    setFilterMinHeight('all') // CORREÇÃO: usar 'all' em vez de string vazia
     setFilterPenaltySpecialist('Todos')
     setAttrFilters(Object.fromEntries(Object.keys(attrFilters).map(k => [k, null])))
   }
@@ -438,7 +438,7 @@ export default function ListaJogadores() {
                     </Select>
                   </div>
 
-                  {/* Filtro de Altura - "Maior que" */}
+                  {/* CORREÇÃO: Filtro de Altura - usar 'all' em vez de string vazia */}
                   <div>
                     <label className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
                       <Ruler className="w-4 h-4" />
@@ -449,7 +449,7 @@ export default function ListaJogadores() {
                         <SelectValue placeholder="Selecione a altura mínima" />
                       </SelectTrigger>
                       <SelectContent className="max-h-60">
-                        <SelectItem value="">Qualquer altura</SelectItem>
+                        <SelectItem value="all">Qualquer altura</SelectItem>
                         {HEIGHT_OPTIONS.map(({ value, label }) => (
                           <SelectItem key={value} value={value}>
                             {label}
@@ -681,7 +681,7 @@ export default function ListaJogadores() {
           </div>
         )}
 
-        {/* LIST VIEW - ATUALIZADA (removidos altura e especialista em pênaltis do primeiro estágio) */}
+        {/* LIST VIEW */}
         {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
           <div className="space-y-6">
             {filteredPlayers.map(j => {
@@ -693,7 +693,7 @@ export default function ListaJogadores() {
                   id={`player-${j.id}`}
                   className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-xl hover:shadow-purple-600/20"
                 >
-                  {/* Linha principal - ATUALIZADA: removidos altura e especialista em pênaltis */}
+                  {/* Linha principal */}
                   <div
                     className="p-6 flex items-center gap-8 cursor-pointer select-none"
                     onClick={() => togglePlayer(j.id)}
@@ -782,7 +782,7 @@ export default function ListaJogadores() {
                           </div>
                         </div>
 
-                        {/* Linha 2: Altura e Especialista em Pênaltis (AGORA APENAS NOS DETALHES) */}
+                        {/* Linha 2: Altura e Especialista em Pênaltis */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                           <div>
                             <span className="text-zinc-500 flex items-center gap-2">
