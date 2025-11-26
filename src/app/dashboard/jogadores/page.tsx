@@ -725,7 +725,6 @@ export default function ListaJogadores() {
 
                     <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
                       <div>
-                        <p className="text-zinc-500">Nome</p>
                         <p className="font-bold text-lg">{j.name}</p>
                         <p className="text-zinc-400 text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
                       </div>
