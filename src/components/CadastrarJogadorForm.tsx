@@ -58,8 +58,8 @@ const OVERALL_VALUE_MAP = [
 const calculateBasePrice = (ovr: number) => OVERALL_VALUE_MAP.find(e => ovr >= e.ovr)?.value || 1_000
 
 // Posições OBRIGATÓRIAS (sem "Nenhum")
-const POSITIONS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'PTE', 'PTD', 'CA'] as const
-const ALT_POS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'PTE', 'PTD', 'CA'] as const
+const POSITIONS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA','MLE','MLD', 'PTE', 'PTD', 'CA'] as const
+const ALT_POS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA','MLE','MLD', 'PTE', 'PTD', 'CA'] as const
 const PREFERRED_FOOT = ['Direito', 'Esquerdo', 'Ambos', 'Nenhum'] as const
 const PLAYSTYLES = ['Artilheiro', 'Puxa marcação', 'Homem de área', 'Pivô', 'Armador criativo', 'Jog. de Lado de Campo', 'Lateral móvel', 'Especialista em cruz.', 'Clássica nº 10', 'Jog. de infiltração', 'Meia versátil', 'Volantão', 'Orquestrador', 'Primeiro volante', 'Zagueiro ofensivo', 'Ponta velocista', 'Zagueiro defensivo', 'Provocador', 'Atacante surpresa', 'Goleiro ofensivo', 'Goleiro defensivo', 'Nenhum'] as const
 const SKILLS = ['Pedalada simples', 'Toque duplo', 'Elástico', '360 graus', 'Chapéu', 'Corte de calcanhar', 'Puxada de letra', 'Finta de letra', 'Controle de domínio', 'Cabeçada', 'Chute de longe', 'Controle da cavadinha', 'Precisão à distância', 'Chute com o peito do pé', 'Folha seca', 'Chute ascendente', 'Finalização acrobática', 'Toque de calcanhar', 'Chute de primeira', 'Passe de primeira', 'Passe em profundidade', 'Passe na medida', 'Cruzamento preciso', 'Curva para fora', 'De letra', 'Passe sem olhar', 'Passe aéreo baixo', 'Reposição baixa do GO', 'Reposição alta do GO', 'Arremesso lateral longo', 'Arremesso longo do GO', 'Pegador de pênaltis', 'Malícia', 'Marcação individual', 'Volta para marcar', 'Interceptação', 'Afastamento acrobático', 'Liderança', 'Super substituto', 'Espírito guerreiro'] as const
@@ -470,11 +470,11 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                   <Attr control={form.control} name="offensive_talent" label="Talento Ofensivo" />
                   <Attr control={form.control} name="ball_control" label="Controle de Bola" />
                   <Attr control={form.control} name="dribbling" label="Drible" />
-                  <Attr control={form.control} name="tight_possession" label="Posse Apertada" />
+                  <Attr control={form.control} name="tight_possession" label="Condução Firme" />
                   <Attr control={form.control} name="finishing" label="Finalização" />
                   <Attr control={form.control} name="heading" label="Cabeceio" />
                   <Attr control={form.control} name="place_kicking" label="Chute Colocado" />
-                  <Attr control={form.control} name="curl" label="Efeito" />
+                  <Attr control={form.control} name="curl" label="Curva" />
                 </div>
               </section>
 
@@ -493,7 +493,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                   <Attr control={form.control} name="speed" label="Velocidade" />
                   <Attr control={form.control} name="acceleration" label="Aceleração" />
                   <Attr control={form.control} name="stamina" label="Resistência" />
-                  <Attr control={form.control} name="jump" label="Salto" />
+                  <Attr control={form.control} name="jump" label="Impulsão" />
                   <Attr control={form.control} name="physical_contact" label="Contato Físico" />
                   <Attr control={form.control} name="balance" label="Equilíbrio" />
                 </div>
@@ -502,8 +502,8 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
               <section>
                 <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Shield className="w-10 h-10" /> Defesa</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <Attr control={form.control} name="defensive_awareness" label="Consciência Def." />
-                  <Attr control={form.control} name="ball_winning" label="Ganho de Bola" />
+                  <Attr control={form.control} name="defensive_awareness" label="Talento Defensivo" />
+                  <Attr control={form.control} name="ball_winning" label="Desarme" />
                   <Attr control={form.control} name="aggression" label="Agressividade" />
                 </div>
               </section>
@@ -513,11 +513,11 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                   <Circle className="w-10 h-10" /> Goleiro {isGK && <span className="text-yellow-400 text-lg">(apenas GO)</span>}
                 </h3>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                  <Attr control={form.control} name="gk_awareness" label="Consciência GO" />
-                  <Attr control={form.control} name="gk_catching" label="Defesa GO" />
-                  <Attr control={form.control} name="gk_clearing" label="Soco" />
-                  <Attr control={form.control} name="gk_reflexes" label="Reflexos GO" />
-                  <Attr control={form.control} name="gk_reach" label="Alcance GO" />
+                  <Attr control={form.control} name="gk_awareness" label="Talento de GO" />
+                  <Attr control={form.control} name="gk_catching" label="Firmeza de GO" />
+                  <Attr control={form.control} name="gk_clearing" label="Afast. de bola de GO" />
+                  <Attr control={form.control} name="gk_reflexes" label="Reflexos de GO" />
+                  <Attr control={form.control} name="gk_reach" label="Alcance de GO" />
                 </div>
               </section>
             </TabsContent>
@@ -548,7 +548,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
 
                 <FormField control={form.control} name="weak_foot_usage" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Uso Pé Fraco</FormLabel>
+                    <FormLabel className="text-lg font-semibold text-white">Pior pé (Frequência)</FormLabel>
                     <FormControl>
                       <Input type="number" min={1} max={3} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
                         {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
@@ -558,7 +558,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
 
                 <FormField control={form.control} name="weak_foot_accuracy" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Precisão PF</FormLabel>
+                    <FormLabel className="text-lg font-semibold text-white">Pior pé (Precisão)</FormLabel>
                     <FormControl>
                       <Input type="number" min={1} max={3} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
                         {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
@@ -568,7 +568,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
 
                 <FormField control={form.control} name="form" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Forma</FormLabel>
+                    <FormLabel className="text-lg font-semibold text-white">Forma Física</FormLabel>
                     <FormControl>
                       <Input type="number" min={1} max={8} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
                         {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
