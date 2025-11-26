@@ -107,7 +107,7 @@ const formSchema = z.object({
   weak_foot_usage: z.coerce.number().min(1).max(3).optional(),
   weak_foot_accuracy: z.coerce.number().min(1).max(3).optional(),
   form: z.coerce.number().min(1).max(8).optional(),
-  injury_resistance: z.coerce.number().min(1).max(2).optional(),
+  injury_resistance: z.coerce.number().min(1).max(3).optional(),
 
   preferred_foot: z.enum(PREFERRED_FOOT).nullable().optional(),
   playstyle: z.enum(PLAYSTYLES).nullable().optional(),
@@ -580,7 +580,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                   <FormItem>
                     <FormLabel className="text-lg font-semibold text-white">Res. Lesão</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} max={2} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
+                      <Input type="number" min={1} max={3} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
                         {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
                     </FormControl>
                   </FormItem>
