@@ -90,8 +90,26 @@ export default function ListaJogadores() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  // NOVO: controle global de quais jogadores estão abertos na lista
+  // NOVO: estados para controle de transição
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
+  const [isTransitioning, setIsTransitioning] = useState(false)
+
+  // NOVO: função para lidar com o clique no card grid
+  const handleGridCardClick = (playerId: string) => {
+    setIsTransitioning(true)
+    setViewMode('list')
+    
+    setTimeout(() => {
+      setOpenedPlayers([playerId])
+      
+      // Rola a página para o jogador selecionado
+      const element = document.getElementById(`player-${playerId}`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      setIsTransitioning(false)
+    }, 150)
+  }
 
   const togglePlayer = (playerId: string) => {
     setOpenedPlayers(prev =>
@@ -298,6 +316,16 @@ export default function ListaJogadores() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white">
+      {/* Overlay de transição */}
+      {isTransitioning && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
+            <p className="text-lg text-white">Carregando detalhes do jogador...</p>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
         {/* Header */}
@@ -515,88 +543,88 @@ export default function ListaJogadores() {
           </div>
         )}
 
-{/* GRID VIEW (corrigida e atualizada com foto menor, nome fora da imagem, OVR destacado e valor abaixo da posição) */}
-{viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
-  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-    {filteredPlayers.map(j => (
-      <div
-        key={j.id}
-        className="group relative bg-zinc-900/90 rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer"
-      >
-        {/* Botão admin */}
-        {userRole === 'admin' && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              openEditPlayer(j)
-            }}
-            className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-2.5 rounded-full backdrop-blur"
-          >
-            <Pencil className="w-4 h-4" />
-          </button>
+        {/* GRID VIEW (com clique para abrir na lista) */}
+        {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+            {filteredPlayers.map(j => (
+              <div
+                key={j.id}
+                onClick={() => handleGridCardClick(j.id)}
+                className="group relative bg-zinc-900/90 rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer"
+              >
+                {/* Botão admin */}
+                {userRole === 'admin' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openEditPlayer(j)
+                    }}
+                    className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-2.5 rounded-full backdrop-blur"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                )}
+
+                {/* FOTO MENOR + OVR DESTACADO SEM NOME EM CIMA */}
+                <div className="relative h-52 bg-zinc-800">
+                  {j.photo_url ? (
+                    <img
+                      src={j.photo_url}
+                      alt={j.name}
+                      className="absolute inset-0 w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-700">
+                      <span className="text-6xl font-black text-zinc-500 opacity-70">{j.position}</span>
+                    </div>
+                  )}
+
+                  {/* OVR estilo PES */}
+                  <div className="absolute top-3 left-3 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg border border-zinc-700 flex flex-col items-center">
+                    <span className="text-3xl font-black text-yellow-400">{j.overall}</span>
+                    <span className="text-[10px] text-zinc-300 -mt-1">OVR</span>
+                  </div>
+                </div>
+
+                {/* ÁREA DE INFORMAÇÕES FORA DA FOTO */}
+                <div className="p-4 space-y-3">
+
+                  {/* Nome */}
+                  <h3 className="font-bold text-lg text-center leading-tight line-clamp-2">{j.name}</h3>
+
+                  {/* Posição */}
+                  <div className="flex justify-center">
+                    <Badge className="bg-purple-600 text-white text-xs font-bold px-4 py-1.5">{j.position}</Badge>
+                  </div>
+
+                  {/* Estilo de jogo */}
+                  <p className="text-xs text-zinc-400 text-center">{j.playstyle || 'Nenhum'}</p>
+
+                  {/* Clube */}
+                  <div className="flex items-center justify-center gap-2.5 mt-1">
+                    {j.logo_url ? (
+                      <img
+                        src={j.logo_url}
+                        alt={j.club}
+                        className="w-7 h-7 object-contain rounded-full ring-2 ring-zinc-700"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                      />
+                    ) : (
+                      <div className="w-7 h-7 bg-zinc-700 rounded-full" />
+                    )}
+
+                    <p className="text-sm text-zinc-300 truncate max-w-[150px] text-center">{j.club}</p>
+                  </div>
+
+                  {/* Valor abaixo da posição */}
+                  <p className="text-center text-xl font-black text-emerald-400 mt-2">
+                    R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
-
-        {/* FOTO MENOR + OVR DESTACADO SEM NOME EM CIMA */}
-        <div className="relative h-52 bg-zinc-800">
-          {j.photo_url ? (
-            <img
-              src={j.photo_url}
-              alt={j.name}
-              className="absolute inset-0 w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-zinc-700">
-              <span className="text-6xl font-black text-zinc-500 opacity-70">{j.position}</span>
-            </div>
-          )}
-
-          {/* OVR estilo PES */}
-          <div className="absolute top-3 left-3 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg border border-zinc-700 flex flex-col items-center">
-            <span className="text-3xl font-black text-yellow-400">{j.overall}</span>
-            <span className="text-[10px] text-zinc-300 -mt-1">OVR</span>
-          </div>
-        </div>
-
-        {/* ÁREA DE INFORMAÇÕES FORA DA FOTO */}
-        <div className="p-4 space-y-3">
-
-          {/* Nome */}
-          <h3 className="font-bold text-lg text-center leading-tight line-clamp-2">{j.name}</h3>
-
-          {/* Posição */}
-          <div className="flex justify-center">
-            <Badge className="bg-purple-600 text-white text-xs font-bold px-4 py-1.5">{j.position}</Badge>
-          </div>
-
-          {/* Estilo de jogo */}
-          <p className="text-xs text-zinc-400 text-center">{j.playstyle || 'Nenhum'}</p>
-
-          {/* Clube */}
-          <div className="flex items-center justify-center gap-2.5 mt-1">
-            {j.logo_url ? (
-              <img
-                src={j.logo_url}
-                alt={j.club}
-                className="w-7 h-7 object-contain rounded-full ring-2 ring-zinc-700"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-              />
-            ) : (
-              <div className="w-7 h-7 bg-zinc-700 rounded-full" />
-            )}
-
-            <p className="text-sm text-zinc-300 truncate max-w-[150px] text-center">{j.club}</p>
-          </div>
-
-          {/* Valor abaixo da posição */}
-          <p className="text-center text-xl font-black text-emerald-400 mt-2">
-            R$ {Number(j.base_price).toLocaleString('pt-BR')}
-          </p>
-        </div>
-      </div>
-    ))}
-  </div>
-)}
-
 
         {/* LIST VIEW CORRIGIDA E ENRIQUECIDA */}
         {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
@@ -607,6 +635,7 @@ export default function ListaJogadores() {
               return (
                 <div
                   key={j.id}
+                  id={`player-${j.id}`}
                   className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-xl hover:shadow-purple-600/20"
                 >
                   {/* Linha principal */}
