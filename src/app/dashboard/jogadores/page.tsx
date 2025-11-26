@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/sheet'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { CadastrarJogadorForm } from '@/components/CadastrarJogadorForm'
-import { PlusCircle, Loader2, AlertCircle, Search, Filter, X, ChevronDown, Pencil, Grid3X3, List, Star, Ruler, Target } from 'lucide-react'
+import { PlusCircle, Loader2, AlertCircle, Search, Filter, X, ChevronDown, Pencil, Grid3X3, List, Star, Ruler } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Player {
@@ -91,9 +91,8 @@ export default function ListaJogadores() {
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
-  // CORREÇÃO: usar 'all' em vez de string vazia
+  // Estado para filtro de altura
   const [filterMinHeight, setFilterMinHeight] = useState<string>('all')
-  const [filterPenaltySpecialist, setFilterPenaltySpecialist] = useState<string>('Todos')
 
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -148,19 +147,49 @@ export default function ListaJogadores() {
 
   const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'PTE', 'PTD', 'CA']
   const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
-  const PENALTY_OPTIONS = ['Todos', 'Sim', 'Não']
 
-  const SKILLS_OPTIONS = [
-    'Pedalada simples', 'Toque duplo', 'Elástico', '360 graus', 'Chapéu', 'Corte de calcanhar',
-    'Puxada de letra', 'Finta de letra', 'Controle de domínio', 'Cabeçada', 'Chute de longe',
-    'Controle da cavadinha', 'Precisão à distância', 'Chute com o peito do pé', 'Folha seca',
-    'Chute ascendente', 'Finalização acrobática', 'Toque de calcanhar', 'Chute de primeira',
-    'Passe de primeira', 'Passe em profundidade', 'Passe na medida', 'Cruzamento preciso',
-    'Curva para fora', 'De letra', 'Passe sem olhar', 'Passe aéreo baixo', 'Reposição baixa do GO',
-    'Reposição alta do GO', 'Arremesso lateral longo', 'Arremesso longo do GO', 'Pegador de pênaltis',
-    'Malícia', 'Marcação individual', 'Volta para marcar', 'Interceptação', 'Afastamento acrobático',
-    'Liderança', 'Super substituto', 'Espírito guerreiro',
-  ]
+  // HABILIDADES ORGANIZADAS EM ORDEM ALFABÉTICA E COM "Especialista em Pênaltis" incluída
+  const SKILLS_OPTIONS = useMemo(() => [
+    '360 graus',
+    'Afastamento acrobático',
+    'Cabeçada',
+    'Chapéu',
+    'Chute ascendente',
+    'Chute com o peito do pé',
+    'Chute de primeira',
+    'Chute de longe',
+    'Controle da cavadinha',
+    'Controle de domínio',
+    'Corte de calcanhar',
+    'Cruzamento preciso',
+    'Curva para fora',
+    'De letra',
+    'Elástico',
+    'Especialista em Pênaltis', // NOVA HABILIDADE ADICIONADA
+    'Espírito guerreiro',
+    'Finalização acrobática',
+    'Finta de letra',
+    'Folha seca',
+    'Interceptação',
+    'Liderança',
+    'Malícia',
+    'Marcação individual',
+    'Passe aéreo baixo',
+    'Passe em profundidade',
+    'Passe na medida',
+    'Passe de primeira',
+    'Passe sem olhar',
+    'Pedalada simples',
+    'Pegador de pênaltis',
+    'Precisão à distância',
+    'Puxada de letra',
+    'Reposição alta do GO',
+    'Reposição baixa do GO',
+    'Super substituto',
+    'Toque de calcanhar',
+    'Toque duplo',
+    'Volta para marcar'
+  ].sort(), []);
 
   const ATTRIBUTE_GROUPS = [
     { name: 'Ataque & Técnica', attributes: ['offensive_talent', 'ball_control', 'dribbling', 'tight_possession', 'finishing', 'heading', 'place_kicking', 'curl'] },
@@ -226,18 +255,26 @@ export default function ListaJogadores() {
       const teamMap = Object.fromEntries((teamsData || []).map(t => [t.id, t]))
       setTeams(teamsData || [])
 
-      const mapped = (playersData || []).map(p => ({
-        ...p,
-        club: p.team_id ? teamMap[p.team_id]?.name || 'Sem Time' : 'Sem Time',
-        logo_url: p.team_id ? teamMap[p.team_id]?.logo_url : null,
-        preferred_foot: p.preferred_foot || 'Nenhum',
-        skills: p.skills || [],
-        playstyle: p.playstyle || null,
-        alternative_positions: p.alternative_positions || [],
-        nationality: p.nationality || 'Desconhecida',
-        height: p.height || null,
-        is_penalty_specialist: p.is_penalty_specialist || false,
-      }))
+      const mapped = (playersData || []).map(p => {
+        // Adicionar "Especialista em Pênaltis" às skills se o jogador for especialista
+        const skills = p.skills || []
+        if (p.is_penalty_specialist && !skills.includes('Especialista em Pênaltis')) {
+          skills.push('Especialista em Pênaltis')
+        }
+
+        return {
+          ...p,
+          club: p.team_id ? teamMap[p.team_id]?.name || 'Sem Time' : 'Sem Time',
+          logo_url: p.team_id ? teamMap[p.team_id]?.logo_url : null,
+          preferred_foot: p.preferred_foot || 'Nenhum',
+          skills: skills,
+          playstyle: p.playstyle || null,
+          alternative_positions: p.alternative_positions || [],
+          nationality: p.nationality || 'Desconhecida',
+          height: p.height || null,
+          is_penalty_specialist: p.is_penalty_specialist || false,
+        }
+      })
 
       setJogadores(mapped)
     } catch (e: any) {
@@ -270,25 +307,19 @@ export default function ListaJogadores() {
       const skills = selectedSkills.length === 0 || selectedSkills.every(s => j.skills?.includes(s))
       const attrs = Object.entries(attrFilters).every(([k, min]) => min === null || (j[k as keyof Player] as number ?? 0) >= min)
       
-      // CORREÇÃO: usar 'all' em vez de string vazia
+      // Filtro de altura
       const height = filterMinHeight === 'all' || (j.height && j.height >= parseInt(filterMinHeight))
       
-      // Filtro de especialista em pênaltis
-      const penalty = filterPenaltySpecialist === 'Todos' || 
-        (filterPenaltySpecialist === 'Sim' && j.is_penalty_specialist) ||
-        (filterPenaltySpecialist === 'Não' && !j.is_penalty_specialist)
-      
-      return name && pos && foot && team && skills && attrs && height && penalty
+      return name && pos && foot && team && skills && attrs && height
     })
-  }, [jogadores, searchName, filterPosition, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight, filterPenaltySpecialist])
+  }, [jogadores, searchName, filterPosition, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight])
 
   const activeAdvancedFilters = [
     filterFoot !== 'Todos',
     filterTeam !== 'Todos',
     selectedSkills.length > 0,
     Object.values(attrFilters).some(v => v !== null),
-    filterMinHeight !== 'all', // CORREÇÃO: usar 'all' em vez de string vazia
-    filterPenaltySpecialist !== 'Todos'
+    filterMinHeight !== 'all',
   ].filter(Boolean).length
 
   const clearAllFilters = () => {
@@ -297,8 +328,7 @@ export default function ListaJogadores() {
     setFilterFoot('Todos')
     setFilterTeam('Todos')
     setSelectedSkills([])
-    setFilterMinHeight('all') // CORREÇÃO: usar 'all' em vez de string vazia
-    setFilterPenaltySpecialist('Todos')
+    setFilterMinHeight('all')
     setAttrFilters(Object.fromEntries(Object.keys(attrFilters).map(k => [k, null])))
   }
 
@@ -438,7 +468,7 @@ export default function ListaJogadores() {
                     </Select>
                   </div>
 
-                  {/* CORREÇÃO: Filtro de Altura - usar 'all' em vez de string vazia */}
+                  {/* Filtro de Altura */}
                   <div>
                     <label className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
                       <Ruler className="w-4 h-4" />
@@ -459,24 +489,7 @@ export default function ListaJogadores() {
                     </Select>
                   </div>
 
-                  {/* Filtro de Especialista em Pênaltis */}
-                  <div>
-                    <label className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
-                      <Target className="w-4 h-4" />
-                      Especialista em Pênaltis
-                    </label>
-                    <Select value={filterPenaltySpecialist} onValueChange={setFilterPenaltySpecialist}>
-                      <SelectTrigger className="bg-zinc-900/70 border-zinc-700 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PENALTY_OPTIONS.map(p => (
-                          <SelectItem key={p} value={p}>{p}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
+                  {/* Filtro de Habilidades (AGORA INCLUI "Especialista em Pênaltis") */}
                   <Collapsible>
                     <CollapsibleTrigger className="flex w-full items-center justify-between py-4 text-lg font-bold text-white hover:text-purple-400">
                       Habilidades ({selectedSkills.length})
@@ -766,7 +779,7 @@ export default function ListaJogadores() {
                   {isOpen && (
                     <div className="border-t border-zinc-800 bg-zinc-900/50 px-6 py-6">
                       <div className="space-y-6">
-                        {/* Linha 1: básicos */}
+                        {/* Linha 1: básicos - REMOVIDO "Especialista em Pênaltis" */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                           <div>
                             <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
@@ -782,7 +795,7 @@ export default function ListaJogadores() {
                           </div>
                         </div>
 
-                        {/* Linha 2: Altura e Especialista em Pênaltis */}
+                        {/* Linha 2: Apenas Altura (REMOVIDO "Especialista em Pênaltis") */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                           <div>
                             <span className="text-zinc-500 flex items-center gap-2">
@@ -790,22 +803,6 @@ export default function ListaJogadores() {
                               Altura:
                             </span> 
                             <strong>{formatHeight(j.height)}</strong>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500 flex items-center gap-2">
-                              <Target className="w-4 h-4" />
-                              Especialista em Pênaltis:
-                            </span> 
-                            <div className="flex items-center gap-2">
-                              {j.is_penalty_specialist ? (
-                                <>
-                                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                                  <strong className="text-yellow-400">Sim</strong>
-                                </>
-                              ) : (
-                                <strong className="text-zinc-400">Não</strong>
-                              )}
-                            </div>
                           </div>
                         </div>
 
@@ -886,7 +883,7 @@ export default function ListaJogadores() {
                           </div>
                         </div>
 
-                        {/* Habilidades especiais */}
+                        {/* Habilidades especiais (AGORA INCLUI "Especialista em Pênaltis" como habilidade normal) */}
                         {j.skills && j.skills.length > 0 && (
                           <div>
                             <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
