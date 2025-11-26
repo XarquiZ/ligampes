@@ -571,46 +571,6 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
 
             {/* DETALHES & SKILLS */}
             <TabsContent value="details" className="space-y-12 mt-8">
-              {/* NOVO CAMPO - ESPECIALISTA EM PÊNALTIS */}
-              <div className="p-6 bg-zinc-800/50 rounded-2xl border border-zinc-700">
-                <FormField
-                  control={form.control}
-                  name="is_penalty_specialist"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border border-zinc-700 p-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-xl font-semibold text-white flex items-center gap-3">
-                          <Target className="w-6 h-6 text-green-400" />
-                          Especialista em Pênaltis
-                        </FormLabel>
-                        <div className="text-zinc-400 text-sm">
-                          Jogador possui habilidade especial para cobrança de pênaltis
-                        </div>
-                      </div>
-                      <FormControl>
-                        <div className="flex gap-4">
-                          <Button
-                            type="button"
-                            variant={field.value ? "default" : "outline"}
-                            className={`h-11 px-6 ${field.value ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'bg-zinc-700 hover:bg-zinc-600 border-zinc-600'}`}
-                            onClick={() => field.onChange(true)}
-                          >
-                            Sim
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={!field.value ? "default" : "outline"}
-                            className={`h-11 px-6 ${!field.value ? 'bg-red-600 hover:bg-red-700 border-red-600' : 'bg-zinc-700 hover:bg-zinc-600 border-zinc-600'}`}
-                            onClick={() => field.onChange(false)}
-                          >
-                            Não
-                          </Button>
-                        </div>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <FormField control={form.control} name="preferred_foot" render={({ field }) => (
