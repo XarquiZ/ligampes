@@ -723,7 +723,7 @@ export default function ListaJogadores() {
                       )}
                     </div>
 
-                    <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-6 text-sm">
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-6 text-sm">
                       <div>
                         <p className="text-zinc-500">Nome</p>
                         <p className="font-bold text-lg">{j.name}</p>
@@ -744,13 +744,15 @@ export default function ListaJogadores() {
                         </div>
                       </div>
                       <div>
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
                           <p className="text-zinc-500">Overall</p>
-                          <p className="text-emerald-400 font-bold text-lg">
-                            R$ {Number(j.base_price).toLocaleString('pt-BR')}
-                          </p>
+                          <p className="text-3xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
                         </div>
-                        <p className="text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
+                      </div>
+                      <div className="flex items-center justify-end">
+                        <p className="text-emerald-400 font-bold text-xl">
+                          R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                        </p>
                       </div>
                       <div className="flex items-center justify-end gap-4">
                         {userRole === 'admin' && (
@@ -859,7 +861,7 @@ export default function ListaJogadores() {
                           <div>
                             <p className="text-zinc-500">Pé Fraco (Uso)</p>
                             <div className="flex items-center gap-3">
-                              <LevelBars value={j.weak_foot_usage ?? 0} max={3} size="sm" />
+                              <LevelBars value={j.weak_foot_usage ?? 0} max={4} size="sm" />
                               <span className="font-bold">{j.weak_foot_usage ?? '-'}</span>
                             </div>
                           </div>
@@ -867,7 +869,7 @@ export default function ListaJogadores() {
                           <div>
                             <p className="text-zinc-500">Pé Fraco (Precisão)</p>
                             <div className="flex items-center gap-3">
-                              <LevelBars value={j.weak_foot_accuracy ?? 0} max={3} size="sm" />
+                              <LevelBars value={j.weak_foot_accuracy ?? 0} max={4} size="sm" />
                               <span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span>
                             </div>
                           </div>
