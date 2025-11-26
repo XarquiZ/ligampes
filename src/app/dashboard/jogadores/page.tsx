@@ -730,9 +730,7 @@ export default function ListaJogadores() {
                         <p className="text-zinc-500">Posição</p>
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge className="bg-purple-600">{j.position}</Badge>
-                          {j.alternative_positions?.map(p => (
-                            <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
-                          ))}
+                          {/* Posições alternativas removidas da linha principal */}
                         </div>
                       </div>
                       <div>
@@ -746,11 +744,6 @@ export default function ListaJogadores() {
                         <p className="text-zinc-500">Overall</p>
                         <p className="text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
                       </div>
-                      <div>
-                        <p className="text-zinc-500">Preço</p>
-                        <p className="text-2xl font-bold text-emerald-400">R$ {Number(j.base_price).toLocaleString('pt-BR')}</p>
-                      </div>
-
                       <div className="flex items-center justify-end gap-4">
                         {userRole === 'admin' && (
                           <Button
@@ -760,6 +753,7 @@ export default function ListaJogadores() {
                               e.stopPropagation()
                               openEditPlayer(j)
                             }}
+                            className="hover:bg-purple-600/20"
                           >
                             <Pencil className="w-5 h-5" />
                           </Button>
@@ -779,24 +773,11 @@ export default function ListaJogadores() {
                   {isOpen && (
                     <div className="border-t border-zinc-800 bg-zinc-900/50 px-6 py-6">
                       <div className="space-y-6">
-                        {/* Linha 1: básicos - REMOVIDO "Especialista em Pênaltis" */}
+                        {/* Linha 1: básicos - Altura na mesma linha da idade */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                           <div>
                             <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
                           </div>
-                          <div>
-                            <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500">Estilo de Jogo:</span> <strong>{j.playstyle || 'Nenhum'}</strong>
-                          </div>
-                        </div>
-
-                        {/* Linha 2: Apenas Altura (REMOVIDO "Especialista em Pênaltis") */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
                           <div>
                             <span className="text-zinc-500 flex items-center gap-2">
                               <Ruler className="w-4 h-4" />
@@ -804,20 +785,65 @@ export default function ListaJogadores() {
                             </span> 
                             <strong>{formatHeight(j.height)}</strong>
                           </div>
+                          <div>
+                            <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
+                          </div>
                         </div>
 
-                        {/* Posições alternativas */}
-                        <div>
-                          <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
-                          <div className="flex gap-2 flex-wrap">
-                            {j.alternative_positions && j.alternative_positions.length > 0 ? (
-                              j.alternative_positions.map(p => (
+                        {/* Posições alternativas (APENAS QUANDO EXPANDIDO) */}
+                        {j.alternative_positions && j.alternative_positions.length > 0 && (
+                          <div>
+                            <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
+                            <div className="flex gap-2 flex-wrap">
+                              {j.alternative_positions.map(p => (
                                 <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
-                              ))
-                            ) : (
-                              <span className="text-zinc-500">Nenhuma</span>
-                            )}
+                              ))}
+                            </div>
                           </div>
+                        )}
+
+                        {/* Atributos */}
+                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-x-6 gap-y-4 text-xs">
+                          {[
+                            { k: 'offensive_talent', l: 'Tal. Ofensivo' },
+                            { k: 'ball_control', l: 'Controle de bola' },
+                            { k: 'dribbling', l: 'Drible' },
+                            { k: 'tight_possession', l: 'Condução Firme' },
+                            { k: 'low_pass', l: 'Passe rasteiro' },
+                            { k: 'lofted_pass', l: 'Passe Alto' },
+                            { k: 'finishing', l: 'Finalização' },
+                            { k: 'heading', l: 'Cabeceio' },
+                            { k: 'place_kicking', l: 'Chute colocado' },
+                            { k: 'curl', l: 'Curva' },
+                            { k: 'speed', l: 'Velocidade' },
+                            { k: 'acceleration', l: 'Aceleração' },
+                            { k: 'kicking_power', l: 'Força do chute' },
+                            { k: 'jump', l: 'Impulsão' },
+                            { k: 'physical_contact', l: 'Contato Físico' },
+                            { k: 'balance', l: 'Equilíbrio' },
+                            { k: 'stamina', l: 'Resistência' },
+                            { k: 'defensive_awareness', l: 'Talento defensivo' },
+                            { k: 'ball_winning', l: 'Desarme' },
+                            { k: 'aggression', l: 'Agressividade' },
+                            { k: 'gk_awareness', l: 'Talento de GO' },
+                            { k: 'gk_catching', l: 'Firmeza de GO' },
+                            { k: 'gk_clearing', l: 'Afast. de bola de GO' },
+                            { k: 'gk_reflexes', l: 'Reflexos de GO' },
+                            { k: 'gk_reach', l: 'Alcance de GO' },
+                          ].map(({ k, l }) => {
+                            const value = j[k as keyof Player] as number | null
+                            const display = (value ?? 40)
+                            const color = getAttrColorHex(display)
+                            return (
+                              <div key={k} className="text-center">
+                                <p className="text-zinc-500 font-medium">{l}</p>
+                                <p className="text-xl font-black" style={{ color }}>{display}</p>
+                              </div>
+                            )
+                          })}
                         </div>
 
                         {/* Pé fraco e Frequência */}
@@ -894,47 +920,6 @@ export default function ListaJogadores() {
                             </div>
                           </div>
                         )}
-
-                        {/* Atributos */}
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-x-6 gap-y-4 text-xs">
-                          {[
-                            { k: 'offensive_talent', l: 'Tal. Ofensivo' },
-                            { k: 'ball_control', l: 'Controle de bola' },
-                            { k: 'dribbling', l: 'Drible' },
-                            { k: 'tight_possession', l: 'Condução Firme' },
-                            { k: 'low_pass', l: 'Passe rasteiro' },
-                            { k: 'lofted_pass', l: 'Passe Alto' },
-                            { k: 'finishing', l: 'Finalização' },
-                            { k: 'heading', l: 'Cabeceio' },
-                            { k: 'place_kicking', l: 'Chute colocado' },
-                            { k: 'curl', l: 'Curva' },
-                            { k: 'speed', l: 'Velocidade' },
-                            { k: 'acceleration', l: 'Aceleração' },
-                            { k: 'kicking_power', l: 'Força do chute' },
-                            { k: 'jump', l: 'Impulsão' },
-                            { k: 'physical_contact', l: 'Contato Físico' },
-                            { k: 'balance', l: 'Equilíbrio' },
-                            { k: 'stamina', l: 'Resistência' },
-                            { k: 'defensive_awareness', l: 'Talento defensivo' },
-                            { k: 'ball_winning', l: 'Desarme' },
-                            { k: 'aggression', l: 'Agressividade' },
-                            { k: 'gk_awareness', l: 'Talento de GO' },
-                            { k: 'gk_catching', l: 'Firmeza de GO' },
-                            { k: 'gk_clearing', l: 'Afast. de bola de GO' },
-                            { k: 'gk_reflexes', l: 'Reflexos de GO' },
-                            { k: 'gk_reach', l: 'Alcance de GO' },
-                          ].map(({ k, l }) => {
-                            const value = j[k as keyof Player] as number | null
-                            const display = (value ?? 40)
-                            const color = getAttrColorHex(display)
-                            return (
-                              <div key={k} className="text-center">
-                                <p className="text-zinc-500 font-medium">{l}</p>
-                                <p className="text-xl font-black" style={{ color }}>{display}</p>
-                              </div>
-                            )
-                          })}
-                        </div>
                       </div>
                     </div>
                   )}
