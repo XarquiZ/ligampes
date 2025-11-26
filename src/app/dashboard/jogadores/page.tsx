@@ -38,6 +38,7 @@ interface Player {
   age?: number | null
   height?: number | null
   is_penalty_specialist?: boolean | null
+  injury_resistance?: number | null
   offensive_talent?: number
   ball_control?: number
   dribbling?: number
@@ -273,6 +274,7 @@ export default function ListaJogadores() {
           nationality: p.nationality || 'Desconhecida',
           height: p.height || null,
           is_penalty_specialist: p.is_penalty_specialist || false,
+          injury_resistance: p.injury_resistance || null,
         }
       })
 
@@ -725,6 +727,7 @@ export default function ListaJogadores() {
                       <div>
                         <p className="text-zinc-500">Nome</p>
                         <p className="font-bold text-lg">{j.name}</p>
+                        <p className="text-zinc-400 text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
                       </div>
                       <div>
                         <p className="text-zinc-500">Posição</p>
@@ -743,6 +746,9 @@ export default function ListaJogadores() {
                       <div>
                         <p className="text-zinc-500">Overall</p>
                         <p className="text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
+                        <p className="text-emerald-400 font-bold text-lg mt-1">
+                          R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                        </p>
                       </div>
                       <div className="flex items-center justify-end gap-4">
                         {userRole === 'admin' && (
@@ -846,8 +852,8 @@ export default function ListaJogadores() {
                           })}
                         </div>
 
-                        {/* Pé fraco e Frequência */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm items-center">
+                        {/* Pé fraco, Frequência, Forma física e Resistência a Lesão */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-sm items-center">
                           <div>
                             <p className="text-zinc-500">Pé Fraco (Uso)</p>
                             <div className="flex items-center gap-3">
@@ -869,6 +875,14 @@ export default function ListaJogadores() {
                             <div className="flex items-center gap-3">
                               <LevelBars value={j.form ?? 0} max={8} size="md" />
                               <span className="font-bold">{j.form ?? '-'}</span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-zinc-500">Resistência a Lesão</p>
+                            <div className="flex items-center gap-3">
+                              <LevelBars value={j.injury_resistance ?? 0} max={3} size="sm" />
+                              <span className="font-bold">{j.injury_resistance ?? '-'}</span>
                             </div>
                           </div>
                         </div>
