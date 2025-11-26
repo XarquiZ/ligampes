@@ -104,7 +104,7 @@ export default function ListaJogadores() {
       const height = 140 + i;
       return {
         value: String(height),
-        label: `${height}cm (${(height / 100).toFixed(2)}m)`
+        label: `${height}cm`
       };
     }), []
   );
@@ -207,10 +207,10 @@ export default function ListaJogadores() {
     return '#E53935'
   }
 
-  // Função para formatar altura
+  // Função para formatar altura (apenas cm)
   const formatHeight = (height: number | null | undefined) => {
     if (height === null || height === undefined) return '-'
-    return `${height}cm (${(height / 100).toFixed(2)}m)`
+    return `${height}cm`
   }
 
   function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null; max?: number; size?: 'sm' | 'md' }) {
@@ -744,11 +744,13 @@ export default function ListaJogadores() {
                         </div>
                       </div>
                       <div>
-                        <p className="text-zinc-500">Overall</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-zinc-500">Overall</p>
+                          <p className="text-emerald-400 font-bold text-lg">
+                            R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
                         <p className="text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
-                        <p className="text-emerald-400 font-bold text-lg mt-1">
-                          R$ {Number(j.base_price).toLocaleString('pt-BR')}
-                        </p>
                       </div>
                       <div className="flex items-center justify-end gap-4">
                         {userRole === 'admin' && (
@@ -789,7 +791,7 @@ export default function ListaJogadores() {
                               <Ruler className="w-4 h-4" />
                               Altura:
                             </span> 
-                            <strong>{formatHeight(j.height)}</strong>
+                            <strong className="ml-6">{formatHeight(j.height)}</strong>
                           </div>
                           <div>
                             <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
