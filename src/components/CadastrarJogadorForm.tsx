@@ -104,8 +104,8 @@ const formSchema = z.object({
   gk_reflexes: z.coerce.number().min(0).max(99).nullable().optional(),
   gk_reach: z.coerce.number().min(0).max(99).nullable().optional(),
 
-  weak_foot_usage: z.coerce.number().min(1).max(3).optional(),
-  weak_foot_accuracy: z.coerce.number().min(1).max(3).optional(),
+  weak_foot_usage: z.coerce.number().min(1).max(4).optional(),
+  weak_foot_accuracy: z.coerce.number().min(1).max(4).optional(),
   form: z.coerce.number().min(1).max(8).optional(),
   injury_resistance: z.coerce.number().min(1).max(3).optional(),
 
@@ -550,7 +550,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                   <FormItem>
                     <FormLabel className="text-lg font-semibold text-white">Pior pé (Frequência)</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} max={3} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
+                      <Input type="number" min={1} max={4} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
                         {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
                     </FormControl>
                   </FormItem>
@@ -560,7 +560,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                   <FormItem>
                     <FormLabel className="text-lg font-semibold text-white">Pior pé (Precisão)</FormLabel>
                     <FormControl>
-                      <Input type="number" min={1} max={3} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
+                      <Input type="number" min={1} max={4} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
                         {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
                     </FormControl>
                   </FormItem>
