@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COM CHAT PRIVADO
+// src/app/dashboard/page.tsx - VERSÃO COMPLETA COM CHAT POPUP
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -12,7 +12,7 @@ import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLe
 import Image from 'next/image'
 import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
-
+import ChatPopup from '@/components/ChatPopup'
 
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
@@ -28,6 +28,8 @@ export default function Dashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -86,6 +88,60 @@ export default function Dashboard() {
 
     loadUserData()
   }, [authLoading, user])
+
+  // Carregar contagem de mensagens não lidas
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data: conversations } = await supabase
+          .from('conversations')
+          .select('id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+
+        if (!conversations?.length) {
+          setUnreadCount(0)
+          return
+        }
+
+        const conversationIds = conversations.map(conv => conv.id)
+        
+        const { count } = await supabase
+          .from('private_messages')
+          .select('*', { count: 'exact', head: true })
+          .in('conversation_id', conversationIds)
+          .eq('read', false)
+          .neq('sender_id', user.id)
+
+        setUnreadCount(count || 0)
+      } catch (error) {
+        console.error('Erro ao carregar contagem de mensagens:', error)
+      }
+    }
+
+    loadUnreadCount()
+
+    // Subscription para atualizar em tempo real
+    const subscription = supabase
+      .channel('unread_messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        () => {
+          loadUnreadCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [user])
 
   const handleSignOut = async () => {
     try {
@@ -245,10 +301,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      // E no final do return, adicione:
-      {user && (
-  <FloatingChatButton />
-)}
+      {/* Chat Components */}
+      {user && team && (
+        <>
+          <FloatingChatButton 
+            currentUser={user}
+            currentTeam={team}
+            unreadCount={unreadCount}
+            onOpenChat={() => setIsChatOpen(true)}
+          />
+          
+          <ChatPopup
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            currentUser={user}
+            currentTeam={team}
+          />
+        </>
+      )}
     </>
   )
 }
