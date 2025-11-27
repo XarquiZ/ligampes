@@ -315,50 +315,95 @@ export default function ListaJogadores() {
     loadUserData()
   }, [authLoading, user])
 
-  // useEffect SIMPLIFICADO: Detectar hash da URL
+  // CORREÇÃO: useEffect para detectar hash da URL e fazer scroll automático
   useEffect(() => {
     const handleHashChange = () => {
       if (typeof window === 'undefined') return;
       
       const hash = window.location.hash;
+      console.log('🔍 Hash detectado:', hash);
+      
       if (hash && hash.startsWith('#player-')) {
         const playerId = hash.replace('#player-', '');
+        console.log('🎯 ID do jogador do hash:', playerId);
         
         // Garantir que está na view de lista
         setViewMode('list');
         
-        // Abrir o card do jogador
-        setOpenedPlayers(prev => 
-          prev.includes(playerId) ? prev : [...prev, playerId]
-        );
-        
-        // Scroll para o jogador
+        // Aguardar um pouco para a view mudar e os elementos renderizarem
         setTimeout(() => {
-          const element = document.getElementById(`player-${playerId}`);
-          if (element) {
-            element.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'center'
-            });
+          // Abrir o card do jogador
+          setOpenedPlayers(prev => 
+            prev.includes(playerId) ? prev : [...prev, playerId]
+          );
+          
+          // Scroll para o jogador após abrir o card
+          setTimeout(() => {
+            const element = document.getElementById(`player-${playerId}`);
+            console.log('🔎 Elemento encontrado:', element);
             
-            // Adicionar destaque visual
-            element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl');
-            setTimeout(() => {
-              element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
-            }, 3000);
-          }
-        }, 800);
+            if (element) {
+              // Scroll suave para o elemento
+              element.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'center',
+                inline: 'nearest'
+              });
+              
+              // Adicionar destaque visual
+              element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-500');
+              
+              // Remover o destaque após 3 segundos
+              setTimeout(() => {
+                element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
+              }, 3000);
+              
+              console.log('✅ Scroll realizado para o jogador:', playerId);
+            } else {
+              console.log('❌ Elemento não encontrado, tentando novamente...');
+              // Tentar novamente após mais tempo
+              setTimeout(() => {
+                const retryElement = document.getElementById(`player-${playerId}`);
+                if (retryElement) {
+                  retryElement.scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'center' 
+                  });
+                  retryElement.classList.add('ring-2', 'ring-purple-500', 'rounded-xl');
+                  setTimeout(() => {
+                    retryElement.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
+                  }, 3000);
+                }
+              }, 1000);
+            }
+          }, 500); // Tempo para o card abrir
+        }, 300); // Tempo para a view mudar
       }
     };
 
     // Executar na montagem inicial se já tiver hash
     handleHashChange();
     
-    // Ouvir mudanças no hash
+    // Ouvir mudanças no hash (quando navega via chat)
     window.addEventListener('hashchange', handleHashChange);
     
+    // Também verificar quando a página termina de carregar
+    window.addEventListener('load', handleHashChange);
+    
+    // Verificar periodicamente por alguns segundos após carregar (fallback)
+    const interval = setInterval(() => {
+      if (window.location.hash && window.location.hash.startsWith('#player-')) {
+        handleHashChange();
+        clearInterval(interval);
+      }
+    }, 500);
+    
+    setTimeout(() => clearInterval(interval), 5000); // Parar após 5 segundos
+
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
+      window.removeEventListener('load', handleHashChange);
+      clearInterval(interval);
     };
   }, []);
 

@@ -218,3 +218,15 @@ div:focus {
 .no-focus-behavior:focus-visible {
   outline: none !important;
 }
+
+.ring-2 {
+  box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.5);
+}
+
+.ring-purple-500 {
+  --tw-ring-color: rgb(168 85 247);
+}
+
+.transition-all {
+  transition: all 0.3s ease-in-out;
+}
