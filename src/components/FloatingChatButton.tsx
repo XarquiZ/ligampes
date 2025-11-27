@@ -26,30 +26,30 @@ interface FloatingChatButtonProps {
 export default function FloatingChatButton({
   currentUser,
   currentTeam,
-  unreadCount: initialUnreadCount,
+  unreadCount,
   onOpenChat,
   onUnreadCountChange
 }: FloatingChatButtonProps) {
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const [internalUnreadCount, setInternalUnreadCount] = useState(unreadCount);
 
-  // Atualizar quando a prop mudar
+  // Sincronizar com a prop
   useEffect(() => {
-    setUnreadCount(initialUnreadCount);
-  }, [initialUnreadCount]);
+    setInternalUnreadCount(unreadCount);
+  }, [unreadCount]);
 
-  // Escutar eventos de atualização do chat
+  // Escutar eventos de atualização
   useEffect(() => {
     const handleUnreadCountUpdated = (event: CustomEvent) => {
       const { totalUnread } = event.detail || {};
       if (typeof totalUnread === 'number') {
-        setUnreadCount(totalUnread);
+        console.log('Evento recebido - totalUnread:', totalUnread);
+        setInternalUnreadCount(totalUnread);
         if (onUnreadCountChange) {
           onUnreadCountChange(totalUnread);
         }
       }
     };
 
-    // Escutar evento personalizado
     window.addEventListener('chatUnreadCountUpdated', handleUnreadCountUpdated as EventListener);
     
     return () => {
@@ -57,14 +57,9 @@ export default function FloatingChatButton({
     };
   }, [onUnreadCountChange]);
 
-  // Função para abrir chat e resetar contador visualmente
+  // Função para abrir chat
   const handleOpenChat = () => {
-    // Resetar visualmente o contador imediatamente
-    setUnreadCount(0);
-    if (onUnreadCountChange) {
-      onUnreadCountChange(0);
-    }
-    // Abrir o chat
+    console.log('Abrindo chat - unreadCount atual:', internalUnreadCount);
     onOpenChat();
   };
 
@@ -75,9 +70,9 @@ export default function FloatingChatButton({
       aria-label="Abrir chat"
     >
       <MessageCircle size={20} className="group-hover:scale-110 transition-transform" />
-      {unreadCount > 0 && (
+      {internalUnreadCount > 0 && (
         <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow-lg border border-zinc-900 animate-pulse">
-          {unreadCount > 9 ? '9+' : unreadCount}
+          {internalUnreadCount > 9 ? '9+' : internalUnreadCount}
         </span>
       )}
     </button>

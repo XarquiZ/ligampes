@@ -93,6 +93,7 @@ export default function ChatPopup({
 
   // Notificar mudança no contador
   const notifyUnreadCountChange = (count: number) => {
+    console.log('Notificando mudança no contador:', count);
     if (onUnreadCountChange) {
       onUnreadCountChange(count);
     }
@@ -125,7 +126,7 @@ export default function ChatPopup({
     loadData();
   }, [isOpen, currentUser.id]);
 
-  // Carregar conversas do usuário
+  // CORREÇÃO CRÍTICA: Carregar conversas do usuário
   const loadConversations = async () => {
     try {
       console.log('Carregando conversas para usuário:', currentUser.id);
@@ -171,20 +172,36 @@ export default function ChatPopup({
         return;
       }
 
-      // Carrega contagem de mensagens não lidas para cada conversa
+      // CORREÇÃO: Carregar contagem de mensagens não lidas de forma mais eficiente
       const conversationsWithUnread = await Promise.all(
         conversationsData.map(async (conv) => {
-          const { count } = await supabase
-            .from('private_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', conv.id)
-            .eq('read', false)
-            .neq('sender_id', currentUser.id);
+          try {
+            const { count, error: countError } = await supabase
+              .from('private_messages')
+              .select('*', { count: 'exact', head: true })
+              .eq('conversation_id', conv.id)
+              .eq('read', false)
+              .neq('sender_id', currentUser.id);
 
-          return {
-            ...conv,
-            unread_count: count || 0
-          };
+            if (countError) {
+              console.error('Erro ao contar mensagens não lidas:', countError);
+              return {
+                ...conv,
+                unread_count: 0
+              };
+            }
+
+            return {
+              ...conv,
+              unread_count: count || 0
+            };
+          } catch (error) {
+            console.error('Erro ao processar conversa:', conv.id, error);
+            return {
+              ...conv,
+              unread_count: 0
+            };
+          }
         })
       );
 
@@ -223,6 +240,7 @@ export default function ChatPopup({
       
       // Calcular e notificar o total de mensagens não lidas
       const totalUnread = calculateTotalUnread(formattedConversations);
+      console.log('Total de mensagens não lidas calculado:', totalUnread);
       notifyUnreadCountChange(totalUnread);
       
     } catch (error) {
@@ -269,9 +287,40 @@ export default function ChatPopup({
     }
   };
 
-  // Carregar mensagens de uma conversa - CORRIGIDO para marcar como lidas
+  // CORREÇÃO CRÍTICA: Função para marcar mensagens como lidas
+  const markMessagesAsRead = async (conversationId: string) => {
+    try {
+      console.log('Marcando mensagens como lidas para conversa:', conversationId);
+      
+      const { error } = await supabase
+        .from('private_messages')
+        .update({ read: true })
+        .eq('conversation_id', conversationId)
+        .eq('read', false)
+        .neq('sender_id', currentUser.id);
+
+      if (error) {
+        console.error('Erro ao marcar mensagens como lidas:', error);
+        return false;
+      }
+
+      console.log('Mensagens marcadas como lidas com sucesso');
+      return true;
+    } catch (error) {
+      console.error('Erro ao processar marcação como lida:', error);
+      return false;
+    }
+  };
+
+  // CORREÇÃO CRÍTICA: Carregar mensagens de uma conversa
   const loadMessages = async (conversationId: string) => {
     try {
+      console.log('Carregando mensagens da conversa:', conversationId);
+
+      // PRIMEIRO: Marcar mensagens como lidas
+      await markMessagesAsRead(conversationId);
+
+      // DEPOIS: Carregar as mensagens
       const { data: messagesData, error } = await supabase
         .from('private_messages')
         .select('*')
@@ -281,29 +330,6 @@ export default function ChatPopup({
       if (error) {
         console.error('Erro ao carregar mensagens:', error);
         return;
-      }
-
-      // CORREÇÃO: Marcar TODAS as mensagens não lidas como lidas
-      const unreadMessages = messagesData?.filter(msg => 
-        !msg.read && msg.sender_id !== currentUser.id
-      );
-
-      if (unreadMessages && unreadMessages.length > 0) {
-        const messageIds = unreadMessages.map(msg => msg.id);
-        
-        const { error: updateError } = await supabase
-          .from('private_messages')
-          .update({ read: true })
-          .in('id', messageIds);
-
-        if (updateError) {
-          console.error('Erro ao marcar mensagens como lidas:', updateError);
-        } else {
-          console.log(`${messageIds.length} mensagens marcadas como lidas`);
-          
-          // Atualizar contagem de não lidas IMEDIATAMENTE
-          await loadConversations();
-        }
       }
 
       const formattedMessages: Message[] = messagesData.map(msg => {
@@ -331,6 +357,11 @@ export default function ChatPopup({
       });
 
       setMessages(formattedMessages);
+      
+      // ATUALIZADO: Recarregar conversas para atualizar o unread_count
+      setTimeout(async () => {
+        await loadConversations();
+      }, 300);
       
     } catch (error) {
       console.error('Erro ao processar mensagens:', error);
@@ -600,9 +631,32 @@ export default function ChatPopup({
     }, 300);
   };
 
-  // Função para selecionar conversa
+  // CORREÇÃO CRÍTICA: Função para selecionar conversa
   const handleSelectConversation = async (conversation: Conversation) => {
+    console.log('Selecionando conversa:', conversation.id, 'unread_count:', conversation.unread_count);
+    
+    // Atualizar UI imediatamente
     setSelectedConversation(conversation);
+    
+    // Se há mensagens não lidas, marcar como lidas ANTES de carregar as mensagens
+    if (conversation.unread_count && conversation.unread_count > 0) {
+      console.log('Conversa tem mensagens não lidas, marcando como lidas...');
+      await markMessagesAsRead(conversation.id);
+      
+      // Atualizar a conversa localmente para remover o badge imediatamente
+      const updatedConversations = conversations.map(conv => 
+        conv.id === conversation.id 
+          ? { ...conv, unread_count: 0 }
+          : conv
+      );
+      setConversations(updatedConversations);
+      
+      // Notificar mudança no contador
+      const totalUnread = calculateTotalUnread(updatedConversations);
+      notifyUnreadCountChange(totalUnread);
+    }
+    
+    // Carregar mensagens
     await loadMessages(conversation.id);
   };
 
