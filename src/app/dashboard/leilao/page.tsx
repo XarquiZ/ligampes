@@ -70,8 +70,7 @@ interface Team {
 
 type TabType = 'active' | 'pending' | 'finished'
 
-
-// Hook CORRIGIDO para saldo reservado específico por time
+// Hook para saldo reservado específico por time
 const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
   const [isLoaded, setIsLoaded] = useState(false)
@@ -257,7 +256,7 @@ export default function PaginaLeilao() {
   const [bidding, setBidding] = useState(false)
   const [bids, setBids] = useState<{[key: string]: Bid[]}>({})
 
-  // CORREÇÃO: Hook melhorado com sincronização e específico por time
+  // Hook melhorado com sincronização e específico por time
   const {
     saldoReservado,
     reservarSaldo,
@@ -284,7 +283,7 @@ export default function PaginaLeilao() {
     return () => clearInterval(interval)
   }, [])
 
-  // SINCRONIZAR SALDO RESERVADO COM ESTADO ATUAL DOS LEILÕES - CORREÇÃO CRÍTICA
+  // SINCRONIZAR SALDO RESERVADO COM ESTADO ATUAL DOS LEILÕES
   useEffect(() => {
     if (isLoaded && auctions.length > 0 && team) {
       console.log('🔄 Sincronizando saldo reservado com estado atual dos leilões para time:', team.id)
@@ -525,6 +524,31 @@ export default function PaginaLeilao() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
 
+  // CORREÇÃO: Função de formatação para criação de leilão (permite qualquer valor)
+  const formatCurrencyCreate = (value: string) => {
+    const onlyNumbers = value.replace(/\D/g, '')
+    if (onlyNumbers === '') return ''
+    
+    const number = parseInt(onlyNumbers) / 100
+    return number.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+  }
+
+  // CORREÇÃO: Função de formatação para lances (apenas formata, não arredonda)
+  const formatCurrencyBid = (value: string) => {
+    const onlyNumbers = value.replace(/\D/g, '')
+    if (onlyNumbers === '') return ''
+    
+    const number = parseInt(onlyNumbers) / 100
+    
+    return number.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })
+  }
+
   // CRIAÇÃO DE LEILÃO
   const handleCreateAuction = async () => {
     if (!selectedPlayer || !startPrice || !startTime) {
@@ -642,21 +666,6 @@ export default function PaginaLeilao() {
     }
   }
 
-  // FUNÇÃO AUXILIAR: Validar se o lance é "redondo" (múltiplo de 1M)
-  const validarLanceRedondo = (amount: number): { valido: boolean; mensagem?: string } => {
-    const UM_MILHAO = 1000000
-    
-    // Verificar se é múltiplo de 1M
-    if (amount % UM_MILHAO !== 0) {
-      return {
-        valido: false,
-        mensagem: `❌ O lance deve ser um valor "redondo" (múltiplo de R$ 1.000.000,00).\n\nExemplos válidos:\n• R$ 2.000.000,00\n• R$ 5.000.000,00\n• R$ 10.000.000,00\n\nValor inserido: R$ ${amount.toLocaleString('pt-BR')}`
-      }
-    }
-    
-    return { valido: true }
-  }
-
   // CORREÇÃO DEFINITIVA: Função completamente revisada para dar lance
   const handlePlaceBid = async (auctionId: string) => {
     console.log(`💰 INICIANDO LANCE - Leilão: ${auctionId}`)
@@ -680,13 +689,6 @@ export default function PaginaLeilao() {
 
     if (isNaN(amount) || amount <= 0) {
       alert('Valor do lance inválido')
-      return
-    }
-
-    // VALIDAÇÃO 1: Lance deve ser "redondo" (múltiplo de 1M)
-    const validacaoRedondo = validarLanceRedondo(amount)
-    if (!validacaoRedondo.valido) {
-      alert(validacaoRedondo.mensagem)
       return
     }
 
@@ -984,35 +986,6 @@ export default function PaginaLeilao() {
     setStartTime('')
   }
 
-  // CORREÇÃO: Função de formatação separada para criação de leilão (permite qualquer valor)
-  const formatCurrencyCreate = (value: string) => {
-    const onlyNumbers = value.replace(/\D/g, '')
-    if (onlyNumbers === '') return ''
-    
-    const number = parseInt(onlyNumbers) / 100
-    return number.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
-  }
-
-  // CORREÇÃO: Função de formatação para lances (arredonda para múltiplos de 1M)
-  const formatCurrencyBid = (value: string) => {
-    const onlyNumbers = value.replace(/\D/g, '')
-    if (onlyNumbers === '') return ''
-    
-    const number = parseInt(onlyNumbers) / 100
-    
-    // Arredondar para o múltiplo de 1M mais próximo apenas para lances
-    const UM_MILHAO = 1000000
-    const valorArredondado = Math.round(number / UM_MILHAO) * UM_MILHAO
-    
-    return valorArredondado.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
-  }
-
   const handleStartPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // CORREÇÃO: Usar formatação livre para criação de leilão
     const formattedValue = formatCurrencyCreate(e.target.value)
@@ -1020,14 +993,14 @@ export default function PaginaLeilao() {
   }
 
   const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // CORREÇÃO: Usar formatação com arredondamento apenas para lances
+    // CORREÇÃO: Usar formatação sem arredondamento para lances
     const formattedValue = formatCurrencyBid(e.target.value)
     setBidAmount(formattedValue)
   }
 
   const generateTimeOptions = () => {
     const times = []
-    for (let hour = 0; hour <= 24; hour++) {
+    for (let hour = 0; hour <= 23; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
         const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
         times.push(timeString)
@@ -1100,7 +1073,6 @@ export default function PaginaLeilao() {
             calculateTimeRemaining={calculateTimeRemaining}
             formatTimeRemaining={formatTimeRemaining}
             saldoReservado={saldoReservado}
-            validarLanceRedondo={validarLanceRedondo}
           />
         ))}
       </div>
@@ -1262,7 +1234,6 @@ export default function PaginaLeilao() {
                         className="pl-10 bg-zinc-800/50 border-zinc-600"
                       />
                     </div>
-                    {/* CORREÇÃO: Removido o aviso sobre arredondamento para criação de leilão */}
                   </div>
                 </div>
 
@@ -1375,28 +1346,24 @@ const AuctionCard = ({
   bidding,
   calculateTimeRemaining,
   formatTimeRemaining,
-  saldoReservado,
-  validarLanceRedondo
+  saldoReservado
 }: any) => {
 
-  // CORREÇÃO: Função de formatação para lances (arredonda para múltiplos de 1M)
+  // CORREÇÃO: Função de formatação para lances (apenas formata, não arredonda)
   const formatCurrencyDisplay = (value: string) => {
     const onlyNumbers = value.replace(/\D/g, '')
     if (onlyNumbers === '') return ''
     
     const number = parseInt(onlyNumbers) / 100
     
-    // Arredondar para o múltiplo de 1M mais próximo apenas para lances
-    const UM_MILHAO = 1000000
-    const valorArredondado = Math.round(number / UM_MILHAO) * UM_MILHAO
-    
-    return valorArredondado.toLocaleString('pt-BR', {
+    return number.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     })
   }
 
   const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // CORREÇÃO: Permitir que o usuário digite qualquer valor
     const formattedValue = formatCurrencyDisplay(e.target.value)
     setBidAmount(formattedValue)
   }
@@ -1502,7 +1469,7 @@ const AuctionCard = ({
           <>
             <div className="flex justify-between items-center p-3 bg-zinc-800/50 rounded-lg">
               <span className="text-zinc-400">
-                {type === 'active' ? 'Lance Atual' : 'Valor Final'}
+                {type === 'active' ? 'Lance Atual' : 'Valor Atual'}
               </span>
               <span className="text-2xl font-bold text-white">
                 R$ {auction.current_bid.toLocaleString('pt-BR')}
@@ -1562,10 +1529,8 @@ const AuctionCard = ({
                   className="pl-10 bg-zinc-800/50 border-zinc-600"
                 />
               </div>
-              {/* CORREÇÃO: Mostrar informações de lance redondo */}
-              <div className="text-sm text-yellow-400 text-center space-y-1">
-                <div>💰 Lance mínimo: R$ {(auction.current_bid + 1000000).toLocaleString('pt-BR')}</div>
-                <div>🎯 Lances devem ser múltiplos de R$ 1.000.000,00</div>
+              <div className="text-sm text-yellow-400 text-center">
+                💰 Lance mínimo: R$ {(auction.current_bid + 1000000).toLocaleString('pt-BR')}
               </div>
               <div className="flex gap-2">
                 <Button
