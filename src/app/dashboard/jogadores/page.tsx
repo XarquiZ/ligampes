@@ -19,6 +19,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { CadastrarJogadorForm } from '@/components/CadastrarJogadorForm'
 import { PlusCircle, Loader2, AlertCircle, Search, Filter, X, ChevronDown, Pencil, Grid3X3, List, Star, Ruler } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Player {
   id: string
@@ -101,6 +103,8 @@ function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null;
 }
 
 export default function ListaJogadores() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [jogadores, setJogadores] = useState<Player[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -111,6 +115,11 @@ export default function ListaJogadores() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+
+  // Estados para dados do usuário
+  const [team, setTeam] = useState<Team | null>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [dataLoading, setDataLoading] = useState(true)
 
   // Estado para filtro de altura
   const [filterMinHeight, setFilterMinHeight] = useState<string>('all')
@@ -279,6 +288,32 @@ export default function ListaJogadores() {
     gk_clearing: null, gk_reflexes: null, gk_reach: null,
   })
 
+  // Carrega dados do usuário para o Sidebar
+  useEffect(() => {
+    if (authLoading || !user) return
+
+    const loadUserData = async () => {
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*, teams(*)')
+          .eq('id', user.id)
+          .single()
+
+        if (!profileError) {
+          setProfile(profileData)
+          setTeam(profileData?.teams || null)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados do usuário:', error)
+      } finally {
+        setDataLoading(false)
+      }
+    }
+
+    loadUserData()
+  }, [authLoading, user])
+
   // useEffect SIMPLIFICADO: Detectar hash da URL
   useEffect(() => {
     const handleHashChange = () => {
@@ -437,596 +472,603 @@ export default function ListaJogadores() {
     ) : null
   , [])
 
-  // O restante do JSX permanece EXATAMENTE igual
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white">
-      {/* Overlay de transição */}
-      {isTransitioning && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
-            <p className="text-lg text-white">Carregando detalhes do jogador...</p>
-          </div>
+  if (authLoading || dataLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="text-2xl font-semibold text-white animate-pulse">
+          Carregando...
         </div>
-      )}
+      </div>
+    )
+  }
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Header */}
-        <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-12">
-          <div>
-            <h1 className="text-5xl md:text-6xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
-              LIGA MPES
-            </h1>
-            <p className="text-zinc-400 mt-2 text-lg">Base de Jogadores • {jogadores.length} jogadores disponíveis</p>
-          </div>
+  return (
+    <div className="flex min-h-screen bg-zinc-950">
+      {/* Sidebar */}
+      <Sidebar user={user!} profile={profile} team={team} />
 
-          <div className="flex items-center gap-4">
-            {/* Toggle de Visualização */}
-            <div className="flex bg-zinc-900/70 rounded-xl p-1 border border-zinc-700">
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-                className={cn("rounded-lg", viewMode === 'grid' && "bg-purple-600")}
-              >
-                <Grid3X3 className="w-5 h-5" />
-              </Button>
-              <Button
-                variant={viewMode === 'list' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className={cn("rounded-lg", viewMode === 'list' && "bg-purple-600")}
-              >
-                <List className="w-5 h-5" />
+      {/* Conteúdo Principal */}
+      <div className="flex-1 transition-all duration-300 lg:ml-0">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-4 lg:p-6">
+          <div className="max-w-7xl mx-auto space-y-6 lg:space-y-8">
+            {/* Header */}
+            <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-6 lg:mb-8">
+              <div>
+                <h1 className="text-3xl lg:text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
+                  JOGADORES
+                </h1>
+                <p className="text-zinc-400 mt-2 text-sm lg:text-lg">Base de Jogadores • {jogadores.length} jogadores disponíveis</p>
+              </div>
+
+              <div className="flex items-center gap-3 lg:gap-4">
+                {/* Toggle de Visualização */}
+                <div className="flex bg-zinc-900/70 rounded-xl p-1 border border-zinc-700">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('grid')}
+                    className={cn("rounded-lg", viewMode === 'grid' && "bg-purple-600")}
+                  >
+                    <Grid3X3 className="w-4 h-4 lg:w-5 lg:h-5" />
+                  </Button>
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('list')}
+                    className={cn("rounded-lg", viewMode === 'list' && "bg-purple-600")}
+                  >
+                    <List className="w-4 h-4 lg:w-5 lg:h-5" />
+                  </Button>
+                </div>
+
+                {/* Filtros Avançados */}
+                <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="lg" className="bg-zinc-900/50 backdrop-blur border-zinc-700 hover:border-purple-500 hover:bg-zinc-800/70 text-white relative">
+                      <Filter className="w-4 h-4 lg:w-5 lg:h-5 mr-2" />
+                      Filtros
+                      {activeAdvancedFilters > 0 && (
+                        <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0 text-xs">
+                          {activeAdvancedFilters}
+                        </Badge>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="w-full max-w-md bg-zinc-950/95 backdrop-blur-xl border-l border-zinc-800 flex flex-col">
+                    <SheetHeader className="p-6 border-b border-zinc-800">
+                      <SheetTitle className="text-2xl font-bold bg-gradient-to-r from-white to-purple-400 bg-clip-text text-transparent">
+                        Filtros Avançados
+                      </SheetTitle>
+                      <SheetDescription className="text-zinc-400">
+                        Refine sua busca por pé preferido, time, habilidades e atributos.
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                      <div>
+                        <label className="text-sm font-semibold text-zinc-300 mb-2 block">Pé Preferido</label>
+                        <Select value={filterFoot} onValueChange={setFilterFoot}>
+                          <SelectTrigger className="bg-zinc-900/70 border-zinc-700 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>{FOOT_OPTIONS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="text-sm font-semibold text-zinc-300 mb-2 block">Time</label>
+                        <Select value={filterTeam} onValueChange={setFilterTeam}>
+                          <SelectTrigger className="bg-zinc-900/70 border-zinc-700 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Todos">Todos os times</SelectItem>
+                            <SelectItem value="Sem Time">Sem time</SelectItem>
+                            {teams.map(t => (
+                              <SelectItem key={t.id} value={t.id}>
+                                <div className="flex items-center gap-3">
+                                  {t.logo_url && <img src={t.logo_url} alt="" className="w-6 h-6 rounded" />}
+                                  <span>{t.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Filtro de Altura */}
+                      <div>
+                        <label className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
+                          <Ruler className="w-4 h-4" />
+                          Altura mínima
+                        </label>
+                        <Select value={filterMinHeight} onValueChange={setFilterMinHeight}>
+                          <SelectTrigger className="bg-zinc-900/70 border-zinc-700 text-white">
+                            <SelectValue placeholder="Selecione a altura mínima" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-60">
+                            <SelectItem value="all">Qualquer altura</SelectItem>
+                            {HEIGHT_OPTIONS.map(({ value, label }) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Filtro de Habilidades */}
+                      <Collapsible>
+                        <CollapsibleTrigger className="flex w-full items-center justify-between py-4 text-lg font-bold text-white hover:text-purple-400">
+                          Habilidades ({selectedSkills.length})
+                          <ChevronDown className="w-5 h-5 transition-transform data-[state=open]:rotate-180" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pt-2">
+                          <div className="flex flex-wrap gap-2">
+                            {SKILLS_OPTIONS.map(skill => (
+                              <Badge
+                                key={skill}
+                                variant={selectedSkills.includes(skill) ? "default" : "secondary"}
+                                className={cn("cursor-pointer text-xs", selectedSkills.includes(skill) ? "bg-purple-600" : "bg-zinc-800 text-zinc-300")}
+                                onClick={() => setSelectedSkills(p => p.includes(skill) ? p.filter(s => s !== skill) : [...p, skill])}
+                              >
+                                {skill}
+                              </Badge>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+
+                      {ATTRIBUTE_GROUPS.map(group => (
+                        <Collapsible key={group.name}>
+                          <CollapsibleTrigger className="flex w-full items-center justify-between py-4 text-lg font-bold text-white hover:text-purple-400">
+                            {group.name}
+                            <ChevronDown className="w-5 h-5 transition-transform data-[state=open]:rotate-180" />
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="space-y-6 pt-4">
+                            {group.attributes.map(key => {
+                              return (
+                                <div key={key} className="space-y-3">
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-zinc-400 font-medium">{ATTR_LABELS[key]}</span>
+                                    <span className="font-bold text-purple-400">{attrFilters[key] ?? '-'}</span>
+                                  </div>
+                                  <Slider
+                                    min={50} max={99} step={1}
+                                    value={[attrFilters[key] ?? 50]}
+                                    onValueChange={([v]) => setAttrFilters(p => ({ ...p, [key]: v === 50 ? null : v }))}
+                                  />
+                                </div>
+                              )
+                            })}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      ))}
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                {userRole === 'admin' && (
+                  <Sheet open={isCadastroOpen} onOpenChange={setIsCadastroOpen}>
+                    <SheetTrigger asChild>
+                      <Button size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-bold text-sm lg:text-lg px-6 lg:px-8">
+                        <PlusCircle className="w-5 h-5 lg:w-6 lg:h-6 mr-2 lg:mr-3" />
+                        Novo Jogador
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
+                      <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
+                        <SheetTitle className="text-2xl font-bold text-white">Cadastrar Novo Jogador</SheetTitle>
+                        <SheetDescription className="text-zinc-400">
+                          Preencha os dados do jogador. Nome e posição são obrigatórios.
+                        </SheetDescription>
+                      </SheetHeader>
+                      <div className="p-6">
+                        <CadastrarJogadorForm onPlayerAdded={handleSuccess} />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                )}
+              </div>
+            </header>
+
+            {/* Busca + Filtros Básicos */}
+            <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 mb-6 lg:mb-8">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4 lg:w-5 lg:h-5" />
+                <Input
+                  placeholder="Procurar jogador..."
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                  className="pl-12 h-12 lg:h-14 bg-zinc-900/70 border-zinc-700 text-white placeholder:text-zinc-500 text-base lg:text-lg rounded-xl"
+                />
+              </div>
+
+              <Select value={filterPosition} onValueChange={setFilterPosition}>
+                <SelectTrigger className="w-full lg:w-64 h-12 lg:h-14 bg-zinc-900/70 border-zinc-700 text-white rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {POSITIONS.map(p => (
+                    <SelectItem key={p} value={p}>{p === 'Todas' ? 'Todas as posições' : p}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" size="lg" onClick={clearAllFilters} className="h-12 lg:h-14 px-4 lg:px-6 bg-zinc-900/70 border-zinc-700 hover:bg-zinc-800 hover:border-purple-500 text-white">
+                <X className="w-4 h-4 lg:w-5 lg:h-5 mr-2" />
+                Resetar Filtros
               </Button>
             </div>
 
-            {/* Filtros Avançados */}
-            <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="lg" className="bg-zinc-900/50 backdrop-blur border-zinc-700 hover:border-purple-500 hover:bg-zinc-800/70 text-white relative">
-                  <Filter className="w-5 h-5 mr-2" />
-                  Filtros
-                  {activeAdvancedFilters > 0 && (
-                    <Badge className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white border-0">
-                      {activeAdvancedFilters}
-                    </Badge>
-                  )}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-full max-w-md bg-zinc-950/95 backdrop-blur-xl border-l border-zinc-800 flex flex-col">
-                <SheetHeader className="p-6 border-b border-zinc-800">
-                  <SheetTitle className="text-2xl font-bold bg-gradient-to-r from-white to-purple-400 bg-clip-text text-transparent">
-                    Filtros Avançados
-                  </SheetTitle>
+            <div className="text-center mb-8 lg:mb-12">
+              <p className="text-lg lg:text-xl text-zinc-400">
+                Encontrados <span className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{filteredPlayers.length}</span> jogadores
+              </p>
+            </div>
+
+            {loading && (
+              <div className="flex justify-center py-20 lg:py-32">
+                <Loader2 className="w-16 h-16 lg:w-20 lg:h-20 animate-spin text-purple-400" />
+              </div>
+            )}
+
+            {fetchError && (
+              <div className="text-center py-16 lg:py-20">
+                <AlertCircle className="w-16 h-16 lg:w-20 lg:h-20 text-red-500 mx-auto mb-4 lg:mb-6" />
+                <p className="text-xl lg:text-2xl text-red-400">{fetchError}</p>
+              </div>
+            )}
+
+            {/* GRID VIEW */}
+            {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 lg:gap-6">
+                {filteredPlayers.map(j => (
+                  <div
+                    key={j.id}
+                    onClick={() => !isTransitioning && handleGridCardClick(j.id)}
+                    className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer"
+                  >
+                    {userRole === 'admin' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openEditPlayer(j)
+                        }}
+                        className="absolute top-2 lg:top-3 right-2 lg:right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-2 rounded-full backdrop-blur"
+                      >
+                        <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
+                      </button>
+                    )}
+
+                    <div className="relative h-40 lg:h-52 bg-zinc-800">
+                      {j.photo_url ? (
+                        <img
+                          src={j.photo_url}
+                          alt={j.name}
+                          className="absolute inset-0 w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center bg-zinc-700">
+                          <span className="text-4xl lg:text-6xl font-black text-zinc-500 opacity-70">{j.position}</span>
+                        </div>
+                      )}
+
+                      <div className="absolute top-2 lg:top-3 left-2 lg:left-3 bg-black/70 backdrop-blur px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg border border-zinc-700 flex flex-col items-center">
+                        <span className="text-2xl lg:text-3xl font-black text-yellow-400">{j.overall}</span>
+                        <span className="text-[8px] lg:text-[10px] text-zinc-300 -mt-1">OVR</span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 lg:p-4 space-y-2 lg:space-y-3">
+                      <h3 className="font-bold text-base lg:text-lg text-center leading-tight line-clamp-2">{j.name}</h3>
+
+                      <div className="flex justify-center">
+                        <Badge className="bg-purple-600 text-white text-xs font-bold px-3 lg:px-4 py-1 lg:py-1.5">{j.position}</Badge>
+                      </div>
+
+                      <p className="text-xs text-zinc-400 text-center">{j.playstyle || 'Nenhum'}</p>
+
+                      <div className="flex items-center justify-center gap-2 lg:gap-2.5 mt-1">
+                        {j.logo_url ? (
+                          <img
+                            src={j.logo_url}
+                            alt={j.club}
+                            className="w-6 h-6 lg:w-7 lg:h-7 object-contain rounded-full ring-2 ring-zinc-700"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                          />
+                        ) : (
+                          <div className="w-6 h-6 lg:w-7 lg:h-7 bg-zinc-700 rounded-full" />
+                        )}
+
+                        <p className="text-xs lg:text-sm text-zinc-300 truncate max-w-[120px] lg:max-w-[150px] text-center">{j.club}</p>
+                      </div>
+
+                      <p className="text-center text-lg lg:text-xl font-black text-emerald-400 mt-1 lg:mt-2">
+                        R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* LIST VIEW */}
+            {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
+              <div className="space-y-4 lg:space-y-6">
+                {filteredPlayers.map(j => {
+                  const isOpen = openedPlayers.includes(j.id)
+
+                  return (
+                    <div
+                      key={j.id}
+                      id={`player-${j.id}`}
+                      className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-lg lg:hover:shadow-xl hover:shadow-purple-600/20"
+                    >
+                      {/* Linha principal */}
+                      <div
+                        className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
+                        onClick={() => !isTransitioning && togglePlayer(j.id)}
+                      >
+                        <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
+                          {j.photo_url ? (
+                            <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                              <span className="text-xl lg:text-3xl font-black text-white">{j.position}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-3 lg:gap-4 text-xs lg:text-sm">
+                          <div>
+                            <p className="font-bold text-base lg:text-lg">{j.name}</p>
+                            <p className="text-zinc-400 text-xs lg:text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
+                          </div>
+                          <div>
+                            <p className="text-zinc-500">Posição</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className="bg-purple-600 text-xs">{j.position}</Badge>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-zinc-500">Clube</p>
+                            <div className="flex items-center gap-2">
+                              {renderClubLogo(j.logo_url, j.club)}
+                              <span className="text-xs lg:text-sm">{j.club}</span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-zinc-500">Overall</p>
+                            <p className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
+                          </div>
+                          <div className="flex flex-col items-end min-w-[140px] lg:min-w-[180px]">
+                            <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
+                            <p className="text-emerald-400 font-bold text-base lg:text-xl whitespace-nowrap">
+                              R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-end gap-3 lg:gap-4">
+                            {userRole === 'admin' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEditPlayer(j)
+                                }}
+                                className="hover:bg-purple-600/20 p-2"
+                              >
+                                <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
+                              </Button>
+                            )}
+
+                            <ChevronDown
+                              className={cn(
+                                "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300",
+                                isOpen && "rotate-180 text-purple-400"
+                              )}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Detalhes expandidos */}
+                      {isOpen && (
+                        <div className="border-t border-zinc-800 bg-zinc-900/50 px-4 lg:px-6 py-4 lg:py-6">
+                          <div className="space-y-4 lg:space-y-6">
+                            {/* Linha 1: básicos - Altura na mesma linha da idade */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm">
+                              <div>
+                                <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
+                              </div>
+                              <div>
+                                <span className="text-zinc-500 flex items-center gap-2">
+                                  <Ruler className="w-3 h-3 lg:w-4 lg:h-4" />
+                                  Altura: <strong className="ml-1 lg:ml-2">{formatHeight(j.height)}</strong>
+                                </span> 
+                              </div>
+                              <div>
+                                <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
+                              </div>
+                              <div>
+                                <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
+                              </div>
+                            </div>
+
+                            {/* Posições alternativas (APENAS QUANDO EXPANDIDO) */}
+                            {j.alternative_positions && j.alternative_positions.length > 0 && (
+                              <div>
+                                <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {j.alternative_positions.map(p => (
+                                    <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Atributos */}
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-4 lg:gap-x-6 gap-y-3 lg:gap-y-4 text-xs">
+                              {[
+                                { k: 'offensive_talent', l: 'Tal. Ofensivo' },
+                                { k: 'ball_control', l: 'Controle de bola' },
+                                { k: 'dribbling', l: 'Drible' },
+                                { k: 'tight_possession', l: 'Condução Firme' },
+                                { k: 'low_pass', l: 'Passe rasteiro' },
+                                { k: 'lofted_pass', l: 'Passe Alto' },
+                                { k: 'finishing', l: 'Finalização' },
+                                { k: 'heading', l: 'Cabeceio' },
+                                { k: 'place_kicking', l: 'Chute colocado' },
+                                { k: 'curl', l: 'Curva' },
+                                { k: 'speed', l: 'Velocidade' },
+                                { k: 'acceleration', l: 'Aceleração' },
+                                { k: 'kicking_power', l: 'Força do chute' },
+                                { k: 'jump', l: 'Impulsão' },
+                                { k: 'physical_contact', l: 'Contato Físico' },
+                                { k: 'balance', l: 'Equilíbrio' },
+                                { k: 'stamina', l: 'Resistência' },
+                                { k: 'defensive_awareness', l: 'Talento defensivo' },
+                                { k: 'ball_winning', l: 'Desarme' },
+                                { k: 'aggression', l: 'Agressividade' },
+                                { k: 'gk_awareness', l: 'Talento de GO' },
+                                { k: 'gk_catching', l: 'Firmeza de GO' },
+                                { k: 'gk_clearing', l: 'Afast. de bola de GO' },
+                                { k: 'gk_reflexes', l: 'Reflexos de GO' },
+                                { k: 'gk_reach', l: 'Alcance de GO' },
+                              ].map(({ k, l }) => {
+                                const value = j[k as keyof Player] as number | null
+                                const display = (value ?? 40)
+                                const color = getAttrColorHex(display)
+                                return (
+                                  <div key={k} className="text-center">
+                                    <p className="text-zinc-500 font-medium text-xs">{l}</p>
+                                    <p className="text-lg lg:text-xl font-black" style={{ color }}>{display}</p>
+                                  </div>
+                                )
+                              })}
+                            </div>
+
+                            {/* Pé fraco, Frequência, Forma física e Resistência a Lesão */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm items-center">
+                              <div>
+                                <p className="text-zinc-500">Pé Fraco (Uso)</p>
+                                <div className="flex items-center gap-2 lg:gap-3">
+                                  <LevelBars value={j.weak_foot_usage ?? 0} max={4} size="sm" />
+                                  <span className="font-bold">{j.weak_foot_usage ?? '-'}</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="text-zinc-500">Pé Fraco (Precisão)</p>
+                                <div className="flex items-center gap-2 lg:gap-3">
+                                  <LevelBars value={j.weak_foot_accuracy ?? 0} max={4} size="sm" />
+                                  <span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="text-zinc-500">Forma Física</p>
+                                <div className="flex items-center gap-2 lg:gap-3">
+                                  <LevelBars value={j.form ?? 0} max={8} size="md" />
+                                  <span className="font-bold">{j.form ?? '-'}</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="text-zinc-500">Resistência a Lesão</p>
+                                <div className="flex items-center gap-2 lg:gap-3">
+                                  <LevelBars value={j.injury_resistance ?? 0} max={3} size="sm" />
+                                  <span className="font-bold">{j.injury_resistance ?? '-'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Inspirador */}
+                            <div>
+                              <p className="text-zinc-500 font-medium mb-2">Inspirador</p>
+                              <div className="flex items-center gap-4 lg:gap-6">
+                                <div className="text-xs lg:text-sm">
+                                  <div className="text-zinc-400">Carregando</div>
+                                  <div className="flex gap-1 mt-1">
+                                    {Array.from({ length: 2 }).map((_, idx) => {
+                                      const filled = (j.inspiring_ball_carry ?? 0) > idx
+                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div className="text-xs lg:text-sm">
+                                  <div className="text-zinc-400">Passe Rasteiro</div>
+                                  <div className="flex gap-1 mt-1">
+                                    {Array.from({ length: 2 }).map((_, idx) => {
+                                      const filled = (j.inspiring_low_pass ?? 0) > idx
+                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div className="text-xs lg:text-sm">
+                                  <div className="text-zinc-400">Passe Alto</div>
+                                  <div className="flex gap-1 mt-1">
+                                    {Array.from({ length: 2 }).map((_, idx) => {
+                                      const filled = (j.inspiring_lofted_pass ?? 0) > idx
+                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Habilidades especiais */}
+                            {j.skills && j.skills.length > 0 && (
+                              <div>
+                                <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {j.skills.map(s => (
+                                    <Badge key={s} className="bg-purple-600/20 text-purple-300 border-purple-600/40 text-xs">{s}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Sheet de Edição */}
+            <Sheet open={isEdicaoOpen} onOpenChange={setIsEdicaoOpen}>
+              <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
+                <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
+                  <SheetTitle className="text-2xl font-bold text-white">Editar Jogador</SheetTitle>
                   <SheetDescription className="text-zinc-400">
-                    Refine sua busca por pé preferido, time, habilidades e atributos.
+                    Atualize os dados do jogador e clique em salvar.
                   </SheetDescription>
                 </SheetHeader>
-                <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                  <div>
-                    <label className="text-sm font-semibold text-zinc-300 mb-2 block">Pé Preferido</label>
-                    <Select value={filterFoot} onValueChange={setFilterFoot}>
-                      <SelectTrigger className="bg-zinc-900/70 border-zinc-700 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>{FOOT_OPTIONS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-semibold text-zinc-300 mb-2 block">Time</label>
-                    <Select value={filterTeam} onValueChange={setFilterTeam}>
-                      <SelectTrigger className="bg-zinc-900/70 border-zinc-700 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Todos">Todos os times</SelectItem>
-                        <SelectItem value="Sem Time">Sem time</SelectItem>
-                        {teams.map(t => (
-                          <SelectItem key={t.id} value={t.id}>
-                            <div className="flex items-center gap-3">
-                              {t.logo_url && <img src={t.logo_url} alt="" className="w-6 h-6 rounded" />}
-                              <span>{t.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Filtro de Altura */}
-                  <div>
-                    <label className="text-sm font-semibold text-zinc-300 mb-2 flex items-center gap-2">
-                      <Ruler className="w-4 h-4" />
-                      Altura mínima
-                    </label>
-                    <Select value={filterMinHeight} onValueChange={setFilterMinHeight}>
-                      <SelectTrigger className="bg-zinc-900/70 border-zinc-700 text-white">
-                        <SelectValue placeholder="Selecione a altura mínima" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        <SelectItem value="all">Qualquer altura</SelectItem>
-                        {HEIGHT_OPTIONS.map(({ value, label }) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Filtro de Habilidades */}
-                  <Collapsible>
-                    <CollapsibleTrigger className="flex w-full items-center justify-between py-4 text-lg font-bold text-white hover:text-purple-400">
-                      Habilidades ({selectedSkills.length})
-                      <ChevronDown className="w-5 h-5 transition-transform data-[state=open]:rotate-180" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pt-2">
-                      <div className="flex flex-wrap gap-2">
-                        {SKILLS_OPTIONS.map(skill => (
-                          <Badge
-                            key={skill}
-                            variant={selectedSkills.includes(skill) ? "default" : "secondary"}
-                            className={cn("cursor-pointer text-xs", selectedSkills.includes(skill) ? "bg-purple-600" : "bg-zinc-800 text-zinc-300")}
-                            onClick={() => setSelectedSkills(p => p.includes(skill) ? p.filter(s => s !== skill) : [...p, skill])}
-                          >
-                            {skill}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-
-                  {ATTRIBUTE_GROUPS.map(group => (
-                    <Collapsible key={group.name}>
-                      <CollapsibleTrigger className="flex w-full items-center justify-between py-4 text-lg font-bold text-white hover:text-purple-400">
-                        {group.name}
-                        <ChevronDown className="w-5 h-5 transition-transform data-[state=open]:rotate-180" />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="space-y-6 pt-4">
-                        {group.attributes.map(key => {
-                          return (
-                            <div key={key} className="space-y-3">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-zinc-400 font-medium">{ATTR_LABELS[key]}</span>
-                                <span className="font-bold text-purple-400">{attrFilters[key] ?? '-'}</span>
-                              </div>
-                              <Slider
-                                min={50} max={99} step={1}
-                                value={[attrFilters[key] ?? 50]}
-                                onValueChange={([v]) => setAttrFilters(p => ({ ...p, [key]: v === 50 ? null : v }))}
-                              />
-                            </div>
-                          )
-                        })}
-                      </CollapsibleContent>
-                    </Collapsible>
-                  ))}
+                <div className="p-6">
+                  {jogadorEditando && (
+                    <CadastrarJogadorForm 
+                      playerToEdit={jogadorEditando as any} 
+                      onPlayerAdded={handleSuccess} 
+                    />
+                  )}
                 </div>
               </SheetContent>
             </Sheet>
 
-            {userRole === 'admin' && (
-              <Sheet open={isCadastroOpen} onOpenChange={setIsCadastroOpen}>
-                <SheetTrigger asChild>
-                  <Button size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-bold text-lg px-8">
-                    <PlusCircle className="w-6 h-6 mr-3" />
-                    Novo Jogador
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
-                  <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
-                    <SheetTitle className="text-2xl font-bold text-white">Cadastrar Novo Jogador</SheetTitle>
-                    <SheetDescription className="text-zinc-400">
-                      Preencha os dados do jogador. Nome e posição são obrigatórios.
-                    </SheetDescription>
-                  </SheetHeader>
-                  <div className="p-6">
-                    <CadastrarJogadorForm onPlayerAdded={handleSuccess} />
-                  </div>
-                </SheetContent>
-              </Sheet>
-            )}
-          </div>
-        </header>
-
-        {/* Busca + Filtros Básicos */}
-        <div className="flex flex-col lg:flex-row gap-6 mb-10">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 w-5 h-5" />
-            <Input
-              placeholder="Procurar jogador..."
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              className="pl-12 h-14 bg-zinc-900/70 border-zinc-700 text-white placeholder:text-zinc-500 text-lg rounded-xl"
-            />
-          </div>
-
-          <Select value={filterPosition} onValueChange={setFilterPosition}>
-            <SelectTrigger className="w-full lg:w-64 h-14 bg-zinc-900/70 border-zinc-700 text-white rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {POSITIONS.map(p => (
-                <SelectItem key={p} value={p}>{p === 'Todas' ? 'Todas as posições' : p}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" size="lg" onClick={clearAllFilters} className="h-14 px-6 bg-zinc-900/70 border-zinc-700 hover:bg-zinc-800 hover:border-purple-500 text-white">
-            <X className="w-5 h-5 mr-2" />
-            Resetar Filtros
-          </Button>
-        </div>
-
-        <div className="text-center mb-12">
-          <p className="text-xl text-zinc-400">
-            Encontrados <span className="text-5xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{filteredPlayers.length}</span> jogadores
-          </p>
-        </div>
-
-        {loading && (
-          <div className="flex justify-center py-32">
-            <Loader2 className="w-20 h-20 animate-spin text-purple-400" />
-          </div>
-        )}
-
-        {fetchError && (
-          <div className="text-center py-20">
-            <AlertCircle className="w-20 h-20 text-red-500 mx-auto mb-6" />
-            <p className="text-2xl text-red-400">{fetchError}</p>
-          </div>
-        )}
-
-        {/* GRID VIEW */}
-        {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
-            {filteredPlayers.map(j => (
-              <div
-                key={j.id}
-                onClick={() => !isTransitioning && handleGridCardClick(j.id)}
-                className="group relative bg-zinc-900/90 rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer"
-              >
-                {userRole === 'admin' && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openEditPlayer(j)
-                    }}
-                    className="absolute top-3 right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-2.5 rounded-full backdrop-blur"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                )}
-
-                <div className="relative h-52 bg-zinc-800">
-                  {j.photo_url ? (
-                    <img
-                      src={j.photo_url}
-                      alt={j.name}
-                      className="absolute inset-0 w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-700">
-                      <span className="text-6xl font-black text-zinc-500 opacity-70">{j.position}</span>
-                    </div>
-                  )}
-
-                  <div className="absolute top-3 left-3 bg-black/70 backdrop-blur px-3 py-1.5 rounded-lg border border-zinc-700 flex flex-col items-center">
-                    <span className="text-3xl font-black text-yellow-400">{j.overall}</span>
-                    <span className="text-[10px] text-zinc-300 -mt-1">OVR</span>
-                  </div>
-                </div>
-
-                <div className="p-4 space-y-3">
-                  <h3 className="font-bold text-lg text-center leading-tight line-clamp-2">{j.name}</h3>
-
-                  <div className="flex justify-center">
-                    <Badge className="bg-purple-600 text-white text-xs font-bold px-4 py-1.5">{j.position}</Badge>
-                  </div>
-
-                  <p className="text-xs text-zinc-400 text-center">{j.playstyle || 'Nenhum'}</p>
-
-                  <div className="flex items-center justify-center gap-2.5 mt-1">
-                    {j.logo_url ? (
-                      <img
-                        src={j.logo_url}
-                        alt={j.club}
-                        className="w-7 h-7 object-contain rounded-full ring-2 ring-zinc-700"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                      />
-                    ) : (
-                      <div className="w-7 h-7 bg-zinc-700 rounded-full" />
-                    )}
-
-                    <p className="text-sm text-zinc-300 truncate max-w-[150px] text-center">{j.club}</p>
-                  </div>
-
-                  <p className="text-center text-xl font-black text-emerald-400 mt-2">
-                    R$ {Number(j.base_price).toLocaleString('pt-BR')}
-                  </p>
+            {!loading && filteredPlayers.length === 0 && (
+              <div className="text-center py-20 lg:py-32">
+                <div className="max-w-md mx-auto bg-zinc-900/80 rounded-2xl lg:rounded-3xl p-8 lg:p-16 border border-zinc-800">
+                  <h3 className="text-2xl lg:text-4xl font-bold text-white mb-4">Nenhum jogador encontrado</h3>
+                  <p className="text-zinc-400 text-sm lg:text-lg">Tente ajustar os filtros.</p>
                 </div>
               </div>
-            ))}
+            )}
           </div>
-        )}
-
-        {/* LIST VIEW */}
-        {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
-          <div className="space-y-6">
-            {filteredPlayers.map(j => {
-              const isOpen = openedPlayers.includes(j.id)
-
-              return (
-                <div
-                  key={j.id}
-                  id={`player-${j.id}`}
-                  className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-xl hover:shadow-purple-600/20"
-                >
-                  {/* Linha principal */}
-                  <div
-                    className="p-6 flex items-center gap-8 cursor-pointer select-none"
-                    onClick={() => !isTransitioning && togglePlayer(j.id)}
-                  >
-                    <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-purple-500/50 flex-shrink-0">
-                      {j.photo_url ? (
-                        <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-3xl font-black text-white">{j.position}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
-                      <div>
-                        <p className="font-bold text-lg">{j.name}</p>
-                        <p className="text-zinc-400 text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
-                      </div>
-                      <div>
-                        <p className="text-zinc-500">Posição</p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge className="bg-purple-600">{j.position}</Badge>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-zinc-500">Clube</p>
-                        <div className="flex items-center gap-2">
-                          {renderClubLogo(j.logo_url, j.club)}
-                          <span>{j.club}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-zinc-500">Overall</p>
-                        <p className="text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
-                      </div>
-                      <div className="flex flex-col items-end min-w-[180px]">
-                        <p className="text-zinc-500 text-right">Valor Base</p>
-                        <p className="text-emerald-400 font-bold text-xl whitespace-nowrap">
-                          R$ {Number(j.base_price).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-end gap-4">
-                        {userRole === 'admin' && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              openEditPlayer(j)
-                            }}
-                            className="hover:bg-purple-600/20"
-                          >
-                            <Pencil className="w-5 h-5" />
-                          </Button>
-                        )}
-
-                        <ChevronDown
-                          className={cn(
-                            "w-6 h-6 text-zinc-400 transition-transform duration-300",
-                            isOpen && "rotate-180 text-purple-400"
-                          )}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Detalhes expandidos */}
-                  {isOpen && (
-                    <div className="border-t border-zinc-800 bg-zinc-900/50 px-6 py-6">
-                      <div className="space-y-6">
-                        {/* Linha 1: básicos - Altura na mesma linha da idade */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-sm">
-                          <div>
-                            <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500 flex items-center gap-2">
-                              <Ruler className="w-4 h-4" />
-                              Altura: <strong className="ml-2">{formatHeight(j.height)}</strong>
-                            </span> 
-                          </div>
-                          <div>
-                            <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
-                          </div>
-                          <div>
-                            <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
-                          </div>
-                        </div>
-
-                        {/* Posições alternativas (APENAS QUANDO EXPANDIDO) */}
-                        {j.alternative_positions && j.alternative_positions.length > 0 && (
-                          <div>
-                            <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
-                            <div className="flex gap-2 flex-wrap">
-                              {j.alternative_positions.map(p => (
-                                <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Atributos */}
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-x-6 gap-y-4 text-xs">
-                          {[
-                            { k: 'offensive_talent', l: 'Tal. Ofensivo' },
-                            { k: 'ball_control', l: 'Controle de bola' },
-                            { k: 'dribbling', l: 'Drible' },
-                            { k: 'tight_possession', l: 'Condução Firme' },
-                            { k: 'low_pass', l: 'Passe rasteiro' },
-                            { k: 'lofted_pass', l: 'Passe Alto' },
-                            { k: 'finishing', l: 'Finalização' },
-                            { k: 'heading', l: 'Cabeceio' },
-                            { k: 'place_kicking', l: 'Chute colocado' },
-                            { k: 'curl', l: 'Curva' },
-                            { k: 'speed', l: 'Velocidade' },
-                            { k: 'acceleration', l: 'Aceleração' },
-                            { k: 'kicking_power', l: 'Força do chute' },
-                            { k: 'jump', l: 'Impulsão' },
-                            { k: 'physical_contact', l: 'Contato Físico' },
-                            { k: 'balance', l: 'Equilíbrio' },
-                            { k: 'stamina', l: 'Resistência' },
-                            { k: 'defensive_awareness', l: 'Talento defensivo' },
-                            { k: 'ball_winning', l: 'Desarme' },
-                            { k: 'aggression', l: 'Agressividade' },
-                            { k: 'gk_awareness', l: 'Talento de GO' },
-                            { k: 'gk_catching', l: 'Firmeza de GO' },
-                            { k: 'gk_clearing', l: 'Afast. de bola de GO' },
-                            { k: 'gk_reflexes', l: 'Reflexos de GO' },
-                            { k: 'gk_reach', l: 'Alcance de GO' },
-                          ].map(({ k, l }) => {
-                            const value = j[k as keyof Player] as number | null
-                            const display = (value ?? 40)
-                            const color = getAttrColorHex(display)
-                            return (
-                              <div key={k} className="text-center">
-                                <p className="text-zinc-500 font-medium">{l}</p>
-                                <p className="text-xl font-black" style={{ color }}>{display}</p>
-                              </div>
-                            )
-                          })}
-                        </div>
-
-                        {/* Pé fraco, Frequência, Forma física e Resistência a Lesão */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-sm items-center">
-                          <div>
-                            <p className="text-zinc-500">Pé Fraco (Uso)</p>
-                            <div className="flex items-center gap-3">
-                              <LevelBars value={j.weak_foot_usage ?? 0} max={4} size="sm" />
-                              <span className="font-bold">{j.weak_foot_usage ?? '-'}</span>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p className="text-zinc-500">Pé Fraco (Precisão)</p>
-                            <div className="flex items-center gap-3">
-                              <LevelBars value={j.weak_foot_accuracy ?? 0} max={4} size="sm" />
-                              <span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p className="text-zinc-500">Forma Física</p>
-                            <div className="flex items-center gap-3">
-                              <LevelBars value={j.form ?? 0} max={8} size="md" />
-                              <span className="font-bold">{j.form ?? '-'}</span>
-                            </div>
-                          </div>
-
-                          <div>
-                            <p className="text-zinc-500">Resistência a Lesão</p>
-                            <div className="flex items-center gap-3">
-                              <LevelBars value={j.injury_resistance ?? 0} max={3} size="sm" />
-                              <span className="font-bold">{j.injury_resistance ?? '-'}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Inspirador */}
-                        <div>
-                          <p className="text-zinc-500 font-medium mb-2">Inspirador</p>
-                          <div className="flex items-center gap-6">
-                            <div className="text-sm">
-                              <div className="text-zinc-400">Carregando</div>
-                              <div className="flex gap-1 mt-1">
-                                {Array.from({ length: 2 }).map((_, idx) => {
-                                  const filled = (j.inspiring_ball_carry ?? 0) > idx
-                                  return <Star key={idx} className={cn("w-4 h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                                })}
-                              </div>
-                            </div>
-
-                            <div className="text-sm">
-                              <div className="text-zinc-400">Passe Rasteiro</div>
-                              <div className="flex gap-1 mt-1">
-                                {Array.from({ length: 2 }).map((_, idx) => {
-                                  const filled = (j.inspiring_low_pass ?? 0) > idx
-                                  return <Star key={idx} className={cn("w-4 h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                                })}
-                              </div>
-                            </div>
-
-                            <div className="text-sm">
-                              <div className="text-zinc-400">Passe Alto</div>
-                              <div className="flex gap-1 mt-1">
-                                {Array.from({ length: 2 }).map((_, idx) => {
-                                  const filled = (j.inspiring_lofted_pass ?? 0) > idx
-                                  return <Star key={idx} className={cn("w-4 h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Habilidades especiais */}
-                        {j.skills && j.skills.length > 0 && (
-                          <div>
-                            <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
-                            <div className="flex flex-wrap gap-2">
-                              {j.skills.map(s => (
-                                <Badge key={s} className="bg-purple-600/20 text-purple-300 border-purple-600/40 text-xs">{s}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Sheet de Edição */}
-        <Sheet open={isEdicaoOpen} onOpenChange={setIsEdicaoOpen}>
-          <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
-            <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
-              <SheetTitle className="text-2xl font-bold text-white">Editar Jogador</SheetTitle>
-              <SheetDescription className="text-zinc-400">
-                Atualize os dados do jogador e clique em salvar.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="p-6">
-              {jogadorEditando && (
-                <CadastrarJogadorForm 
-                  playerToEdit={jogadorEditando as any} 
-                  onPlayerAdded={handleSuccess} 
-                />
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {!loading && filteredPlayers.length === 0 && (
-          <div className="text-center py-32">
-            <div className="max-w-md mx-auto bg-zinc-900/80 rounded-3xl p-16 border border-zinc-800">
-              <h3 className="text-4xl font-bold text-white mb-4">Nenhum jogador encontrado</h3>
-              <p className="text-zinc-400 text-lg">Tente ajustar os filtros.</p>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   )
