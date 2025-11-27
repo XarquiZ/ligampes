@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation' // ADICIONE ESTE IMPORT
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,8 @@ import { PlusCircle, Loader2, AlertCircle, Search, Filter, X, ChevronDown, Penci
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
+import FloatingChatButton from '@/components/FloatingChatButton'
+import ChatPopup from '@/components/Chatpopup'
 
 interface Player {
   id: string
@@ -104,7 +106,7 @@ function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null;
 }
 
 export default function ListaJogadores() {
-  const router = useRouter() // AGORA ESTÁ DEFINIDO
+  const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const [jogadores, setJogadores] = useState<Player[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -121,6 +123,10 @@ export default function ListaJogadores() {
   const [team, setTeam] = useState<Team | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
+
+  // Estados para o chat
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   // Estado para filtro de altura
   const [filterMinHeight, setFilterMinHeight] = useState<string>('all')
@@ -314,6 +320,60 @@ export default function ListaJogadores() {
 
     loadUserData()
   }, [authLoading, user])
+
+  // Carregar contagem de mensagens não lidas
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data: conversations } = await supabase
+          .from('conversations')
+          .select('id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+
+        if (!conversations?.length) {
+          setUnreadCount(0)
+          return
+        }
+
+        const conversationIds = conversations.map(conv => conv.id)
+        
+        const { count } = await supabase
+          .from('private_messages')
+          .select('*', { count: 'exact', head: true })
+          .in('conversation_id', conversationIds)
+          .eq('read', false)
+          .neq('sender_id', user.id)
+
+        setUnreadCount(count || 0)
+      } catch (error) {
+        console.error('Erro ao carregar contagem de mensagens:', error)
+      }
+    }
+
+    loadUnreadCount()
+
+    // Subscription para atualizar em tempo real
+    const subscription = supabase
+      .channel('unread_messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        () => {
+          loadUnreadCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [user])
 
   // CORREÇÃO: useEffect para detectar hash da URL e fazer scroll automático
   useEffect(() => {
@@ -517,6 +577,18 @@ export default function ListaJogadores() {
       />
     ) : null
   , [])
+
+  // Criar objetos compatíveis com os componentes de chat
+  const chatUser = useMemo(() => ({
+    id: user?.id || '',
+    name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
+    email: user?.email || ''
+  }), [user, profile])
+
+  const chatTeam = useMemo(() => ({
+    id: team?.id || '',
+    name: team?.name || 'Sem time'
+  }), [team])
 
   if (authLoading || dataLoading) {
     return (
@@ -1115,6 +1187,25 @@ export default function ListaJogadores() {
             )}
           </div>
         </div>
+
+        {/* Chat Components */}
+        {user && team && (
+          <>
+            <FloatingChatButton 
+              currentUser={chatUser}
+              currentTeam={chatTeam}
+              unreadCount={unreadCount}
+              onOpenChat={() => setIsChatOpen(true)}
+            />
+            
+            <ChatPopup
+              isOpen={isChatOpen}
+              onClose={() => setIsChatOpen(false)}
+              currentUser={chatUser}
+              currentTeam={chatTeam}
+            />
+          </>
+        )}
       </div>
     </div>
   )
