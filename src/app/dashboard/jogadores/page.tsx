@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,7 +20,6 @@ import { CadastrarJogadorForm } from '@/components/CadastrarJogadorForm'
 import { PlusCircle, Loader2, AlertCircle, Search, Filter, X, ChevronDown, Pencil, Grid3X3, List, Star, Ruler } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// MOVER AS INTERFACES PARA FORA DO COMPONENTE
 interface Player {
   id: string
   name: string
@@ -79,47 +78,7 @@ interface Team {
   logo_url: string | null
 }
 
-// MOVER CONSTANTES PARA FORA DO COMPONENTE
-const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
-const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
-
-const ATTRIBUTE_GROUPS = [
-  { name: 'Ataque & Técnica', attributes: ['offensive_talent', 'ball_control', 'dribbling', 'tight_possession', 'finishing', 'heading', 'place_kicking', 'curl'] },
-  { name: 'Passes', attributes: ['low_pass', 'lofted_pass'] },
-  { name: 'Físico', attributes: ['speed', 'acceleration', 'kicking_power', 'jump', 'physical_contact', 'balance', 'stamina'] },
-  { name: 'Defesa', attributes: ['defensive_awareness', 'ball_winning', 'aggression'] },
-  { name: 'Goleiro', attributes: ['gk_awareness', 'gk_catching', 'gk_clearing', 'gk_reflexes', 'gk_reach'] },
-]
-
-const ATTR_LABELS: Record<string, string> = {
-  offensive_talent: 'Tal. Ofensivo',
-  ball_control: 'Controle de bola',
-  dribbling: 'Drible',
-  tight_possession: 'Condução Firme',
-  low_pass: 'Passe rasteiro',
-  lofted_pass: 'Passe Alto',
-  finishing: 'Finalização',
-  heading: 'Cabeceio',
-  place_kicking: 'Chute colocado',
-  curl: 'Curva',
-  speed: 'Velocidade',
-  acceleration: 'Aceleração',
-  kicking_power: 'Força do chute',
-  jump: 'Impulsão',
-  physical_contact: 'Contato Físico',
-  balance: 'Equilíbrio',
-  stamina: 'Resistência',
-  defensive_awareness: 'Talento defensivo',
-  ball_winning: 'Desarme',
-  aggression: 'Agressividade',
-  gk_awareness: 'Talento de GO',
-  gk_catching: 'Firmeza de GO',
-  gk_clearing: 'Afast. de bola de GO',
-  gk_reflexes: 'Reflexos de GO',
-  gk_reach: 'Alcance de GO',
-}
-
-// COMPONENTE LevelBars MOVIDO PARA FORA
+// Componente LevelBars movido para fora
 function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null; max?: number; size?: 'sm' | 'md' }) {
   const v = Math.max(0, Math.min(max, value ?? 0))
   const w = size === 'sm' ? 'w-4 h-2' : 'w-6 h-2.5'
@@ -141,20 +100,6 @@ function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null;
   )
 }
 
-// FUNÇÃO formatHeight MOVIDA PARA FORA
-const formatHeight = (height: number | null | undefined) => {
-  if (height === null || height === undefined) return '-'
-  return `${height}cm`
-}
-
-// FUNÇÃO getAttrColorHex MOVIDA PARA FORA
-const getAttrColorHex = (value: number) => {
-  if (value >= 95) return '#4FC3F7'
-  if (value >= 85) return '#8BC34A'
-  if (value >= 75) return '#FB8C00'
-  return '#E53935'
-}
-
 export default function ListaJogadores() {
   const [jogadores, setJogadores] = useState<Player[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -172,10 +117,46 @@ export default function ListaJogadores() {
 
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const [lastNavigatedPlayer, setLastNavigatedPlayer] = useState<string | null>(null)
 
-  // Ref para controlar se já processamos a navegação
-  const navigationProcessedRef = useRef<Set<string>>(new Set())
+  // Constantes movidas para dentro do componente para evitar hoisting
+  const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
+  const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
+
+  const ATTRIBUTE_GROUPS = [
+    { name: 'Ataque & Técnica', attributes: ['offensive_talent', 'ball_control', 'dribbling', 'tight_possession', 'finishing', 'heading', 'place_kicking', 'curl'] },
+    { name: 'Passes', attributes: ['low_pass', 'lofted_pass'] },
+    { name: 'Físico', attributes: ['speed', 'acceleration', 'kicking_power', 'jump', 'physical_contact', 'balance', 'stamina'] },
+    { name: 'Defesa', attributes: ['defensive_awareness', 'ball_winning', 'aggression'] },
+    { name: 'Goleiro', attributes: ['gk_awareness', 'gk_catching', 'gk_clearing', 'gk_reflexes', 'gk_reach'] },
+  ]
+
+  const ATTR_LABELS: Record<string, string> = {
+    offensive_talent: 'Tal. Ofensivo',
+    ball_control: 'Controle de bola',
+    dribbling: 'Drible',
+    tight_possession: 'Condução Firme',
+    low_pass: 'Passe rasteiro',
+    lofted_pass: 'Passe Alto',
+    finishing: 'Finalização',
+    heading: 'Cabeceio',
+    place_kicking: 'Chute colocado',
+    curl: 'Curva',
+    speed: 'Velocidade',
+    acceleration: 'Aceleração',
+    kicking_power: 'Força do chute',
+    jump: 'Impulsão',
+    physical_contact: 'Contato Físico',
+    balance: 'Equilíbrio',
+    stamina: 'Resistência',
+    defensive_awareness: 'Talento defensivo',
+    ball_winning: 'Desarme',
+    aggression: 'Agressividade',
+    gk_awareness: 'Talento de GO',
+    gk_catching: 'Firmeza de GO',
+    gk_clearing: 'Afast. de bola de GO',
+    gk_reflexes: 'Reflexos de GO',
+    gk_reach: 'Alcance de GO',
+  }
 
   // Opções de altura (140cm até 230cm)
   const HEIGHT_OPTIONS = useMemo(() => 
@@ -231,39 +212,20 @@ export default function ListaJogadores() {
     'Volta para marcar'
   ].sort(), []);
 
-  // FUNÇÃO MELHORADA: Scroll para elemento com retry
-  const scrollToPlayer = useCallback((playerId: string, retryCount = 0) => {
-    const element = document.getElementById(`player-${playerId}`);
-    
-    if (element) {
-      console.log('Elemento encontrado, fazendo scroll para:', playerId);
-      element.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center',
-        inline: 'nearest'
-      });
-      
-      // Adicionar destaque visual
-      element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-300');
-      setTimeout(() => {
-        element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
-      }, 3000);
-      
-      return true;
-    } else if (retryCount < 5) {
-      // Tentar novamente após um delay
-      console.log(`Elemento não encontrado, tentando novamente (${retryCount + 1}/5):`, `player-${playerId}`);
-      setTimeout(() => {
-        scrollToPlayer(playerId, retryCount + 1);
-      }, 300);
-      return false;
-    } else {
-      console.log('Elemento não encontrado após várias tentativas:', `player-${playerId}`);
-      return false;
-    }
-  }, []);
+  // Funções auxiliares simplificadas
+  const formatHeight = (height: number | null | undefined) => {
+    if (height === null || height === undefined) return '-'
+    return `${height}cm`
+  }
 
-  // FUNÇÃO MELHORADA: Para navegação via chat
+  const getAttrColorHex = (value: number) => {
+    if (value >= 95) return '#4FC3F7'
+    if (value >= 85) return '#8BC34A'
+    if (value >= 75) return '#FB8C00'
+    return '#E53935'
+  }
+
+  // FUNÇÃO SIMPLIFICADA: Para navegação via chat
   const handleGridCardClick = useCallback((playerId: string) => {
     setIsTransitioning(true)
     setViewMode('list')
@@ -273,22 +235,28 @@ export default function ListaJogadores() {
         prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
       )
       
-      // Atualizar a URL para manter consistência com o chat
-      if (typeof window !== 'undefined') {
-        window.history.replaceState(null, '', `#player-${playerId}`);
-      }
-      
       // Scroll para o jogador
       setTimeout(() => {
-        scrollToPlayer(playerId);
+        const element = document.getElementById(`player-${playerId}`)
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center'
+          })
+          
+          // Adicionar destaque visual
+          element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl')
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl')
+          }, 3000)
+        }
         setIsTransitioning(false)
-      }, 300) // Aumentado o delay para garantir o render
+      }, 300)
     }, 200)
-  }, [scrollToPlayer])
+  }, [])
 
   const togglePlayer = useCallback((playerId: string) => {
-    if (isTransitioning) return; // Não permitir cliques durante transição
-    
+    if (isTransitioning) return;
     setOpenedPlayers(prev =>
       prev.includes(playerId)
         ? prev.filter(id => id !== playerId)
@@ -311,82 +279,52 @@ export default function ListaJogadores() {
     gk_clearing: null, gk_reflexes: null, gk_reach: null,
   })
 
-  // useEffect MELHORADO: Detectar hash da URL para navegação do chat
+  // useEffect SIMPLIFICADO: Detectar hash da URL
   useEffect(() => {
-    const handleHashNavigation = (playerId: string, isInitialLoad = false) => {
-      // Evitar processar a mesma navegação múltiplas vezes
-      if (navigationProcessedRef.current.has(playerId) && !isInitialLoad) {
-        return;
-      }
-      
-      navigationProcessedRef.current.add(playerId);
-      setLastNavigatedPlayer(playerId);
-      
-      console.log('Processando navegação para jogador:', playerId, 'initial:', isInitialLoad);
-      
-      // Garantir que está na view de lista
-      setViewMode('list');
-      
-      // Abrir o card do jogador
-      setOpenedPlayers(prev => 
-        prev.includes(playerId) ? prev : [...prev, playerId]
-      );
-      
-      // Scroll para o jogador após um delay para garantir o render
-      const scrollDelay = isInitialLoad ? 1000 : 800;
-      
-      setTimeout(() => {
-        const success = scrollToPlayer(playerId);
-        if (!success && !isInitialLoad) {
-          // Se não encontrou, tentar novamente com mais delay
-          setTimeout(() => scrollToPlayer(playerId), 500);
-        }
-      }, scrollDelay);
-    };
-
     const handleHashChange = () => {
       if (typeof window === 'undefined') return;
       
       const hash = window.location.hash;
       if (hash && hash.startsWith('#player-')) {
         const playerId = hash.replace('#player-', '');
-        console.log('Hash change detectado:', playerId);
-        handleHashNavigation(playerId, false);
+        
+        // Garantir que está na view de lista
+        setViewMode('list');
+        
+        // Abrir o card do jogador
+        setOpenedPlayers(prev => 
+          prev.includes(playerId) ? prev : [...prev, playerId]
+        );
+        
+        // Scroll para o jogador
+        setTimeout(() => {
+          const element = document.getElementById(`player-${playerId}`);
+          if (element) {
+            element.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center'
+            });
+            
+            // Adicionar destaque visual
+            element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl');
+            setTimeout(() => {
+              element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
+            }, 3000);
+          }
+        }, 800);
       }
     };
 
     // Executar na montagem inicial se já tiver hash
-    if (typeof window !== 'undefined') {
-      const initialHash = window.location.hash;
-      if (initialHash && initialHash.startsWith('#player-')) {
-        const playerId = initialHash.replace('#player-', '');
-        console.log('Hash inicial detectado:', playerId);
-        handleHashNavigation(playerId, true);
-      }
-    }
+    handleHashChange();
     
-    // Ouvir mudanças no hash (quando navegar via chat)
+    // Ouvir mudanças no hash
     window.addEventListener('hashchange', handleHashChange);
     
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
-      navigationProcessedRef.current.clear();
     };
-  }, [scrollToPlayer]);
-
-  // useEffect ADICIONAL: Tentar scroll novamente quando os filteredPlayers mudarem
-  useEffect(() => {
-    if (lastNavigatedPlayer && filteredPlayers.length > 0) {
-      // Verificar se o jogador está na lista filtrada
-      const playerExists = filteredPlayers.some(p => p.id === lastNavigatedPlayer);
-      if (playerExists) {
-        console.log('Jogador encontrado na lista filtrada, tentando scroll novamente:', lastNavigatedPlayer);
-        setTimeout(() => {
-          scrollToPlayer(lastNavigatedPlayer);
-        }, 500);
-      }
-    }
-  }, [filteredPlayers, lastNavigatedPlayer, scrollToPlayer]);
+  }, []);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -486,9 +424,6 @@ export default function ListaJogadores() {
     setSelectedSkills([])
     setFilterMinHeight('all')
     setAttrFilters(Object.fromEntries(Object.keys(attrFilters).map(k => [k, null])))
-    // Limpar também a navegação
-    setLastNavigatedPlayer(null)
-    navigationProcessedRef.current.clear()
   }, [attrFilters])
 
   const renderClubLogo = useCallback((url: string | null, name: string) =>
@@ -502,9 +437,10 @@ export default function ListaJogadores() {
     ) : null
   , [])
 
+  // O restante do JSX permanece EXATAMENTE igual
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white">
-      {/* Overlay de transição - CORRIGIDO para não bloquear cliques */}
+      {/* Overlay de transição */}
       {isTransitioning && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-4">
@@ -828,7 +764,7 @@ export default function ListaJogadores() {
                   id={`player-${j.id}`}
                   className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-xl hover:shadow-purple-600/20"
                 >
-                  {/* Linha principal - CORRIGIDO: não permite cliques durante transição */}
+                  {/* Linha principal */}
                   <div
                     className="p-6 flex items-center gap-8 cursor-pointer select-none"
                     onClick={() => !isTransitioning && togglePlayer(j.id)}
