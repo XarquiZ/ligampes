@@ -12,6 +12,8 @@ import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter,
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
+import FloatingChatButton from '@/components/FloatingChatButton'
+import ChatPopup from '@/components/Chatpopup'
 
 interface Player {
   id: string
@@ -586,6 +588,10 @@ export default function ElencoPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
 
+  // Estados para o chat
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+
   // Filtros atualizados para checkboxes
   const [selectedPositions, setSelectedPositions] = useState<string[]>([])
   const [selectedPlaystyles, setSelectedPlaystyles] = useState<string[]>([])
@@ -684,6 +690,60 @@ export default function ElencoPage() {
 
     loadUserData()
   }, [authLoading, user])
+
+  // Carregar contagem de mensagens não lidas
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data: conversations } = await supabase
+          .from('conversations')
+          .select('id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+
+        if (!conversations?.length) {
+          setUnreadCount(0)
+          return
+        }
+
+        const conversationIds = conversations.map(conv => conv.id)
+        
+        const { count } = await supabase
+          .from('private_messages')
+          .select('*', { count: 'exact', head: true })
+          .in('conversation_id', conversationIds)
+          .eq('read', false)
+          .neq('sender_id', user.id)
+
+        setUnreadCount(count || 0)
+      } catch (error) {
+        console.error('Erro ao carregar contagem de mensagens:', error)
+      }
+    }
+
+    loadUnreadCount()
+
+    // Subscription para atualizar em tempo real
+    const subscription = supabase
+      .channel('unread_messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        () => {
+          loadUnreadCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [user])
 
   const loadPlayers = useCallback(async () => {
     if (!teamId) { setPlayers([]); setFilteredPlayers([]); return }
@@ -924,6 +984,18 @@ export default function ElencoPage() {
       </div>
     </div>
   )
+
+  // Criar objetos compatíveis com os componentes de chat
+  const chatUser = useMemo(() => ({
+    id: user?.id || '',
+    name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
+    email: user?.email || ''
+  }), [user, profile])
+
+  const chatTeam = useMemo(() => ({
+    id: team?.id || '',
+    name: team?.name || 'Sem time'
+  }), [team])
 
   if (authLoading || dataLoading) {
     return (
@@ -1373,6 +1445,25 @@ export default function ElencoPage() {
 
           </div>
         </div>
+
+        {/* Chat Components */}
+        {user && team && (
+          <>
+            <FloatingChatButton 
+              currentUser={chatUser}
+              currentTeam={chatTeam}
+              unreadCount={unreadCount}
+              onOpenChat={() => setIsChatOpen(true)}
+            />
+            
+            <ChatPopup
+              isOpen={isChatOpen}
+              onClose={() => setIsChatOpen(false)}
+              currentUser={chatUser}
+              currentTeam={chatTeam}
+            />
+          </>
+        )}
       </div>
     </div>
   )
