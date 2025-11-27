@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import Sidebar from '@/components/Sidebar'
 
 interface Player {
   id: string
@@ -66,6 +67,14 @@ interface Team {
   name: string
   logo_url: string
   balance: number
+}
+
+interface UserProfile {
+  id: string
+  email?: string
+  user_metadata?: {
+    full_name?: string
+  }
 }
 
 type TabType = 'active' | 'pending' | 'finished'
@@ -236,6 +245,8 @@ export default function PaginaLeilao() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [team, setTeam] = useState<Team | null>(null)
+  const [user, setUser] = useState<UserProfile | null>(null)
+  const [profile, setProfile] = useState<any>(null)
   
   // Estados para o modal de criar leilão
   const [createAuctionModalOpen, setCreateAuctionModalOpen] = useState(false)
@@ -347,6 +358,7 @@ export default function PaginaLeilao() {
       }
 
       console.log('👤 Sessão do usuário:', session.user.id)
+      setUser(session.user)
 
       // Carregar perfil com join no time
       const { data: profile, error: profileError } = await supabase
@@ -362,6 +374,7 @@ export default function PaginaLeilao() {
         console.error('❌ Erro ao carregar perfil:', profileError)
       } else {
         console.log('📋 Perfil carregado:', profile)
+        setProfile(profile)
         setIsAdmin(profile?.role === 'admin')
 
         // Definir time diretamente do perfil
@@ -1090,239 +1103,251 @@ export default function PaginaLeilao() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-orange-950/20 to-zinc-950 text-white p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
-          <div>
-            <h1 className="text-5xl font-black text-white mb-2">LEILÃO DE JOGADORES</h1>
-            <p className="text-zinc-400 text-lg">
-              Adquira os melhores jogadores livres no mercado
-            </p>
-          </div>
+    <div className="flex min-h-screen bg-zinc-950">
+      {/* Sidebar */}
+      <Sidebar 
+        user={user!}
+        profile={profile}
+        team={team}
+      />
 
-          {/* CORREÇÃO: Exibir informações do time com saldo reservado PERSISTENTE E ESPECÍFICO */}
-          {team && (
-            <div className="flex items-center gap-4 bg-zinc-800/50 rounded-lg p-4">
-              {team.logo_url && (
-                <img 
-                  src={team.logo_url} 
-                  alt={team.name}
-                  className="w-10 h-10 rounded-full"
-                />
-              )}
+      {/* Conteúdo Principal */}
+      <div className="flex-1 lg:ml-0">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-orange-950/20 to-zinc-950 text-white p-8">
+          <div className="max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
               <div>
-                <p className="font-semibold text-white">{team.name}</p>
-                <p className="text-green-400">
-                  Saldo: R$ {team.balance.toLocaleString('pt-BR')}
+                <h1 className="text-5xl font-black text-white mb-2">LEILÃO DE JOGADORES</h1>
+                <p className="text-zinc-400 text-lg">
+                  Adquira os melhores jogadores livres no mercado
                 </p>
-                {getSaldoReservado() > 0 && (
-                  <div className="text-sm">
-                    <p className="text-yellow-400">
-                      Disponível: R$ {getSaldoDisponivel().toLocaleString('pt-BR')}
-                    </p>
-                    <p className="text-zinc-400">
-                      Reserva: R$ {getSaldoReservado().toLocaleString('pt-BR')}
-                    </p>
-                  </div>
-                )}
               </div>
-            </div>
-          )}
 
-          {isAdmin && (
-            <Dialog open={createAuctionModalOpen} onOpenChange={setCreateAuctionModalOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-orange-600 hover:bg-orange-700 text-white">
-                  <Gavel className="w-4 h-4 mr-2" />
-                  Criar Leilão
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">
-                    Criar Novo Leilão
-                  </DialogTitle>
-                </DialogHeader>
-
-                <div className="space-y-4 py-4">
+              {/* CORREÇÃO: Exibir informações do time com saldo reservado PERSISTENTE E ESPECÍFICO */}
+              {team && (
+                <div className="flex items-center gap-4 bg-zinc-800/50 rounded-lg p-4">
+                  {team.logo_url && (
+                    <img 
+                      src={team.logo_url} 
+                      alt={team.name}
+                      className="w-10 h-10 rounded-full"
+                    />
+                  )}
                   <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Jogador
-                    </label>
-                    <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
-                      <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
-                        <SelectValue placeholder="Selecione um jogador" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {freePlayers.map(player => (
-                          <SelectItem key={player.id} value={player.id}>
-                            <div className="flex items-center gap-3">
-                              {player.photo_url ? (
-                                <img 
-                                  src={player.photo_url} 
-                                  alt={player.name}
-                                  className="w-8 h-8 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center">
-                                  <User className="w-4 h-4 text-zinc-400" />
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{player.name}</p>
-                                <p className="text-xs text-zinc-400">
-                                  {player.position} • OVR {player.overall}
-                                </p>
-                              </div>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Horário de Início
-                    </label>
-                    <Select value={startTime} onValueChange={setStartTime}>
-                      <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
-                        <SelectValue placeholder="Selecione o horário" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {timeOptions.map(time => (
-                          <SelectItem key={time} value={time}>
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4" />
-                              {time}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Duração (minutos)
-                    </label>
-                    <Select value={auctionDuration} onValueChange={setAuctionDuration}>
-                      <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 minuto</SelectItem>
-                        <SelectItem value="3">3 minutos</SelectItem>
-                        <SelectItem value="5">5 minutos</SelectItem>
-                        <SelectItem value="10">10 minutos</SelectItem>
-                        <SelectItem value="15">15 minutos</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Preço Inicial (R$)
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-                      <Input
-                        placeholder="0,00"
-                        value={startPrice}
-                        onChange={handleStartPriceChange}
-                        className="pl-10 bg-zinc-800/50 border-zinc-600"
-                      />
-                    </div>
+                    <p className="font-semibold text-white">{team.name}</p>
+                    <p className="text-green-400">
+                      Saldo: R$ {team.balance.toLocaleString('pt-BR')}
+                    </p>
+                    {getSaldoReservado() > 0 && (
+                      <div className="text-sm">
+                        <p className="text-yellow-400">
+                          Disponível: R$ {getSaldoDisponivel().toLocaleString('pt-BR')}
+                        </p>
+                        <p className="text-zinc-400">
+                          Reserva: R$ {getSaldoReservado().toLocaleString('pt-BR')}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
+              )}
 
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setCreateAuctionModalOpen(false)}
-                    className="bg-transparent border-zinc-600"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleCreateAuction}
-                    disabled={creatingAuction}
-                    className="bg-orange-600 hover:bg-orange-700"
-                  >
-                    {creatingAuction ? 'Criando...' : 'Criar Leilão'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
+              {isAdmin && (
+                <Dialog open={createAuctionModalOpen} onOpenChange={setCreateAuctionModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-orange-600 hover:bg-orange-700 text-white">
+                      <Gavel className="w-4 h-4 mr-2" />
+                      Criar Leilão
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-bold">
+                        Criar Novo Leilão
+                      </DialogTitle>
+                    </DialogHeader>
 
-        {/* Sistema de Abas */}
-        <div className="mb-8">
-          <div className="flex space-x-1 bg-zinc-800/50 rounded-lg p-1">
-            <Button
-              variant={activeTab === 'active' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('active')}
-              className={cn(
-                "flex-1 transition-all duration-200",
-                activeTab === 'active' 
-                  ? "bg-orange-600 text-white shadow-lg" 
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
-              )}
-            >
-              <Gavel className="w-4 h-4 mr-2" />
-              Abertos
-              {auctions.filter(a => a.status === 'active').length > 0 && (
-                <Badge variant="secondary" className="ml-2 bg-red-500 text-white">
-                  {auctions.filter(a => a.status === 'active').length}
-                </Badge>
-              )}
-            </Button>
+                    <div className="space-y-4 py-4">
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Jogador
+                        </label>
+                        <Select value={selectedPlayer} onValueChange={setSelectedPlayer}>
+                          <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
+                            <SelectValue placeholder="Selecione um jogador" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {freePlayers.map(player => (
+                              <SelectItem key={player.id} value={player.id}>
+                                <div className="flex items-center gap-3">
+                                  {player.photo_url ? (
+                                    <img 
+                                      src={player.photo_url} 
+                                      alt={player.name}
+                                      className="w-8 h-8 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center">
+                                      <User className="w-4 h-4 text-zinc-400" />
+                                    </div>
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium truncate">{player.name}</p>
+                                    <p className="text-xs text-zinc-400">
+                                      {player.position} • OVR {player.overall}
+                                    </p>
+                                  </div>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-            <Button
-              variant={activeTab === 'pending' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('pending')}
-              className={cn(
-                "flex-1 transition-all duration-200",
-                activeTab === 'pending' 
-                  ? "bg-yellow-600 text-white shadow-lg" 
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
-              )}
-            >
-              <Clock className="w-4 h-4 mr-2" />
-              Agendados
-              {auctions.filter(a => a.status === 'pending').length > 0 && (
-                <Badge variant="secondary" className="ml-2 bg-yellow-500 text-white">
-                  {auctions.filter(a => a.status === 'pending').length}
-                </Badge>
-              )}
-            </Button>
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Horário de Início
+                        </label>
+                        <Select value={startTime} onValueChange={setStartTime}>
+                          <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
+                            <SelectValue placeholder="Selecione o horário" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {timeOptions.map(time => (
+                              <SelectItem key={time} value={time}>
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-4 h-4" />
+                                  {time}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-            <Button
-              variant={activeTab === 'finished' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('finished')}
-              className={cn(
-                "flex-1 transition-all duration-200",
-                activeTab === 'finished' 
-                  ? "bg-green-600 text-white shadow-lg" 
-                  : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Duração (minutos)
+                        </label>
+                        <Select value={auctionDuration} onValueChange={setAuctionDuration}>
+                          <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1">1 minuto</SelectItem>
+                            <SelectItem value="3">3 minutos</SelectItem>
+                            <SelectItem value="5">5 minutos</SelectItem>
+                            <SelectItem value="10">10 minutos</SelectItem>
+                            <SelectItem value="15">15 minutos</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Preço Inicial (R$)
+                        </label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+                          <Input
+                            placeholder="0,00"
+                            value={startPrice}
+                            onChange={handleStartPriceChange}
+                            className="pl-10 bg-zinc-800/50 border-zinc-600"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setCreateAuctionModalOpen(false)}
+                        className="bg-transparent border-zinc-600"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleCreateAuction}
+                        disabled={creatingAuction}
+                        className="bg-orange-600 hover:bg-orange-700"
+                      >
+                        {creatingAuction ? 'Criando...' : 'Criar Leilão'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               )}
-            >
-              <Trophy className="w-4 h-4 mr-2" />
-              Finalizados
-              {auctions.filter(a => a.status === 'finished').length > 0 && (
-                <Badge variant="secondary" className="ml-2 bg-green-500 text-white">
-                  {auctions.filter(a => a.status === 'finished').length}
-                </Badge>
-              )}
-            </Button>
+            </div>
+
+            {/* Sistema de Abas */}
+            <div className="mb-8">
+              <div className="flex space-x-1 bg-zinc-800/50 rounded-lg p-1">
+                <Button
+                  variant={activeTab === 'active' ? 'default' : 'ghost'}
+                  onClick={() => setActiveTab('active')}
+                  className={cn(
+                    "flex-1 transition-all duration-200",
+                    activeTab === 'active' 
+                      ? "bg-orange-600 text-white shadow-lg" 
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
+                  )}
+                >
+                  <Gavel className="w-4 h-4 mr-2" />
+                  Abertos
+                  {auctions.filter(a => a.status === 'active').length > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-red-500 text-white">
+                      {auctions.filter(a => a.status === 'active').length}
+                    </Badge>
+                  )}
+                </Button>
+
+                <Button
+                  variant={activeTab === 'pending' ? 'default' : 'ghost'}
+                  onClick={() => setActiveTab('pending')}
+                  className={cn(
+                    "flex-1 transition-all duration-200",
+                    activeTab === 'pending' 
+                      ? "bg-yellow-600 text-white shadow-lg" 
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
+                  )}
+                >
+                  <Clock className="w-4 h-4 mr-2" />
+                  Agendados
+                  {auctions.filter(a => a.status === 'pending').length > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-yellow-500 text-white">
+                      {auctions.filter(a => a.status === 'pending').length}
+                    </Badge>
+                  )}
+                </Button>
+
+                <Button
+                  variant={activeTab === 'finished' ? 'default' : 'ghost'}
+                  onClick={() => setActiveTab('finished')}
+                  className={cn(
+                    "flex-1 transition-all duration-200",
+                    activeTab === 'finished' 
+                      ? "bg-green-600 text-white shadow-lg" 
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
+                  )}
+                >
+                  <Trophy className="w-4 h-4 mr-2" />
+                  Finalizados
+                  {auctions.filter(a => a.status === 'finished').length > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-green-500 text-white">
+                      {auctions.filter(a => a.status === 'finished').length}
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* Conteúdo das Abas */}
+            <div className="min-h-[400px]">
+              {renderTabContent()}
+            </div>
           </div>
-        </div>
-
-        {/* Conteúdo das Abas */}
-        <div className="min-h-[400px]">
-          {renderTabContent()}
         </div>
       </div>
     </div>
