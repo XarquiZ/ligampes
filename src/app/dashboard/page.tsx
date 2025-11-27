@@ -12,7 +12,7 @@ import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLe
 import Image from 'next/image'
 import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
-import ChatPopup from '@/components/ChatPopup'
+import ChatPopup from '@/components/Chatpopup'
 
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
