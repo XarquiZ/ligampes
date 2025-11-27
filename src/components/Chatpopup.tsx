@@ -110,6 +110,68 @@ export default function ChatPopup({
     }
   };
 
+  // CORREÇÃO: Função para marcar mensagens como lidas - VERSÃO MELHORADA E VERIFICADA
+  const markMessagesAsRead = async (conversationId: string) => {
+    try {
+      console.log('🎯 Marcando mensagens como lidas para conversa:', conversationId);
+      
+      // PRIMEIRO: Verificar quantas mensagens não lidas existem
+      const { count: unreadCount, error: countError } = await supabase
+        .from('private_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId)
+        .eq('read', false)
+        .neq('sender_id', currentUser.id);
+
+      if (countError) {
+        console.error('❌ Erro ao contar mensagens não lidas:', countError);
+        return false;
+      }
+
+      console.log(`📊 Encontradas ${unreadCount} mensagens não lidas para marcar como lidas`);
+
+      if (unreadCount === 0) {
+        console.log('ℹ️ Nenhuma mensagem não lida encontrada');
+        return true;
+      }
+
+      // SEGUNDO: Marcar as mensagens como lidas
+      const { data, error, count } = await supabase
+        .from('private_messages')
+        .update({ read: true })
+        .eq('conversation_id', conversationId)
+        .eq('read', false)
+        .neq('sender_id', currentUser.id)
+        .select('*', { count: 'exact' });
+
+      if (error) {
+        console.error('❌ Erro ao marcar mensagens como lidas:', error);
+        return false;
+      }
+
+      console.log(`✅ ${count || 0} mensagens marcadas como lidas com sucesso`);
+
+      // TERCEIRO: Verificar se realmente foram atualizadas
+      const { count: verifiedCount, error: verifyError } = await supabase
+        .from('private_messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('conversation_id', conversationId)
+        .eq('read', false)
+        .neq('sender_id', currentUser.id);
+
+      if (verifyError) {
+        console.error('❌ Erro ao verificar atualização:', verifyError);
+      } else {
+        console.log(`🔍 Verificação: ${verifiedCount} mensagens ainda não lidas após atualização`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao processar marcação como lida:', error);
+      return false;
+    }
+  };
+
   // Carregar dados quando o popup abrir
   useEffect(() => {
     if (!isOpen || !currentUser.id) return;
@@ -182,14 +244,16 @@ export default function ChatPopup({
         return;
       }
 
-      // CORREÇÃO: Buscar contagem de mensagens não lidas apenas se não estiver processando
+      // CORREÇÃO: Buscar contagem de mensagens não lidas de forma mais eficiente
       const conversationsWithUnread = await Promise.all(
         conversationsData.map(async (conv) => {
           // Se estamos processando esta conversa, usar o estado local
-          if (isProcessingConversation && conv.id === lastProcessedConversation) {
+          if (lastProcessedConversation === conv.id) {
+            console.log(`🔄 Usando estado local para conversa ${conv.id} (processando)`);
+            const localConv = conversations.find(c => c.id === conv.id);
             return {
               ...conv,
-              unread_count: 0 // Já foi marcada como lida
+              unread_count: localConv?.unread_count || 0
             };
           }
 
@@ -264,6 +328,8 @@ export default function ChatPopup({
         const totalUnread = calculateTotalUnread(formattedConversations);
         console.log('📊 Total de mensagens não lidas calculado:', totalUnread);
         notifyUnreadCountChange(totalUnread);
+      } else {
+        console.log('⏸️  Pulando atualização do contador (shouldSkipUnreadUpdate = true)');
       }
       
     } catch (error) {
@@ -307,32 +373,6 @@ export default function ChatPopup({
       setCoaches(formattedCoaches);
     } catch (error) {
       console.error('Erro ao processar treinadores:', error);
-    }
-  };
-
-  // CORREÇÃO: Função para marcar mensagens como lidas - VERSÃO MELHORADA
-  const markMessagesAsRead = async (conversationId: string) => {
-    try {
-      console.log('🎯 Marcando mensagens como lidas para conversa:', conversationId);
-      
-      const { data, error, count } = await supabase
-        .from('private_messages')
-        .update({ read: true })
-        .eq('conversation_id', conversationId)
-        .eq('read', false)
-        .neq('sender_id', currentUser.id)
-        .select('*', { count: 'exact' });
-
-      if (error) {
-        console.error('❌ Erro ao marcar mensagens como lidas:', error);
-        return false;
-      }
-
-      console.log(`✅ ${count || 0} mensagens marcadas como lidas com sucesso`);
-      return true;
-    } catch (error) {
-      console.error('❌ Erro ao processar marcação como lida:', error);
-      return false;
     }
   };
 
@@ -708,24 +748,69 @@ export default function ChatPopup({
           const totalUnread = calculateTotalUnread(updatedConversations);
           console.log('🔢 Total de não lidas após atualização:', totalUnread);
           notifyUnreadCountChange(totalUnread);
+          
+          // 5. Forçar uma sincronização com o banco após um delay
+          setTimeout(async () => {
+            console.log('🔄 Forçando sincronização com banco...');
+            await loadConversations(true); // forceUpdate = true
+          }, 1000);
+        } else {
+          console.error('❌ Falha ao marcar mensagens como lidas');
         }
       }
       
-      // 5. Carregar as mensagens da conversa
+      // 6. Carregar as mensagens da conversa
       await loadMessages(conversation.id);
       
-      // 6. Aguardar um pouco e permitir atualizações futuras
+      // 7. Aguardar um pouco e permitir atualizações futuras
       setTimeout(() => {
         setShouldSkipUnreadUpdate(false);
-      }, 2000);
+        setLastProcessedConversation(null);
+      }, 3000);
       
     } catch (error) {
       console.error('💥 Erro ao selecionar conversa:', error);
       setShouldSkipUnreadUpdate(false);
+      setLastProcessedConversation(null);
     } finally {
       setIsProcessingConversation(false);
     }
   };
+
+  // CORREÇÃO: Adicionar listener para atualizações em tempo real
+  useEffect(() => {
+    if (!isOpen || !currentUser.id || conversations.length === 0) return;
+
+    // Subscribe para atualizações em tempo real das mensagens
+    const subscription = supabase
+      .channel('private_messages_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages',
+          filter: `conversation_id=in.(${conversations.map(c => `"${c.id}"`).join(',')})`
+        },
+        (payload) => {
+          console.log('🔄 Mudança detectada nas mensagens:', payload);
+          // Recarregar conversas quando houver mudanças nas mensagens
+          loadConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [isOpen, currentUser.id, conversations]);
+
+  // CORREÇÃO: Adicionar listener para quando o componente for montado/desmontado
+  useEffect(() => {
+    if (isOpen && currentUser.id) {
+      loadConversations();
+    }
+  }, [isOpen, currentUser.id]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
