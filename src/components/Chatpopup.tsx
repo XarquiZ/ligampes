@@ -199,6 +199,11 @@ export default function ChatPopup({
       });
 
       setConversations(formattedConversations);
+      
+      // Disparar evento para atualizar o contador no botão flutuante
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('chatConversationsUpdated'));
+      }
     } catch (error) {
       console.error('Erro ao processar conversas:', error);
     }
@@ -265,13 +270,19 @@ export default function ChatPopup({
       if (unreadMessages && unreadMessages.length > 0) {
         const messageIds = unreadMessages.map(msg => msg.id);
         
-        await supabase
+        const { error: updateError } = await supabase
           .from('private_messages')
           .update({ read: true })
           .in('id', messageIds);
 
-        // Atualizar contagem de não lidas após marcar como lidas
-        await loadConversations();
+        if (updateError) {
+          console.error('Erro ao marcar mensagens como lidas:', updateError);
+        } else {
+          console.log(`${messageIds.length} mensagens marcadas como lidas`);
+          
+          // Atualizar contagem de não lidas IMEDIATAMENTE
+          await loadConversations();
+        }
       }
 
       const formattedMessages: Message[] = messagesData.map(msg => {
@@ -340,7 +351,7 @@ export default function ChatPopup({
     }
   };
 
-  // Carregar jogadores do time selecionado - CORRIGIDO
+  // Carregar jogadores do time selecionado
   const loadPlayers = async (teamId: string) => {
     try {
       const { data: playersData, error } = await supabase
@@ -391,7 +402,7 @@ export default function ChatPopup({
     player.name.toLowerCase().includes(playerSearch.toLowerCase())
   );
 
-  // Compartilhar jogador no chat - CORRIGIDO
+  // Compartilhar jogador no chat
   const sharePlayer = async () => {
     if (!selectedPlayer || !selectedConversation) return;
 
@@ -548,6 +559,26 @@ export default function ChatPopup({
     }
   };
 
+  // Função para navegar para o jogador - CORRIGIDA
+  const navigateToPlayer = (playerId: string) => {
+    // Fechar o chat popup
+    onClose();
+    
+    // Navegar para a página de jogadores com o ID do jogador
+    setTimeout(() => {
+      const playerUrl = `/dashboard/jogadores#player-${playerId}`;
+      
+      // Se já estamos na página de jogadores, apenas rolar para o elemento
+      if (window.location.pathname.includes('/dashboard/jogadores')) {
+        // Forçar recarregamento para garantir que a view esteja em lista
+        window.location.href = playerUrl;
+      } else {
+        // Navegar para a página de jogadores
+        window.location.href = playerUrl;
+      }
+    }, 300);
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -576,14 +607,9 @@ export default function ChatPopup({
   // Função para navegar entre abas mesmo com conversa aberta
   const handleTabClick = (tab: TabType) => {
     setActiveTab(tab);
-  };
-
-  // Função para navegar para o jogador
-  const navigateToPlayer = (playerId: string) => {
-    // Aqui você pode implementar a navegação para a página do jogador
-    // Por exemplo, usando window.location ou seu router
-    console.log('Navegar para jogador:', playerId);
-    // window.location.href = `/dashboard/jogadores#player-${playerId}`;
+    if (tab === 'coaches') {
+      setSelectedConversation(null);
+    }
   };
 
   if (!isOpen) return null;
@@ -693,9 +719,9 @@ export default function ChatPopup({
                     }`}
                   >
                     {message.type === 'player' && message.playerData ? (
-                      // Mensagem de jogador compartilhado
+                      // Mensagem de jogador compartilhado - AGORA CLICÁVEL
                       <div
-                        className="max-w-[85%] rounded-lg p-3 backdrop-blur-xl bg-white/10 border border-white/10 cursor-pointer hover:bg-white/20 transition-all"
+                        className="max-w-[85%] rounded-lg p-3 backdrop-blur-xl bg-white/10 border border-white/10 cursor-pointer hover:bg-white/20 transition-all group relative"
                         onClick={() => navigateToPlayer(message.playerData!.id)}
                       >
                         <div className="flex items-center gap-3">
@@ -703,15 +729,17 @@ export default function ChatPopup({
                             <img 
                               src={message.playerData.photo_url} 
                               alt={message.playerData.name}
-                              className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/50"
+                              className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400 transition-all"
                             />
                           ) : (
-                            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform">
                               <span className="text-white text-xs font-bold">{message.playerData.position}</span>
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="font-bold text-white text-sm truncate">{message.playerData.name}</p>
+                            <p className="font-bold text-white text-sm truncate group-hover:text-purple-300 transition-colors">
+                              {message.playerData.name}
+                            </p>
                             <div className="flex items-center gap-2 mt-1">
                               <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-0.5 rounded">
                                 OVR {message.playerData.overall}
@@ -726,6 +754,7 @@ export default function ChatPopup({
                         <p className="text-[10px] text-gray-400 mt-2 text-right">
                           {formatTime(message.timestamp)}
                         </p>
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 to-pink-600/0 group-hover:from-purple-600/10 group-hover:to-pink-600/10 rounded-lg transition-all" />
                       </div>
                     ) : (
                       // Mensagem de texto normal
@@ -859,7 +888,7 @@ export default function ChatPopup({
                             </div>
                           </div>
                           
-                          {/* Indicador de mensagens não lidas - MELHORADO */}
+                          {/* Indicador de mensagens não lidas - ATUALIZADO */}
                           {conversation.unread_count > 0 && (
                             <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
                               <span className="bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-bold shadow-lg">
@@ -925,7 +954,7 @@ export default function ChatPopup({
         )}
       </div>
 
-      {/* Modal de seleção de jogadores - CORRIGIDO cor do texto */}
+      {/* Modal de seleção de jogadores */}
       {showPlayerSelector && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-900 rounded-xl border border-white/10 w-full max-w-md max-h-[80vh] overflow-hidden">
@@ -937,7 +966,7 @@ export default function ChatPopup({
 
             {/* Conteúdo */}
             <div className="p-4 space-y-4">
-              {/* Seletor de time - CORRIGIDO cor do texto */}
+              {/* Seletor de time */}
               <div>
                 <label className="text-xs text-zinc-400 font-medium mb-1 block">Selecionar Time</label>
                 <select
