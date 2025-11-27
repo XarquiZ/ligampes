@@ -83,45 +83,71 @@ export default function ChatPopup({
     loadData();
   }, [isOpen, currentUser.id]);
 
-  // Carregar conversas do usuário
+  // Carregar conversas do usuário - CORRIGIDO
   const loadConversations = async () => {
-    const { data: conversationsData, error } = await supabase
-      .from('conversations')
-      .select(`
-        *,
-        user1:profiles!conversations_user1_id_fkey(id, coach_name, email, role),
-        user2:profiles!conversations_user2_id_fkey(id, coach_name, email, role)
-      `)
-      .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
-      .order('last_message_at', { ascending: false });
+    try {
+      // Primeiro carrega as conversas
+      const { data: conversationsData, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+        .order('last_message_at', { ascending: false });
 
-    if (error) {
-      console.error('Erro ao carregar conversas:', error);
-      return;
+      if (error) {
+        console.error('Erro ao carregar conversas:', error);
+        return;
+      }
+
+      if (!conversationsData?.length) {
+        setConversations([]);
+        return;
+      }
+
+      // Carrega os perfis separadamente
+      const userIds = conversationsData.flatMap(conv => [conv.user1_id, conv.user2_id]);
+      const uniqueUserIds = [...new Set(userIds)];
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, coach_name, email, role')
+        .in('id', uniqueUserIds);
+
+      if (profilesError) {
+        console.error('Erro ao carregar perfis:', profilesError);
+        return;
+      }
+
+      // Formata as conversas
+      const formattedConversations: Conversation[] = conversationsData.map(conv => {
+        const user1 = profilesData.find(p => p.id === conv.user1_id);
+        const user2 = profilesData.find(p => p.id === conv.user2_id);
+
+        return {
+          id: conv.id,
+          user1_id: conv.user1_id,
+          user2_id: conv.user2_id,
+          user1: {
+            id: conv.user1_id,
+            name: user1?.coach_name || user1?.email || 'Usuário',
+            email: user1?.email || '',
+            role: user1?.role
+          },
+          user2: {
+            id: conv.user2_id,
+            name: user2?.coach_name || user2?.email || 'Usuário',
+            email: user2?.email || '',
+            role: user2?.role
+          },
+          last_message: conv.last_message,
+          last_message_at: conv.last_message_at,
+          unread_count: conv.unread_count || 0
+        };
+      });
+
+      setConversations(formattedConversations);
+    } catch (error) {
+      console.error('Erro ao processar conversas:', error);
     }
-
-    const formattedConversations: Conversation[] = conversationsData.map(conv => ({
-      id: conv.id,
-      user1_id: conv.user1_id,
-      user2_id: conv.user2_id,
-      user1: {
-        id: conv.user1.id,
-        name: conv.user1.coach_name || conv.user1.email,
-        email: conv.user1.email,
-        role: conv.user1.role
-      },
-      user2: {
-        id: conv.user2.id,
-        name: conv.user2.coach_name || conv.user2.email,
-        email: conv.user2.email,
-        role: conv.user2.role
-      },
-      last_message: conv.last_message,
-      last_message_at: conv.last_message_at,
-      unread_count: conv.unread_count
-    }));
-
-    setConversations(formattedConversations);
   };
 
   // Carregar todos os treinadores
@@ -172,7 +198,7 @@ export default function ChatPopup({
     setMessages(formattedMessages);
   };
 
-  // Iniciar nova conversa
+  // Iniciar nova conversa - CORRIGIDO
   const startNewConversation = async (coach: User) => {
     // Verificar se já existe conversa
     const existingConversation = conversations.find(conv => 
@@ -187,47 +213,53 @@ export default function ChatPopup({
       return;
     }
 
-    // Criar nova conversa
-    const { data: newConversation, error } = await supabase
-      .from('conversations')
-      .insert({
-        user1_id: currentUser.id,
-        user2_id: coach.id
-      })
-      .select(`
-        *,
-        user1:profiles!conversations_user1_id_fkey(id, coach_name, email, role),
-        user2:profiles!conversations_user2_id_fkey(id, coach_name, email, role)
-      `)
-      .single();
+    try {
+      // Criar nova conversa
+      const { data: newConversation, error } = await supabase
+        .from('conversations')
+        .insert({
+          user1_id: currentUser.id,
+          user2_id: coach.id,
+          last_message: 'Conversa iniciada',
+          last_message_at: new Date().toISOString()
+        })
+        .select()
+        .single();
 
-    if (error) {
-      console.error('Erro ao criar conversa:', error);
-      return;
-    }
-
-    const formattedConversation: Conversation = {
-      id: newConversation.id,
-      user1_id: newConversation.user1_id,
-      user2_id: newConversation.user2_id,
-      user1: {
-        id: newConversation.user1.id,
-        name: newConversation.user1.coach_name || newConversation.user1.email,
-        email: newConversation.user1.email,
-        role: newConversation.user1.role
-      },
-      user2: {
-        id: newConversation.user2.id,
-        name: newConversation.user2.coach_name || newConversation.user2.email,
-        email: newConversation.user2.email,
-        role: newConversation.user2.role
+      if (error) {
+        console.error('Erro ao criar conversa:', error);
+        return;
       }
-    };
 
-    setSelectedConversation(formattedConversation);
-    setMessages([]);
-    setActiveTab('conversations');
-    await loadConversations(); // Recarregar lista de conversas
+      // Criar objeto de conversa formatado
+      const formattedConversation: Conversation = {
+        id: newConversation.id,
+        user1_id: newConversation.user1_id,
+        user2_id: newConversation.user2_id,
+        user1: {
+          id: currentUser.id,
+          name: currentUser.name,
+          email: currentUser.email,
+          role: currentUser.role
+        },
+        user2: {
+          id: coach.id,
+          name: coach.name,
+          email: coach.email,
+          role: coach.role
+        },
+        last_message: 'Conversa iniciada',
+        last_message_at: newConversation.last_message_at,
+        unread_count: 0
+      };
+
+      setSelectedConversation(formattedConversation);
+      setMessages([]);
+      setActiveTab('conversations');
+      await loadConversations(); // Recarregar lista de conversas
+    } catch (error) {
+      console.error('Erro ao processar nova conversa:', error);
+    }
   };
 
   // Enviar mensagem
@@ -238,34 +270,38 @@ export default function ChatPopup({
 
     const messageText = newMessage.trim();
 
-    // Enviar mensagem via Supabase
-    const { error } = await supabase
-      .from('private_messages')
-      .insert({
-        conversation_id: selectedConversation.id,
-        sender_id: currentUser.id,
-        message: messageText
-      });
+    try {
+      // Enviar mensagem via Supabase
+      const { error } = await supabase
+        .from('private_messages')
+        .insert({
+          conversation_id: selectedConversation.id,
+          sender_id: currentUser.id,
+          message: messageText
+        });
 
-    if (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      return;
+      if (error) {
+        console.error('Erro ao enviar mensagem:', error);
+        return;
+      }
+
+      // Atualizar última mensagem na conversa
+      await supabase
+        .from('conversations')
+        .update({
+          last_message: messageText,
+          last_message_at: new Date().toISOString()
+        })
+        .eq('id', selectedConversation.id);
+
+      // Recarregar mensagens e conversas
+      await loadMessages(selectedConversation.id);
+      await loadConversations();
+      
+      setNewMessage('');
+    } catch (error) {
+      console.error('Erro ao processar envio de mensagem:', error);
     }
-
-    // Atualizar última mensagem na conversa
-    await supabase
-      .from('conversations')
-      .update({
-        last_message: messageText,
-        last_message_at: new Date().toISOString()
-      })
-      .eq('id', selectedConversation.id);
-
-    // Recarregar mensagens e conversas
-    await loadMessages(selectedConversation.id);
-    await loadConversations();
-    
-    setNewMessage('');
   };
 
   const scrollToBottom = () => {
@@ -295,7 +331,7 @@ export default function ChatPopup({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col z-50">
+    <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col z-50">
       {/* Header */}
       <div className="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">
         <div>
@@ -338,12 +374,12 @@ export default function ChatPopup({
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {selectedConversation ? (
           // Área de mensagens
           <>
             {/* Header da conversa */}
-            <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSelectedConversation(null)}
@@ -402,7 +438,7 @@ export default function ChatPopup({
             {/* Input de mensagem */}
             <form
               onSubmit={handleSendMessage}
-              className="p-3 border-t border-gray-200 bg-white"
+              className="p-3 border-t border-gray-200 bg-white shrink-0"
             >
               <div className="flex space-x-2">
                 <input
@@ -426,7 +462,7 @@ export default function ChatPopup({
           // Lista de conversas ou treinadores
           <>
             {activeTab === 'coaches' && (
-              <div className="p-3 border-b border-gray-200">
+              <div className="p-3 border-b border-gray-200 shrink-0">
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                   <input
