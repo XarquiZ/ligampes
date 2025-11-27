@@ -12,18 +12,283 @@ import { Send, MessageCircle, X, Users, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
-// ... (as interfaces permanecem as mesmas)
+interface Profile {
+  id: string
+  full_name: string | null
+  coach_name: string | null
+  email: string | null
+  team_id: string | null
+  teams: {
+    id: string
+    name: string
+    logo_url: string | null
+  } | null
+}
+
+interface PrivateMessage {
+  id: string
+  conversation_id: string
+  sender_id: string
+  message: string
+  created_at: string
+  read: boolean
+}
+
+interface Conversation {
+  id: string
+  user1_id: string
+  user2_id: string
+  created_at: string
+  updated_at: string
+  other_user: Profile
+  last_message?: PrivateMessage
+}
+
+interface PrivateChatProps {
+  currentUser: {
+    id: string
+    email: string
+  }
+  currentTeam: {
+    id: string
+    name: string
+    logo_url?: string
+  }
+}
 
 export default function PrivateChat({ currentUser, currentTeam }: PrivateChatProps) {
-  // ... (os states permanecem os mesmos)
+  const [coaches, setCoaches] = useState<Profile[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [selectedCoach, setSelectedCoach] = useState<Profile | null>(null)
+  const [messages, setMessages] = useState<PrivateMessage[]>([])
+  const [newMessage, setNewMessage] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // ... (outros useEffects permanecem)
-
-  // Efeito específico para scroll automático
+  // Carregar treinadores
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    if (isOpen) {
+      loadCoaches()
+      loadConversations()
+    }
+  }, [isOpen])
+
+  // Carregar mensagens quando selecionar um treinador
+  useEffect(() => {
+    if (selectedCoach && isOpen) {
+      loadMessages(selectedCoach.id)
+      const unsubscribe = setupMessageSubscription(selectedCoach.id)
+      return () => {
+        unsubscribe()
+      }
+    }
+  }, [selectedCoach, isOpen])
+
+  // Efeito específico para scroll automático - CORRIGIDO
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom()
+    }
+  }, [messages]) // Agora messages está definido
+
+  const loadCoaches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select(`
+          id,
+          full_name,
+          coach_name,
+          email,
+          team_id,
+          teams (id, name, logo_url)
+        `)
+        .neq('id', currentUser.id)
+        .order('coach_name')
+
+      if (error) throw error
+      setCoaches(data || [])
+    } catch (error) {
+      console.error('Erro ao carregar treinadores:', error)
+    }
+  }
+
+  const loadConversations = async () => {
+    try {
+      const { data: convsData, error: convsError } = await supabase
+        .from('conversations')
+        .select('*')
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+        .order('updated_at', { ascending: false })
+
+      if (convsError) {
+        console.error('Erro ao carregar conversas:', convsError)
+        return
+      }
+
+      const conversationsWithUsers = await Promise.all(
+        (convsData || []).map(async (conv) => {
+          const otherUserId = conv.user1_id === currentUser.id ? conv.user2_id : conv.user1_id
+          
+          const { data: userData } = await supabase
+            .from('profiles')
+            .select(`
+              id,
+              full_name,
+              coach_name,
+              email,
+              team_id,
+              teams (id, name, logo_url)
+            `)
+            .eq('id', otherUserId)
+            .single()
+
+          const { data: lastMessage } = await supabase
+            .from('private_messages')
+            .select('*')
+            .eq('conversation_id', conv.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+          return {
+            ...conv,
+            other_user: userData,
+            last_message: lastMessage
+          }
+        })
+      )
+
+      setConversations(conversationsWithUsers)
+    } catch (error) {
+      console.error('Erro ao carregar conversas:', error)
+    }
+  }
+
+  const loadMessages = async (otherUserId: string) => {
+    try {
+      const conversationId = await findOrCreateConversation(otherUserId)
+
+      const { data, error } = await supabase
+        .from('private_messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true })
+        .limit(50)
+
+      if (error) throw error
+      setMessages(data || [])
+    } catch (error) {
+      console.error('Erro ao carregar mensagens:', error)
+    }
+  }
+
+  const findOrCreateConversation = async (otherUserId: string): Promise<string> => {
+    try {
+      const { data: conversations, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
+
+      if (error) {
+        console.error('Erro ao buscar conversas:', error)
+        throw error
+      }
+
+      const existingConv = conversations?.find(conv => 
+        (conv.user1_id === currentUser.id && conv.user2_id === otherUserId) ||
+        (conv.user1_id === otherUserId && conv.user2_id === currentUser.id)
+      )
+
+      if (existingConv) {
+        return existingConv.id
+      }
+
+      const { data: newConv, error: createError } = await supabase
+        .from('conversations')
+        .insert({
+          user1_id: currentUser.id,
+          user2_id: otherUserId
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('Erro ao criar conversa:', createError)
+        throw createError
+      }
+
+      return newConv.id
+    } catch (error) {
+      console.error('Erro em findOrCreateConversation:', error)
+      throw error
+    }
+  }
+
+  const setupMessageSubscription = (otherUserId: string) => {
+    const subscription = supabase
+      .channel('private_messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        async (payload) => {
+          try {
+            const conversationId = await findOrCreateConversation(otherUserId)
+            if (payload.new.conversation_id === conversationId) {
+              setMessages(prev => [...prev, payload.new as PrivateMessage])
+              loadConversations()
+            }
+          } catch (error) {
+            console.error('Erro no subscription:', error)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedCoach) return
+
+    setIsLoading(true)
+    
+    try {
+      const conversationId = await findOrCreateConversation(selectedCoach.id)
+
+      const { error } = await supabase
+        .from('private_messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: currentUser.id,
+          message: newMessage.trim()
+        })
+
+      if (error) throw error
+
+      setNewMessage('')
+      
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', conversationId)
+
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error)
+      alert('Erro ao enviar mensagem. Tente novamente.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -31,7 +296,30 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
     }, 100)
   }
 
-  // ... (outras funções permanecem)
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleTimeString('pt-BR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })
+  }
+
+  const filteredCoaches = coaches.filter(coach =>
+    coach.coach_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    coach.teams?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    coach.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const getDisplayName = (profile: Profile) => {
+    return profile.coach_name || profile.full_name || profile.email?.split('@')[0] || 'Treinador'
+  }
 
   return (
     <>
@@ -231,7 +519,6 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
                             </span>
                           </div>
                         ))}
-                        {/* Elemento invisível para scroll automático */}
                         <div ref={messagesEndRef} />
                       </div>
                     </ScrollArea>
