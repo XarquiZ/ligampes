@@ -86,12 +86,11 @@ export default function ChatPopup({
     loadData();
   }, [isOpen, currentUser.id]);
 
-  // Carregar conversas do usuário - CORRIGIDO
+  // Carregar conversas do usuário
   const loadConversations = async () => {
     try {
       console.log('Carregando conversas para usuário:', currentUser.id);
       
-      // Primeiro carrega as conversas
       const { data: conversationsData, error } = await supabase
         .from('conversations')
         .select('*')
@@ -237,7 +236,7 @@ export default function ChatPopup({
     }
   };
 
-  // Iniciar nova conversa - CORRIGIDO
+  // Iniciar nova conversa
   const startNewConversation = async (coach: User) => {
     // Verificar se já existe conversa
     const existingConversation = conversations.find(conv => 
@@ -299,7 +298,7 @@ export default function ChatPopup({
       setSelectedConversation(formattedConversation);
       setMessages([]);
       setActiveTab('conversations');
-      await loadConversations(); // Recarregar lista de conversas
+      await loadConversations();
     } catch (error) {
       console.error('Erro ao processar nova conversa:', error);
     }
@@ -380,18 +379,18 @@ export default function ChatPopup({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-white rounded-lg shadow-xl border border-gray-200 flex flex-col z-50">
+    <div className="fixed bottom-6 right-6 w-96 h-[600px] bg-zinc-900 rounded-2xl shadow-2xl border border-white/10 flex flex-col z-50 backdrop-blur-xl">
       {/* Header */}
-      <div className="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-2xl flex justify-between items-center">
         <div>
-          <h3 className="font-semibold">Chat - {currentTeam.name}</h3>
-          <p className="text-blue-100 text-sm">
+          <h3 className="font-black text-lg">CHAT - {currentTeam.name}</h3>
+          <p className="text-purple-200 text-sm font-medium">
             {selectedConversation ? `Conversando com ${getOtherUser(selectedConversation).name}` : 'Selecione uma conversa'}
           </p>
         </div>
         <button
           onClick={onClose}
-          className="text-white hover:text-blue-200 transition-colors"
+          className="text-white hover:text-purple-200 transition-colors p-1 rounded-full hover:bg-white/10"
           aria-label="Fechar chat"
         >
           <X size={20} />
@@ -399,73 +398,81 @@ export default function ChatPopup({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-white/10 bg-zinc-800/50">
         <button
           onClick={() => setActiveTab('conversations')}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+          className={`flex-1 py-4 px-6 text-sm font-bold transition-all ${
             activeTab === 'conversations'
-              ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-400 border-b-2 border-purple-400'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
           }`}
         >
-          Conversas
+          CONVERSAS
         </button>
         <button
           onClick={() => setActiveTab('coaches')}
-          className={`flex-1 py-3 px-4 text-sm font-medium transition-colors ${
+          className={`flex-1 py-4 px-6 text-sm font-bold transition-all ${
             activeTab === 'coaches'
-              ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-400 border-b-2 border-purple-400'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
           }`}
         >
-          Treinadores
+          TREINADORES
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-zinc-900 to-zinc-800">
         {selectedConversation ? (
           // Área de mensagens
           <>
             {/* Header da conversa */}
-            <div className="p-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2">
+            <div className="p-4 border-b border-white/10 bg-zinc-800/50 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => setSelectedConversation(null)}
-                  className="text-gray-500 hover:text-gray-700 p-1"
+                  className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-all"
                 >
                   ←
                 </button>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {getOtherUser(selectedConversation).team_logo ? (
                     <img 
                       src={getOtherUser(selectedConversation).team_logo} 
                       alt={getOtherUser(selectedConversation).team_name}
-                      className="w-6 h-6 rounded-full object-cover"
+                      className="w-8 h-8 rounded-full object-cover border-2 border-purple-500/50"
                     />
                   ) : (
-                    <User size={16} className="text-gray-600" />
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                      <User size={16} className="text-white" />
+                    </div>
                   )}
-                  <span className="font-medium text-sm">
-                    {getOtherUser(selectedConversation).name}
-                    {getOtherUser(selectedConversation).role === 'admin' && (
-                      <Crown size={12} className="inline ml-1 text-yellow-500" />
+                  <div>
+                    <span className="font-bold text-white text-sm flex items-center gap-1">
+                      {getOtherUser(selectedConversation).name}
+                      {getOtherUser(selectedConversation).role === 'admin' && (
+                        <Crown size={14} className="text-yellow-500" />
+                      )}
+                    </span>
+                    {getOtherUser(selectedConversation).team_name && (
+                      <span className="text-xs text-purple-400 font-medium">
+                        {getOtherUser(selectedConversation).team_name}
+                      </span>
                     )}
-                  </span>
+                  </div>
                 </div>
               </div>
-              {getOtherUser(selectedConversation).team_name && (
-                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
-                  {getOtherUser(selectedConversation).team_name}
-                </span>
-              )}
             </div>
 
             {/* Mensagens */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-zinc-900 to-zinc-800">
               {messages.length === 0 ? (
-                <div className="text-center text-gray-500 text-sm py-8">
-                  Nenhuma mensagem ainda. Inicie a conversa!
+                <div className="text-center text-gray-500 text-sm py-12">
+                  <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <MessageCircle size={24} className="text-gray-600" />
+                  </div>
+                  <p className="font-medium">Nenhuma mensagem ainda</p>
+                  <p className="text-xs mt-1">Inicie a conversa!</p>
                 </div>
               ) : (
                 messages.map((message) => (
@@ -476,18 +483,18 @@ export default function ChatPopup({
                     }`}
                   >
                     <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
+                      className={`max-w-[80%] rounded-2xl p-4 backdrop-blur-xl ${
                         message.sender === 'user'
-                          ? 'bg-blue-600 text-white rounded-br-none'
-                          : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-br-none shadow-lg'
+                          : 'bg-white/10 text-white rounded-bl-none border border-white/10'
                       }`}
                     >
-                      <p className="text-sm">{message.text}</p>
+                      <p className="text-sm font-medium">{message.text}</p>
                       <p
-                        className={`text-xs mt-1 ${
+                        className={`text-xs mt-2 font-medium ${
                           message.sender === 'user'
-                            ? 'text-blue-200'
-                            : 'text-gray-500'
+                            ? 'text-purple-200'
+                            : 'text-gray-400'
                         }`}
                       >
                         {formatTime(message.timestamp)}
@@ -502,22 +509,22 @@ export default function ChatPopup({
             {/* Input de mensagem */}
             <form
               onSubmit={handleSendMessage}
-              className="p-3 border-t border-gray-200 bg-white shrink-0"
+              className="p-4 border-t border-white/10 bg-zinc-800/50 shrink-0"
             >
-              <div className="flex space-x-2">
+              <div className="flex space-x-3">
                 <input
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Digite sua mensagem..."
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-400 backdrop-blur-xl"
                 />
                 <button
                   type="submit"
                   disabled={!newMessage.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white p-2 rounded-lg transition-colors"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white p-3 rounded-xl transition-all duration-300 shadow-lg disabled:shadow-none"
                 >
-                  <Send size={16} />
+                  <Send size={18} />
                 </button>
               </div>
             </form>
@@ -526,15 +533,15 @@ export default function ChatPopup({
           // Lista de conversas ou treinadores
           <>
             {activeTab === 'coaches' && (
-              <div className="p-3 border-b border-gray-200 shrink-0">
+              <div className="p-4 border-b border-white/10 bg-zinc-800/50 shrink-0">
                 <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                  <Search size={16} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     placeholder="Buscar treinadores..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-gray-400 backdrop-blur-xl"
                   />
                 </div>
               </div>
@@ -543,12 +550,16 @@ export default function ChatPopup({
             <div className="flex-1 overflow-y-auto">
               {loading ? (
                 <div className="flex items-center justify-center h-32">
-                  <div className="text-gray-500 text-sm">Carregando...</div>
+                  <div className="text-gray-500 text-sm font-medium">Carregando...</div>
                 </div>
               ) : activeTab === 'conversations' ? (
                 conversations.length === 0 ? (
-                  <div className="text-center text-gray-500 text-sm py-8">
-                    Nenhuma conversa iniciada
+                  <div className="text-center text-gray-500 py-12">
+                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <MessageCircle size={24} className="text-gray-600" />
+                    </div>
+                    <p className="font-medium">Nenhuma conversa iniciada</p>
+                    <p className="text-xs mt-1">Vá para "Treinadores" para começar</p>
                   </div>
                 ) : (
                   conversations.map((conversation) => {
@@ -560,11 +571,11 @@ export default function ChatPopup({
                           setSelectedConversation(conversation);
                           loadMessages(conversation.id);
                         }}
-                        className="w-full p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
+                        className="w-full p-4 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group"
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center overflow-hidden">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center overflow-hidden border-2 border-purple-500/50 group-hover:border-purple-400 transition-all">
                               {otherUser.team_logo ? (
                                 <img 
                                   src={otherUser.team_logo} 
@@ -572,26 +583,26 @@ export default function ChatPopup({
                                   className="w-full h-full object-cover"
                                 />
                               ) : (
-                                <User size={16} className="text-blue-600" />
+                                <User size={18} className="text-white" />
                               )}
                             </div>
-                            <div>
-                              <p className="font-medium text-sm text-gray-900 flex items-center gap-1">
+                            <div className="text-left">
+                              <p className="font-bold text-white text-sm flex items-center gap-2">
                                 {otherUser.name}
                                 {otherUser.role === 'admin' && (
                                   <Crown size={12} className="text-yellow-500" />
                                 )}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-purple-400 text-xs font-medium">
                                 {otherUser.team_name}
                               </p>
-                              <p className="text-xs text-gray-500 truncate max-w-[200px]">
+                              <p className="text-gray-400 text-xs mt-1 truncate max-w-[200px]">
                                 {conversation.last_message || 'Nenhuma mensagem'}
                               </p>
                             </div>
                           </div>
                           {conversation.unread_count > 0 && (
-                            <span className="bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                            <span className="bg-red-500 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center font-bold shadow-lg">
                               {conversation.unread_count}
                             </span>
                           )}
@@ -603,18 +614,22 @@ export default function ChatPopup({
               ) : (
                 // Tab de Treinadores
                 filteredCoaches.length === 0 ? (
-                  <div className="text-center text-gray-500 text-sm py-8">
-                    Nenhum treinador encontrado
+                  <div className="text-center text-gray-500 py-12">
+                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <User size={24} className="text-gray-600" />
+                    </div>
+                    <p className="font-medium">Nenhum treinador encontrado</p>
+                    <p className="text-xs mt-1">Tente ajustar sua busca</p>
                   </div>
                 ) : (
                   filteredCoaches.map((coach) => (
                     <button
                       key={coach.id}
                       onClick={() => startNewConversation(coach)}
-                      className="w-full p-4 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left"
+                      className="w-full p-4 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center overflow-hidden">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center overflow-hidden border-2 border-green-500/50 group-hover:border-green-400 transition-all">
                           {coach.team_logo ? (
                             <img 
                               src={coach.team_logo} 
@@ -622,17 +637,19 @@ export default function ChatPopup({
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <User size={16} className="text-green-600" />
+                            <User size={18} className="text-white" />
                           )}
                         </div>
-                        <div>
-                          <p className="font-medium text-sm text-gray-900 flex items-center gap-1">
+                        <div className="text-left">
+                          <p className="font-bold text-white text-sm flex items-center gap-2">
                             {coach.name}
                             {coach.role === 'admin' && (
                               <Crown size={12} className="text-yellow-500" />
                             )}
                           </p>
-                          <p className="text-xs text-gray-500">{coach.team_name}</p>
+                          <p className="text-green-400 text-xs font-medium">
+                            {coach.team_name}
+                          </p>
                         </div>
                       </div>
                     </button>
