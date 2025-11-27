@@ -58,6 +58,7 @@ interface ChatPopupProps {
   onClose: () => void;
   currentUser: User;
   currentTeam: Team;
+  onUnreadCountChange?: (count: number) => void;
 }
 
 type TabType = 'conversations' | 'coaches';
@@ -66,7 +67,8 @@ export default function ChatPopup({
   isOpen, 
   onClose, 
   currentUser, 
-  currentTeam 
+  currentTeam,
+  onUnreadCountChange
 }: ChatPopupProps) {
   const [activeTab, setActiveTab] = useState<TabType>('conversations');
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -84,7 +86,25 @@ export default function ChatPopup({
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Carregar conversas e treinadores
+  // Calcular total de mensagens não lidas
+  const calculateTotalUnread = (conversations: Conversation[]) => {
+    return conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0);
+  };
+
+  // Notificar mudança no contador
+  const notifyUnreadCountChange = (count: number) => {
+    if (onUnreadCountChange) {
+      onUnreadCountChange(count);
+    }
+    // Disparar evento para outros componentes
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('chatUnreadCountUpdated', { 
+        detail: { totalUnread: count } 
+      }));
+    }
+  };
+
+  // Carregar dados quando o popup abrir
   useEffect(() => {
     if (!isOpen || !currentUser.id) return;
 
@@ -123,6 +143,7 @@ export default function ChatPopup({
 
       if (!conversationsData?.length) {
         setConversations([]);
+        notifyUnreadCountChange(0);
         return;
       }
 
@@ -200,10 +221,10 @@ export default function ChatPopup({
 
       setConversations(formattedConversations);
       
-      // Disparar evento para atualizar o contador no botão flutuante
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('chatConversationsUpdated'));
-      }
+      // Calcular e notificar o total de mensagens não lidas
+      const totalUnread = calculateTotalUnread(formattedConversations);
+      notifyUnreadCountChange(totalUnread);
+      
     } catch (error) {
       console.error('Erro ao processar conversas:', error);
     }
@@ -559,7 +580,7 @@ export default function ChatPopup({
     }
   };
 
-  // Função para navegar para o jogador - CORRIGIDA
+  // Função para navegar para o jogador
   const navigateToPlayer = (playerId: string) => {
     // Fechar o chat popup
     onClose();
@@ -577,6 +598,12 @@ export default function ChatPopup({
         window.location.href = playerUrl;
       }
     }, 300);
+  };
+
+  // Função para selecionar conversa
+  const handleSelectConversation = async (conversation: Conversation) => {
+    setSelectedConversation(conversation);
+    await loadMessages(conversation.id);
   };
 
   const scrollToBottom = () => {
@@ -853,10 +880,7 @@ export default function ChatPopup({
                     return (
                       <button
                         key={conversation.id}
-                        onClick={() => {
-                          setSelectedConversation(conversation);
-                          loadMessages(conversation.id);
-                        }}
+                        onClick={() => handleSelectConversation(conversation)}
                         className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group relative"
                       >
                         <div className="flex items-center justify-between">
