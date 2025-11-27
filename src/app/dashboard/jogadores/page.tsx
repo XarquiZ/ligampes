@@ -20,6 +20,7 @@ import { CadastrarJogadorForm } from '@/components/CadastrarJogadorForm'
 import { PlusCircle, Loader2, AlertCircle, Search, Filter, X, ChevronDown, Pencil, Grid3X3, List, Star, Ruler } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+// MOVER AS INTERFACES PARA FORA DO COMPONENTE
 interface Player {
   id: string
   name: string
@@ -64,8 +65,6 @@ interface Player {
   gk_clearing?: number
   gk_reflexes?: number
   gk_reach?: number
-
-  // detalhes adicionais
   weak_foot_usage?: number | null
   weak_foot_accuracy?: number | null
   form?: number | null
@@ -78,6 +77,82 @@ interface Team {
   id: string
   name: string
   logo_url: string | null
+}
+
+// MOVER CONSTANTES PARA FORA DO COMPONENTE
+const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
+const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
+
+const ATTRIBUTE_GROUPS = [
+  { name: 'Ataque & Técnica', attributes: ['offensive_talent', 'ball_control', 'dribbling', 'tight_possession', 'finishing', 'heading', 'place_kicking', 'curl'] },
+  { name: 'Passes', attributes: ['low_pass', 'lofted_pass'] },
+  { name: 'Físico', attributes: ['speed', 'acceleration', 'kicking_power', 'jump', 'physical_contact', 'balance', 'stamina'] },
+  { name: 'Defesa', attributes: ['defensive_awareness', 'ball_winning', 'aggression'] },
+  { name: 'Goleiro', attributes: ['gk_awareness', 'gk_catching', 'gk_clearing', 'gk_reflexes', 'gk_reach'] },
+]
+
+const ATTR_LABELS: Record<string, string> = {
+  offensive_talent: 'Tal. Ofensivo',
+  ball_control: 'Controle de bola',
+  dribbling: 'Drible',
+  tight_possession: 'Condução Firme',
+  low_pass: 'Passe rasteiro',
+  lofted_pass: 'Passe Alto',
+  finishing: 'Finalização',
+  heading: 'Cabeceio',
+  place_kicking: 'Chute colocado',
+  curl: 'Curva',
+  speed: 'Velocidade',
+  acceleration: 'Aceleração',
+  kicking_power: 'Força do chute',
+  jump: 'Impulsão',
+  physical_contact: 'Contato Físico',
+  balance: 'Equilíbrio',
+  stamina: 'Resistência',
+  defensive_awareness: 'Talento defensivo',
+  ball_winning: 'Desarme',
+  aggression: 'Agressividade',
+  gk_awareness: 'Talento de GO',
+  gk_catching: 'Firmeza de GO',
+  gk_clearing: 'Afast. de bola de GO',
+  gk_reflexes: 'Reflexos de GO',
+  gk_reach: 'Alcance de GO',
+}
+
+// COMPONENTE LevelBars MOVIDO PARA FORA
+function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null; max?: number; size?: 'sm' | 'md' }) {
+  const v = Math.max(0, Math.min(max, value ?? 0))
+  const w = size === 'sm' ? 'w-4 h-2' : 'w-6 h-2.5'
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: max }).map((_, i) => {
+        const active = i < v
+        return (
+          <div
+            key={i}
+            className={cn(
+              `${w} rounded-sm transition-all`,
+              active ? 'bg-yellow-400 shadow-sm' : 'bg-zinc-700/80'
+            )}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+// FUNÇÃO formatHeight MOVIDA PARA FORA
+const formatHeight = (height: number | null | undefined) => {
+  if (height === null || height === undefined) return '-'
+  return `${height}cm`
+}
+
+// FUNÇÃO getAttrColorHex MOVIDA PARA FORA
+const getAttrColorHex = (value: number) => {
+  if (value >= 95) return '#4FC3F7'
+  if (value >= 85) return '#8BC34A'
+  if (value >= 75) return '#FB8C00'
+  return '#E53935'
 }
 
 export default function ListaJogadores() {
@@ -109,63 +184,6 @@ export default function ListaJogadores() {
     }), []
   );
 
-  // FUNÇÃO ATUALIZADA: Para navegação via chat
-  const handleGridCardClick = (playerId: string) => {
-    setIsTransitioning(true)
-    setViewMode('list')
-    
-    setTimeout(() => {
-      setOpenedPlayers([playerId])
-      
-      // Atualizar a URL para manter consistência com o chat
-      window.history.replaceState(null, '', `#player-${playerId}`);
-      
-      setTimeout(() => {
-        const element = document.getElementById(`player-${playerId}`)
-        if (element) {
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center',
-            inline: 'nearest'
-          })
-          
-          // Adicionar destaque visual
-          element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-300')
-          setTimeout(() => {
-            element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl')
-          }, 3000)
-        }
-        setIsTransitioning(false)
-      }, 100)
-    }, 150)
-  }
-
-  const togglePlayer = (playerId: string) => {
-    setOpenedPlayers(prev =>
-      prev.includes(playerId)
-        ? prev.filter(id => id !== playerId)
-        : [...prev, playerId]
-    )
-  }
-
-  const [searchName, setSearchName] = useState('')
-  const [filterPosition, setFilterPosition] = useState('Todas')
-  const [filterFoot, setFilterFoot] = useState('Todos')
-  const [filterTeam, setFilterTeam] = useState('Todos')
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
-
-  const [attrFilters, setAttrFilters] = useState<Record<string, number | null>>({
-    offensive_talent: null, ball_control: null, dribbling: null, tight_possession: null,
-    low_pass: null, lofted_pass: null, finishing: null, heading: null, place_kicking: null,
-    curl: null, speed: null, acceleration: null, kicking_power: null, jump: null,
-    physical_contact: null, balance: null, stamina: null, defensive_awareness: null,
-    ball_winning: null, aggression: null, gk_awareness: null, gk_catching: null,
-    gk_clearing: null, gk_reflexes: null, gk_reach: null,
-  })
-
-  const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
-  const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
-
   // HABILIDADES ORGANIZADAS EM ORDEM ALFABÉTICA E COM "Especialista em Pênaltis" incluída
   const SKILLS_OPTIONS = useMemo(() => [
     '360 graus',
@@ -183,7 +201,7 @@ export default function ListaJogadores() {
     'Curva para fora',
     'De letra',
     'Elástico',
-    'Especialista em Pênaltis', // NOVA HABILIDADE ADICIONADA
+    'Especialista em Pênaltis',
     'Espírito guerreiro',
     'Finalização acrobática',
     'Finta de letra',
@@ -209,51 +227,67 @@ export default function ListaJogadores() {
     'Volta para marcar'
   ].sort(), []);
 
-  const ATTRIBUTE_GROUPS = [
-    { name: 'Ataque & Técnica', attributes: ['offensive_talent', 'ball_control', 'dribbling', 'tight_possession', 'finishing', 'heading', 'place_kicking', 'curl'] },
-    { name: 'Passes', attributes: ['low_pass', 'lofted_pass'] },
-    { name: 'Físico', attributes: ['speed', 'acceleration', 'kicking_power', 'jump', 'physical_contact', 'balance', 'stamina'] },
-    { name: 'Defesa', attributes: ['defensive_awareness', 'ball_winning', 'aggression'] },
-    { name: 'Goleiro', attributes: ['gk_awareness', 'gk_catching', 'gk_clearing', 'gk_reflexes', 'gk_reach'] },
-  ]
+  // FUNÇÃO handleGridCardClick ATUALIZADA
+  const handleGridCardClick = useCallback((playerId: string) => {
+    setIsTransitioning(true)
+    setViewMode('list')
+    
+    setTimeout(() => {
+      setOpenedPlayers([playerId])
+      
+      // Atualizar a URL para manter consistência com o chat
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', `#player-${playerId}`);
+      }
+      
+      setTimeout(() => {
+        const element = document.getElementById(`player-${playerId}`)
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          })
+          
+          // Adicionar destaque visual
+          element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-300')
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl')
+          }, 3000)
+        }
+        setIsTransitioning(false)
+      }, 100)
+    }, 150)
+  }, [])
 
-  const getAttrColorHex = (value: number) => {
-    if (value >= 95) return '#4FC3F7'
-    if (value >= 85) return '#8BC34A'
-    if (value >= 75) return '#FB8C00'
-    return '#E53935'
-  }
-
-  // Função para formatar altura (apenas cm)
-  const formatHeight = (height: number | null | undefined) => {
-    if (height === null || height === undefined) return '-'
-    return `${height}cm`
-  }
-
-  function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null; max?: number; size?: 'sm' | 'md' }) {
-    const v = Math.max(0, Math.min(max, value ?? 0))
-    const w = size === 'sm' ? 'w-4 h-2' : 'w-6 h-2.5'
-    return (
-      <div className="flex items-center gap-1">
-        {Array.from({ length: max }).map((_, i) => {
-          const active = i < v
-          return (
-            <div
-              key={i}
-              className={cn(
-                `${w} rounded-sm transition-all`,
-                active ? 'bg-yellow-400 shadow-sm' : 'bg-zinc-700/80'
-              )}
-            />
-          )
-        })}
-      </div>
+  const togglePlayer = useCallback((playerId: string) => {
+    setOpenedPlayers(prev =>
+      prev.includes(playerId)
+        ? prev.filter(id => id !== playerId)
+        : [...prev, playerId]
     )
-  }
+  }, [])
+
+  const [searchName, setSearchName] = useState('')
+  const [filterPosition, setFilterPosition] = useState('Todas')
+  const [filterFoot, setFilterFoot] = useState('Todos')
+  const [filterTeam, setFilterTeam] = useState('Todos')
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
+
+  const [attrFilters, setAttrFilters] = useState<Record<string, number | null>>({
+    offensive_talent: null, ball_control: null, dribbling: null, tight_possession: null,
+    low_pass: null, lofted_pass: null, finishing: null, heading: null, place_kicking: null,
+    curl: null, speed: null, acceleration: null, kicking_power: null, jump: null,
+    physical_contact: null, balance: null, stamina: null, defensive_awareness: null,
+    ball_winning: null, aggression: null, gk_awareness: null, gk_catching: null,
+    gk_clearing: null, gk_reflexes: null, gk_reach: null,
+  })
 
   // NOVO useEffect: Detectar hash da URL para navegação do chat
   useEffect(() => {
     const handleHashChange = () => {
+      if (typeof window === 'undefined') return;
+      
       const hash = window.location.hash;
       if (hash && hash.startsWith('#player-')) {
         const playerId = hash.replace('#player-', '');
@@ -297,7 +331,7 @@ export default function ListaJogadores() {
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [filteredPlayers]); // Adicione filteredPlayers como dependência
+  }, []); // Removida a dependência filteredPlayers
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -308,7 +342,7 @@ export default function ListaJogadores() {
       }
     }
     checkAdmin()
-  }, [supabase])
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -349,21 +383,21 @@ export default function ListaJogadores() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const handleSuccess = () => {
+  const handleSuccess = useCallback(() => {
     setIsCadastroOpen(false)
     setIsEdicaoOpen(false)
     setJogadorEditando(null)
     fetchData()
-  }
+  }, [fetchData])
 
-  const openEditPlayer = (player: Player) => {
+  const openEditPlayer = useCallback((player: Player) => {
     setJogadorEditando(player)
     setIsEdicaoOpen(true)
-  }
+  }, [])
 
   const filteredPlayers = useMemo(() => {
     return jogadores.filter(j => {
@@ -389,7 +423,7 @@ export default function ListaJogadores() {
     filterMinHeight !== 'all',
   ].filter(Boolean).length
 
-  const clearAllFilters = () => {
+  const clearAllFilters = useCallback(() => {
     setSearchName('')
     setFilterPosition('Todas')
     setFilterFoot('Todos')
@@ -397,9 +431,9 @@ export default function ListaJogadores() {
     setSelectedSkills([])
     setFilterMinHeight('all')
     setAttrFilters(Object.fromEntries(Object.keys(attrFilters).map(k => [k, null])))
-  }
+  }, [attrFilters])
 
-  const renderClubLogo = (url: string | null, name: string) =>
+  const renderClubLogo = useCallback((url: string | null, name: string) =>
     url ? (
       <img
         src={url}
@@ -408,35 +442,9 @@ export default function ListaJogadores() {
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
       />
     ) : null
+  , [])
 
-  const ATTR_LABELS: Record<string, string> = {
-    offensive_talent: 'Tal. Ofensivo',
-    ball_control: 'Controle de bola',
-    dribbling: 'Drible',
-    tight_possession: 'Condução Firme',
-    low_pass: 'Passe rasteiro',
-    lofted_pass: 'Passe Alto',
-    finishing: 'Finalização',
-    heading: 'Cabeceio',
-    place_kicking: 'Chute colocado',
-    curl: 'Curva',
-    speed: 'Velocidade',
-    acceleration: 'Aceleração',
-    kicking_power: 'Força do chute',
-    jump: 'Impulsão',
-    physical_contact: 'Contato Físico',
-    balance: 'Equilíbrio',
-    stamina: 'Resistência',
-    defensive_awareness: 'Talento defensivo',
-    ball_winning: 'Desarme',
-    aggression: 'Agressividade',
-    gk_awareness: 'Talento de GO',
-    gk_catching: 'Firmeza de GO',
-    gk_clearing: 'Afast. de bola de GO',
-    gk_reflexes: 'Reflexos de GO',
-    gk_reach: 'Alcance de GO',
-  }
-
+  // ... (o restante do JSX permanece igual)
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white">
       {/* Overlay de transição */}
@@ -450,7 +458,6 @@ export default function ListaJogadores() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-
         {/* Header */}
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-12">
           <div>
@@ -556,7 +563,7 @@ export default function ListaJogadores() {
                     </Select>
                   </div>
 
-                  {/* Filtro de Habilidades (AGORA INCLUI "Especialista em Pênaltis") */}
+                  {/* Filtro de Habilidades */}
                   <Collapsible>
                     <CollapsibleTrigger className="flex w-full items-center justify-between py-4 text-lg font-bold text-white hover:text-purple-400">
                       Habilidades ({selectedSkills.length})
@@ -586,19 +593,10 @@ export default function ListaJogadores() {
                       </CollapsibleTrigger>
                       <CollapsibleContent className="space-y-6 pt-4">
                         {group.attributes.map(key => {
-                          const labels: Record<string, string> = {
-                            offensive_talent: 'Tal. Ofensivo', ball_control: 'Controle de bola', dribbling: 'Drible',
-                            tight_possession: 'Condução Firme', low_pass: 'Passe rasteiro', lofted_pass: 'Passe Alto',
-                            finishing: 'Finalização', heading: 'Cabeceio', place_kicking: 'Chute colocado', curl: 'Curva',
-                            speed: 'Velocidade', acceleration: 'Aceleração', kicking_power: 'Força do chute',
-                            jump: 'Impulsão', physical_contact: 'Contato Físico', balance: 'Equilíbrio', stamina: 'Resistência',
-                            defensive_awareness: 'Talento defensivo', ball_winning: 'Ganho de Bola', aggression: 'Agressividade',
-                            gk_awareness: 'Talento de GO', gk_catching: 'Firmeza de GO', gk_clearing: 'Afast. de bola de GO', gk_reflexes: 'Reflexos de GO', gk_reach: 'Alcance de GO',
-                          }
                           return (
                             <div key={key} className="space-y-3">
                               <div className="flex justify-between text-sm">
-                                <span className="text-zinc-400 font-medium">{labels[key]}</span>
+                                <span className="text-zinc-400 font-medium">{ATTR_LABELS[key]}</span>
                                 <span className="font-bold text-purple-400">{attrFilters[key] ?? '-'}</span>
                               </div>
                               <Slider
@@ -647,7 +645,7 @@ export default function ListaJogadores() {
             <Input
               placeholder="Procurar jogador..."
               value={searchName}
-              onChange={e => setSearchName(e.target.value)}
+              onChange={(e) => setSearchName(e.target.value)}
               className="pl-12 h-14 bg-zinc-900/70 border-zinc-700 text-white placeholder:text-zinc-500 text-lg rounded-xl"
             />
           </div>
@@ -797,7 +795,6 @@ export default function ListaJogadores() {
                         <p className="text-zinc-500">Posição</p>
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge className="bg-purple-600">{j.position}</Badge>
-                          {/* Posições alternativas removidas da linha principal */}
                         </div>
                       </div>
                       <div>
@@ -989,7 +986,7 @@ export default function ListaJogadores() {
                           </div>
                         </div>
 
-                        {/* Habilidades especiais (AGORA INCLUI "Especialista em Pênaltis" como habilidade normal) */}
+                        {/* Habilidades especiais */}
                         {j.skills && j.skills.length > 0 && (
                           <div>
                             <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
