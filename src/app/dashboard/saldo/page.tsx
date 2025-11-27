@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import Sidebar from '@/components/Sidebar'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Team {
   id: string
@@ -51,11 +54,15 @@ function formatDate(dateString: string) {
 }
 
 export default function PaginaSaldo() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [team, setTeam] = useState<Team | null>(null)
+  const [profile, setProfile] = useState<any>(null)
   const [transactions, setTransactions] = useState<BalanceTransaction[]>([])
   const [allTeams, setAllTeams] = useState<Team[]>([])
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [dataLoading, setDataLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'credit' | 'debit'>('all')
 
   // Estados para o modal de admin
@@ -66,18 +73,38 @@ export default function PaginaSaldo() {
   const [transactionType, setTransactionType] = useState<'add' | 'remove'>('add')
   const [processing, setProcessing] = useState(false)
 
+  // Carrega dados do usuário para o Sidebar
   useEffect(() => {
-    loadData()
-  }, [])
+    if (authLoading || !user) return
 
-  // useEffect para debug
-  useEffect(() => {
-    console.log('🔄 Estado do time atualizado:', team)
-  }, [team])
+    const loadUserData = async () => {
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*, teams(*)')
+          .eq('id', user.id)
+          .single()
+
+        if (!profileError) {
+          setProfile(profileData)
+          setTeam(profileData?.teams || null)
+          setIsAdmin(profileData?.role === 'admin')
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados do usuário:', error)
+      } finally {
+        setDataLoading(false)
+      }
+    }
+
+    loadUserData()
+  }, [authLoading, user])
 
   useEffect(() => {
-    console.log('📊 Transações atualizadas:', transactions)
-  }, [transactions])
+    if (user) {
+      loadData()
+    }
+  }, [user])
 
   const loadData = async () => {
     console.log('🔄 Carregando dados...')
@@ -350,6 +377,16 @@ export default function PaginaSaldo() {
     ? transactions 
     : transactions.filter(t => t.type === filter)
 
+  if (authLoading || dataLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="text-2xl font-semibold text-white animate-pulse">
+          Carregando...
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -359,331 +396,340 @@ export default function PaginaSaldo() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
-          <div>
-            <h1 className="text-5xl font-black text-white mb-2">SALDO DO CLUBE</h1>
-            <p className="text-zinc-400 text-lg">
-              Acompanhe suas finanças e movimentações
-            </p>
-          </div>
+    <div className="flex min-h-screen bg-zinc-950">
+      {/* Sidebar */}
+      <Sidebar user={user!} profile={profile} team={team} />
 
-          {isAdmin && (
-            <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  <DollarSign className="w-4 h-4 mr-2" />
-                  Gerenciar Saldos
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-zinc-900 border-zinc-700 text-white">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold">
-                    Adicionar/Remover Saldo
-                  </DialogTitle>
-                </DialogHeader>
-
-                <div className="space-y-4 py-4">
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Selecione o Clube
-                    </label>
-                    <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                      <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
-                        <SelectValue placeholder="Escolha um clube" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allTeams.map(team => (
-                          <SelectItem key={team.id} value={team.id}>
-                            <div className="flex items-center gap-2">
-                              {team.logo_url && (
-                                <img 
-                                  src={team.logo_url} 
-                                  alt={team.name}
-                                  className="w-6 h-6 rounded-full object-contain"
-                                />
-                              )}
-                              <span>{team.name}</span>
-                              <Badge variant="secondary" className="ml-auto">
-                                {formatBalance(team.balance)}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Tipo de Operação
-                    </label>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant={transactionType === 'add' ? 'default' : 'outline'}
-                        onClick={() => setTransactionType('add')}
-                        className={cn(
-                          "flex-1",
-                          transactionType === 'add' 
-                            ? "bg-emerald-600 hover:bg-emerald-700" 
-                            : "bg-zinc-800/50 border-zinc-600"
-                        )}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Adicionar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={transactionType === 'remove' ? 'default' : 'outline'}
-                        onClick={() => setTransactionType('remove')}
-                        className={cn(
-                          "flex-1",
-                          transactionType === 'remove' 
-                            ? "bg-red-600 hover:bg-red-700" 
-                            : "bg-zinc-800/50 border-zinc-600"
-                        )}
-                      >
-                        <Minus className="w-4 h-4 mr-2" />
-                        Remover
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Valor
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-                      <Input
-                        placeholder="0,00"
-                        value={transactionAmount}
-                        onChange={handleAmountChange}
-                        className="pl-10 bg-zinc-800/50 border-zinc-600"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Descrição
-                    </label>
-                    <Input
-                      placeholder="Ex: Premiação do campeonato, Multa, etc."
-                      value={transactionDescription}
-                      onChange={(e) => setTransactionDescription(e.target.value)}
-                      className="bg-zinc-800/50 border-zinc-600"
-                    />
-                  </div>
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={() => setAdminModalOpen(false)}
-                    className="bg-transparent border-zinc-600"
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleAdminTransaction}
-                    disabled={processing}
-                    className={cn(
-                      transactionType === 'add' 
-                        ? "bg-emerald-600 hover:bg-emerald-700" 
-                        : "bg-red-600 hover:bg-red-700"
-                    )}
-                  >
-                    {processing ? 'Processando...' : transactionType === 'add' ? 'Adicionar Saldo' : 'Remover Saldo'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
-
-        {team ? (
-          <div className="space-y-8">
-            {/* Cards de Resumo */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Saldo Atual */}
-              <Card className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/30 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-zinc-400 text-sm">Saldo Atual</p>
-                    <p className="text-3xl font-bold text-white mt-2">
-                      {formatBalance(team.balance)}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-purple-500/20 rounded-full">
-                    <DollarSign className="w-8 h-8 text-purple-400" />
-                  </div>
-                </div>
-              </Card>
-
-              {/* Entradas */}
-              <Card className="bg-gradient-to-br from-emerald-600/20 to-green-600/20 border-emerald-500/30 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-zinc-400 text-sm">Total de Entradas</p>
-                    <p className="text-3xl font-bold text-white mt-2">
-                      {formatBalance(totalCredits)}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-emerald-500/20 rounded-full">
-                    <TrendingUp className="w-8 h-8 text-emerald-400" />
-                  </div>
-                </div>
-              </Card>
-
-              {/* Saídas */}
-              <Card className="bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/30 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-zinc-400 text-sm">Total de Saídas</p>
-                    <p className="text-3xl font-bold text-white mt-2">
-                      {formatBalance(totalDebits)}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-red-500/20 rounded-full">
-                    <TrendingDown className="w-8 h-8 text-red-400" />
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Histórico de Transações */}
-            <Card className="bg-white/5 border-white/10 p-6">
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Histórico de Transações</h2>
-                  <p className="text-zinc-400">Todas as movimentações do seu clube</p>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant={filter === 'all' ? 'default' : 'outline'}
-                    onClick={() => setFilter('all')}
-                    className={cn(
-                      "text-sm",
-                      filter === 'all' ? "bg-purple-600" : "bg-zinc-800/50 border-zinc-600"
-                    )}
-                  >
-                    <Filter className="w-4 h-4 mr-2" />
-                    Todas
-                  </Button>
-                  <Button
-                    variant={filter === 'credit' ? 'default' : 'outline'}
-                    onClick={() => setFilter('credit')}
-                    className={cn(
-                      "text-sm",
-                      filter === 'credit' ? "bg-emerald-600" : "bg-zinc-800/50 border-zinc-600"
-                    )}
-                  >
-                    <TrendingUp className="w-4 h-4 mr-2" />
-                    Entradas
-                  </Button>
-                  <Button
-                    variant={filter === 'debit' ? 'default' : 'outline'}
-                    onClick={() => setFilter('debit')}
-                    className={cn(
-                      "text-sm",
-                      filter === 'debit' ? "bg-red-600" : "bg-zinc-800/50 border-zinc-600"
-                    )}
-                  >
-                    <TrendingDown className="w-4 h-4 mr-2" />
-                    Saídas
-                  </Button>
-                </div>
+      {/* Conteúdo Principal */}
+      <div className="flex-1 transition-all duration-300 lg:ml-0">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-4 lg:p-6">
+          <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 lg:gap-6 mb-6 lg:mb-8">
+              <div>
+                <h1 className="text-3xl lg:text-5xl font-black text-white mb-2">SALDO DO CLUBE</h1>
+                <p className="text-zinc-400 text-sm lg:text-lg">
+                  Acompanhe suas finanças e movimentações
+                </p>
               </div>
 
-              {filteredTransactions.length === 0 ? (
-                <div className="text-center py-12">
-                  <DollarSign className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-                  <p className="text-zinc-400 text-lg">Nenhuma transação encontrada</p>
-                  <p className="text-zinc-500">Suas movimentações aparecerão aqui</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {filteredTransactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="flex items-center justify-between p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={cn(
-                          "p-3 rounded-full",
-                          transaction.type === 'credit' 
-                            ? "bg-emerald-500/20" 
-                            : "bg-red-500/20"
-                        )}>
-                          {transaction.type === 'credit' ? (
-                            <ArrowUpRight className="w-6 h-6 text-emerald-400" />
-                          ) : (
-                            <ArrowDownLeft className="w-6 h-6 text-red-400" />
-                          )}
-                        </div>
+              {isAdmin && (
+                <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm lg:text-base">
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Gerenciar Saldos
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md lg:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl lg:text-2xl font-bold">
+                        Adicionar/Remover Saldo
+                      </DialogTitle>
+                    </DialogHeader>
 
-                        <div>
-                          <p className="font-semibold text-white">
-                            {transaction.description}
-                          </p>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-zinc-400">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {formatDate(transaction.created_at)}
-                            </div>
-                            {transaction.player_name && (
-                              <div className="flex items-center gap-1">
-                                <User className="w-3 h-3" />
-                                {transaction.player_name}
-                              </div>
+                    <div className="space-y-3 lg:space-y-4 py-3 lg:py-4">
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Selecione o Clube
+                        </label>
+                        <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                          <SelectTrigger className="bg-zinc-800/50 border-zinc-600 text-sm">
+                            <SelectValue placeholder="Escolha um clube" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allTeams.map(team => (
+                              <SelectItem key={team.id} value={team.id}>
+                                <div className="flex items-center gap-2">
+                                  {team.logo_url && (
+                                    <img 
+                                      src={team.logo_url} 
+                                      alt={team.name}
+                                      className="w-5 h-5 lg:w-6 lg:h-6 rounded-full object-contain"
+                                    />
+                                  )}
+                                  <span className="text-sm">{team.name}</span>
+                                  <Badge variant="secondary" className="ml-auto text-xs">
+                                    {formatBalance(team.balance)}
+                                  </Badge>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Tipo de Operação
+                        </label>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant={transactionType === 'add' ? 'default' : 'outline'}
+                            onClick={() => setTransactionType('add')}
+                            className={cn(
+                              "flex-1 text-xs lg:text-sm",
+                              transactionType === 'add' 
+                                ? "bg-emerald-600 hover:bg-emerald-700" 
+                                : "bg-zinc-800/50 border-zinc-600"
                             )}
-                            {transaction.related_team && (
-                              <div className="flex items-center gap-1">
-                                <Building2 className="w-3 h-3" />
-                                {transaction.related_team}
-                              </div>
+                          >
+                            <Plus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                            Adicionar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant={transactionType === 'remove' ? 'default' : 'outline'}
+                            onClick={() => setTransactionType('remove')}
+                            className={cn(
+                              "flex-1 text-xs lg:text-sm",
+                              transactionType === 'remove' 
+                                ? "bg-red-600 hover:bg-red-700" 
+                                : "bg-zinc-800/50 border-zinc-600"
                             )}
-                          </div>
+                          >
+                            <Minus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                            Remover
+                          </Button>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <p className={cn(
-                          "text-xl font-bold",
-                          transaction.type === 'credit' ? "text-emerald-400" : "text-red-400"
-                        )}>
-                          {transaction.type === 'credit' ? '+' : '-'} {formatBalance(transaction.amount)}
-                        </p>
-                        <Badge 
-                          variant="secondary" 
-                          className={cn(
-                            "mt-1",
-                            transaction.type === 'credit' ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                          )}
-                        >
-                          {transaction.type === 'credit' ? 'Entrada' : 'Saída'}
-                        </Badge>
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Valor
+                        </label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3 h-3 lg:w-4 lg:h-4" />
+                          <Input
+                            placeholder="0,00"
+                            value={transactionAmount}
+                            onChange={handleAmountChange}
+                            className="pl-8 lg:pl-10 bg-zinc-800/50 border-zinc-600 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Descrição
+                        </label>
+                        <Input
+                          placeholder="Ex: Premiação do campeonato, Multa, etc."
+                          value={transactionDescription}
+                          onChange={(e) => setTransactionDescription(e.target.value)}
+                          className="bg-zinc-800/50 border-zinc-600 text-sm"
+                        />
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    <DialogFooter className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setAdminModalOpen(false)}
+                        className="bg-transparent border-zinc-600 text-sm flex-1"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={handleAdminTransaction}
+                        disabled={processing}
+                        className={cn(
+                          "flex-1 text-sm",
+                          transactionType === 'add' 
+                            ? "bg-emerald-600 hover:bg-emerald-700" 
+                            : "bg-red-600 hover:bg-red-700"
+                        )}
+                      >
+                        {processing ? 'Processando...' : transactionType === 'add' ? 'Adicionar' : 'Remover'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               )}
-            </Card>
+            </div>
+
+            {team ? (
+              <div className="space-y-6 lg:space-y-8">
+                {/* Cards de Resumo */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+                  {/* Saldo Atual */}
+                  <Card className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/30 p-4 lg:p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-zinc-400 text-xs lg:text-sm">Saldo Atual</p>
+                        <p className="text-xl lg:text-3xl font-bold text-white mt-1 lg:mt-2">
+                          {formatBalance(team.balance)}
+                        </p>
+                      </div>
+                      <div className="p-2 lg:p-3 bg-purple-500/20 rounded-full">
+                        <DollarSign className="w-6 h-6 lg:w-8 lg:h-8 text-purple-400" />
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Entradas */}
+                  <Card className="bg-gradient-to-br from-emerald-600/20 to-green-600/20 border-emerald-500/30 p-4 lg:p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-zinc-400 text-xs lg:text-sm">Total de Entradas</p>
+                        <p className="text-xl lg:text-3xl font-bold text-white mt-1 lg:mt-2">
+                          {formatBalance(totalCredits)}
+                        </p>
+                      </div>
+                      <div className="p-2 lg:p-3 bg-emerald-500/20 rounded-full">
+                        <TrendingUp className="w-6 h-6 lg:w-8 lg:h-8 text-emerald-400" />
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Saídas */}
+                  <Card className="bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/30 p-4 lg:p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-zinc-400 text-xs lg:text-sm">Total de Saídas</p>
+                        <p className="text-xl lg:text-3xl font-bold text-white mt-1 lg:mt-2">
+                          {formatBalance(totalDebits)}
+                        </p>
+                      </div>
+                      <div className="p-2 lg:p-3 bg-red-500/20 rounded-full">
+                        <TrendingDown className="w-6 h-6 lg:w-8 lg:h-8 text-red-400" />
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* Histórico de Transações */}
+                <Card className="bg-white/5 border-white/10 p-4 lg:p-6">
+                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-4 mb-4 lg:mb-6">
+                    <div>
+                      <h2 className="text-xl lg:text-2xl font-bold text-white">Histórico de Transações</h2>
+                      <p className="text-zinc-400 text-sm">Todas as movimentações do seu clube</p>
+                    </div>
+
+                    <div className="flex gap-1 lg:gap-2">
+                      <Button
+                        variant={filter === 'all' ? 'default' : 'outline'}
+                        onClick={() => setFilter('all')}
+                        className={cn(
+                          "text-xs lg:text-sm h-8 lg:h-9",
+                          filter === 'all' ? "bg-purple-600" : "bg-zinc-800/50 border-zinc-600"
+                        )}
+                      >
+                        <Filter className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                        Todas
+                      </Button>
+                      <Button
+                        variant={filter === 'credit' ? 'default' : 'outline'}
+                        onClick={() => setFilter('credit')}
+                        className={cn(
+                          "text-xs lg:text-sm h-8 lg:h-9",
+                          filter === 'credit' ? "bg-emerald-600" : "bg-zinc-800/50 border-zinc-600"
+                        )}
+                      >
+                        <TrendingUp className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                        Entradas
+                      </Button>
+                      <Button
+                        variant={filter === 'debit' ? 'default' : 'outline'}
+                        onClick={() => setFilter('debit')}
+                        className={cn(
+                          "text-xs lg:text-sm h-8 lg:h-9",
+                          filter === 'debit' ? "bg-red-600" : "bg-zinc-800/50 border-zinc-600"
+                        )}
+                      >
+                        <TrendingDown className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                        Saídas
+                      </Button>
+                    </div>
+                  </div>
+
+                  {filteredTransactions.length === 0 ? (
+                    <div className="text-center py-8 lg:py-12">
+                      <DollarSign className="w-12 h-12 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-3 lg:mb-4" />
+                      <p className="text-zinc-400 text-base lg:text-lg">Nenhuma transação encontrada</p>
+                      <p className="text-zinc-500 text-sm">Suas movimentações aparecerão aqui</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 lg:space-y-3">
+                      {filteredTransactions.map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          className="flex items-center justify-between p-3 lg:p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 lg:gap-4">
+                            <div className={cn(
+                              "p-2 lg:p-3 rounded-full",
+                              transaction.type === 'credit' 
+                                ? "bg-emerald-500/20" 
+                                : "bg-red-500/20"
+                            )}>
+                              {transaction.type === 'credit' ? (
+                                <ArrowUpRight className="w-4 h-4 lg:w-6 lg:h-6 text-emerald-400" />
+                              ) : (
+                                <ArrowDownLeft className="w-4 h-4 lg:w-6 lg:h-6 text-red-400" />
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-white text-sm lg:text-base truncate">
+                                {transaction.description}
+                              </p>
+                              <div className="flex flex-col lg:flex-row lg:items-center gap-1 lg:gap-4 mt-1 text-xs lg:text-sm text-zinc-400">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {formatDate(transaction.created_at)}
+                                </div>
+                                {transaction.player_name && (
+                                  <div className="flex items-center gap-1">
+                                    <User className="w-3 h-3" />
+                                    <span className="truncate">{transaction.player_name}</span>
+                                  </div>
+                                )}
+                                {transaction.related_team && (
+                                  <div className="flex items-center gap-1">
+                                    <Building2 className="w-3 h-3" />
+                                    <span className="truncate">{transaction.related_team}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <p className={cn(
+                              "text-base lg:text-xl font-bold",
+                              transaction.type === 'credit' ? "text-emerald-400" : "text-red-400"
+                            )}>
+                              {transaction.type === 'credit' ? '+' : '-'} {formatBalance(transaction.amount)}
+                            </p>
+                            <Badge 
+                              variant="secondary" 
+                              className={cn(
+                                "mt-1 text-xs",
+                                transaction.type === 'credit' ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                              )}
+                            >
+                              {transaction.type === 'credit' ? 'Entrada' : 'Saída'}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            ) : (
+              <Card className="p-8 lg:p-16 text-center bg-white/5 border-white/10">
+                <Building2 className="w-12 h-12 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-3 lg:mb-4" />
+                <h3 className="text-xl lg:text-2xl font-bold text-white mb-2">Nenhum clube associado</h3>
+                <p className="text-zinc-400 text-sm lg:text-base">
+                  Você precisa estar associado a um clube para visualizar o saldo.
+                </p>
+              </Card>
+            )}
           </div>
-        ) : (
-          <Card className="p-16 text-center bg-white/5 border-white/10">
-            <Building2 className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-white mb-2">Nenhum clube associado</h3>
-            <p className="text-zinc-400">
-              Você precisa estar associado a um clube para visualizar o saldo.
-            </p>
-          </Card>
-        )}
+        </div>
       </div>
     </div>
   )
