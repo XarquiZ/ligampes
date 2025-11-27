@@ -114,7 +114,10 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
         .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
         .order('updated_at', { ascending: false })
 
-      if (convsError) throw convsError
+      if (convsError) {
+        console.error('Erro ao carregar conversas:', convsError)
+        return
+      }
 
       // Para cada conversa, buscar informações do outro usuário
       const conversationsWithUsers = await Promise.all(
@@ -179,29 +182,48 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
   }
 
   const findOrCreateConversation = async (otherUserId: string): Promise<string> => {
-    // Tentar encontrar conversa existente
-    const { data: existingConv } = await supabase
-      .from('conversations')
-      .select('id')
-      .or(`and(user1_id.eq.${currentUser.id},user2_id.eq.${otherUserId}),and(user1_id.eq.${otherUserId},user2_id.eq.${currentUser.id})`)
-      .single()
+    try {
+      // Buscar todas as conversas do usuário atual
+      const { data: conversations, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
 
-    if (existingConv) {
-      return existingConv.id
+      if (error) {
+        console.error('Erro ao buscar conversas:', error)
+        throw error
+      }
+
+      // Encontrar conversa existente
+      const existingConv = conversations?.find(conv => 
+        (conv.user1_id === currentUser.id && conv.user2_id === otherUserId) ||
+        (conv.user1_id === otherUserId && conv.user2_id === currentUser.id)
+      )
+
+      if (existingConv) {
+        return existingConv.id
+      }
+
+      // Criar nova conversa
+      const { data: newConv, error: createError } = await supabase
+        .from('conversations')
+        .insert({
+          user1_id: currentUser.id,
+          user2_id: otherUserId
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        console.error('Erro ao criar conversa:', createError)
+        throw createError
+      }
+
+      return newConv.id
+    } catch (error) {
+      console.error('Erro em findOrCreateConversation:', error)
+      throw error
     }
-
-    // Criar nova conversa
-    const { data: newConv, error } = await supabase
-      .from('conversations')
-      .insert({
-        user1_id: currentUser.id,
-        user2_id: otherUserId
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-    return newConv.id
   }
 
   const setupMessageSubscription = (otherUserId: string) => {
@@ -215,12 +237,16 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
           table: 'private_messages'
         },
         async (payload) => {
-          // Verificar se a mensagem é para a conversa atual
-          const conversationId = await findOrCreateConversation(otherUserId)
-          if (payload.new.conversation_id === conversationId) {
-            setMessages(prev => [...prev, payload.new as PrivateMessage])
-            scrollToBottom()
-            loadConversations() // Atualizar lista de conversas
+          try {
+            // Verificar se a mensagem é para a conversa atual
+            const conversationId = await findOrCreateConversation(otherUserId)
+            if (payload.new.conversation_id === conversationId) {
+              setMessages(prev => [...prev, payload.new as PrivateMessage])
+              scrollToBottom()
+              loadConversations() // Atualizar lista de conversas
+            }
+          } catch (error) {
+            console.error('Erro no subscription:', error)
           }
         }
       )
@@ -290,7 +316,8 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
 
   const filteredCoaches = coaches.filter(coach =>
     coach.coach_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    coach.teams?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    coach.teams?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    coach.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const getDisplayName = (profile: Profile) => {
