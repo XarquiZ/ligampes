@@ -86,8 +86,10 @@ export default function ChatPopup({
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // CORREÇÃO: Estado para controlar se já estamos processando uma conversa
+  // CORREÇÃO: Estados para controlar o ciclo de atualização
   const [isProcessingConversation, setIsProcessingConversation] = useState(false);
+  const [lastProcessedConversation, setLastProcessedConversation] = useState<string | null>(null);
+  const [shouldSkipUnreadUpdate, setShouldSkipUnreadUpdate] = useState(false);
 
   // Calcular total de mensagens não lidas
   const calculateTotalUnread = (conversations: Conversation[]) => {
@@ -130,8 +132,8 @@ export default function ChatPopup({
   }, [isOpen, currentUser.id]);
 
   // CORREÇÃO: Carregar conversas do usuário - VERSÃO OTIMIZADA
-  const loadConversations = async (skipUnreadUpdate = false) => {
-    if (isProcessingConversation) {
+  const loadConversations = async (forceUpdate = false) => {
+    if (isProcessingConversation && !forceUpdate) {
       console.log('Ignorando loadConversations - já processando uma conversa');
       return;
     }
@@ -152,9 +154,7 @@ export default function ChatPopup({
 
       if (!conversationsData?.length) {
         setConversations([]);
-        if (!skipUnreadUpdate) {
-          notifyUnreadCountChange(0);
-        }
+        notifyUnreadCountChange(0);
         return;
       }
 
@@ -182,9 +182,17 @@ export default function ChatPopup({
         return;
       }
 
-      // CORREÇÃO CRÍTICA: Buscar contagem de mensagens não lidas de forma mais eficiente
+      // CORREÇÃO: Buscar contagem de mensagens não lidas apenas se não estiver processando
       const conversationsWithUnread = await Promise.all(
         conversationsData.map(async (conv) => {
+          // Se estamos processando esta conversa, usar o estado local
+          if (isProcessingConversation && conv.id === lastProcessedConversation) {
+            return {
+              ...conv,
+              unread_count: 0 // Já foi marcada como lida
+            };
+          }
+
           try {
             // Buscar contagem de mensagens não lidas do OUTRO usuário
             const { count, error: countError } = await supabase
@@ -252,9 +260,11 @@ export default function ChatPopup({
       setConversations(formattedConversations);
       
       // Calcular e notificar o total de mensagens não lidas
-      const totalUnread = calculateTotalUnread(formattedConversations);
-      console.log('📊 Total de mensagens não lidas calculado:', totalUnread);
-      notifyUnreadCountChange(totalUnread);
+      if (!shouldSkipUnreadUpdate) {
+        const totalUnread = calculateTotalUnread(formattedConversations);
+        console.log('📊 Total de mensagens não lidas calculado:', totalUnread);
+        notifyUnreadCountChange(totalUnread);
+      }
       
     } catch (error) {
       console.error('Erro ao processar conversas:', error);
@@ -300,7 +310,7 @@ export default function ChatPopup({
     }
   };
 
-  // CORREÇÃO: Função para marcar mensagens como lidas - VERSÃO SIMPLIFICADA
+  // CORREÇÃO: Função para marcar mensagens como lidas - VERSÃO MELHORADA
   const markMessagesAsRead = async (conversationId: string) => {
     try {
       console.log('🎯 Marcando mensagens como lidas para conversa:', conversationId);
@@ -658,7 +668,7 @@ export default function ChatPopup({
     }, 300);
   };
 
-  // CORREÇÃO: Função handleSelectConversation otimizada
+  // CORREÇÃO: Função handleSelectConversation completamente reescrita
   const handleSelectConversation = async (conversation: Conversation) => {
     if (isProcessingConversation) {
       console.log('⏳ Já processando uma conversa, ignorando...');
@@ -669,12 +679,14 @@ export default function ChatPopup({
     console.log('📊 unread_count inicial:', conversation.unread_count);
     
     setIsProcessingConversation(true);
+    setLastProcessedConversation(conversation.id);
+    setShouldSkipUnreadUpdate(true);
     
     try {
-      // Atualizar UI imediatamente
+      // 1. Atualizar UI imediatamente
       setSelectedConversation(conversation);
       
-      // Se há mensagens não lidas, marcar como lidas
+      // 2. Se há mensagens não lidas, marcar como lidas no banco
       if (conversation.unread_count && conversation.unread_count > 0) {
         console.log('🔴 Marcando mensagens como lidas...');
         
@@ -683,7 +695,7 @@ export default function ChatPopup({
         if (success) {
           console.log('✅ Mensagens marcadas como lidas! Atualizando UI...');
           
-          // ATUALIZAÇÃO CRÍTICA: Atualizar a conversa localmente
+          // 3. Atualizar a conversa localmente SEM recarregar tudo
           const updatedConversations = conversations.map(conv => 
             conv.id === conversation.id 
               ? { ...conv, unread_count: 0 }
@@ -692,24 +704,24 @@ export default function ChatPopup({
           
           setConversations(updatedConversations);
           
-          // Atualizar o contador global
+          // 4. Atualizar o contador global baseado no estado local
           const totalUnread = calculateTotalUnread(updatedConversations);
           console.log('🔢 Total de não lidas após atualização:', totalUnread);
           notifyUnreadCountChange(totalUnread);
-          
-          // CORREÇÃO: Forçar um reload das conversas após um delay para sincronizar com o banco
-          setTimeout(async () => {
-            console.log('🔄 Sincronizando com banco de dados...');
-            await loadConversations(true); // skipUnreadUpdate = true para evitar loop
-          }, 500);
         }
       }
       
-      // Carregar as mensagens da conversa
+      // 5. Carregar as mensagens da conversa
       await loadMessages(conversation.id);
+      
+      // 6. Aguardar um pouco e permitir atualizações futuras
+      setTimeout(() => {
+        setShouldSkipUnreadUpdate(false);
+      }, 2000);
       
     } catch (error) {
       console.error('💥 Erro ao selecionar conversa:', error);
+      setShouldSkipUnreadUpdate(false);
     } finally {
       setIsProcessingConversation(false);
     }
