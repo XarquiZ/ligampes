@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -172,6 +172,10 @@ export default function ListaJogadores() {
 
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [lastNavigatedPlayer, setLastNavigatedPlayer] = useState<string | null>(null)
+
+  // Ref para controlar se já processamos a navegação
+  const navigationProcessedRef = useRef<Set<string>>(new Set())
 
   // Opções de altura (140cm até 230cm)
   const HEIGHT_OPTIONS = useMemo(() => 
@@ -227,46 +231,70 @@ export default function ListaJogadores() {
     'Volta para marcar'
   ].sort(), []);
 
-  // FUNÇÃO handleGridCardClick ATUALIZADA
+  // FUNÇÃO MELHORADA: Scroll para elemento com retry
+  const scrollToPlayer = useCallback((playerId: string, retryCount = 0) => {
+    const element = document.getElementById(`player-${playerId}`);
+    
+    if (element) {
+      console.log('Elemento encontrado, fazendo scroll para:', playerId);
+      element.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center',
+        inline: 'nearest'
+      });
+      
+      // Adicionar destaque visual
+      element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-300');
+      setTimeout(() => {
+        element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
+      }, 3000);
+      
+      return true;
+    } else if (retryCount < 5) {
+      // Tentar novamente após um delay
+      console.log(`Elemento não encontrado, tentando novamente (${retryCount + 1}/5):`, `player-${playerId}`);
+      setTimeout(() => {
+        scrollToPlayer(playerId, retryCount + 1);
+      }, 300);
+      return false;
+    } else {
+      console.log('Elemento não encontrado após várias tentativas:', `player-${playerId}`);
+      return false;
+    }
+  }, []);
+
+  // FUNÇÃO MELHORADA: Para navegação via chat
   const handleGridCardClick = useCallback((playerId: string) => {
     setIsTransitioning(true)
     setViewMode('list')
     
     setTimeout(() => {
-      setOpenedPlayers([playerId])
+      setOpenedPlayers(prev => 
+        prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
+      )
       
       // Atualizar a URL para manter consistência com o chat
       if (typeof window !== 'undefined') {
         window.history.replaceState(null, '', `#player-${playerId}`);
       }
       
+      // Scroll para o jogador
       setTimeout(() => {
-        const element = document.getElementById(`player-${playerId}`)
-        if (element) {
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center',
-            inline: 'nearest'
-          })
-          
-          // Adicionar destaque visual
-          element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-300')
-          setTimeout(() => {
-            element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl')
-          }, 3000)
-        }
+        scrollToPlayer(playerId);
         setIsTransitioning(false)
-      }, 100)
-    }, 150)
-  }, [])
+      }, 300) // Aumentado o delay para garantir o render
+    }, 200)
+  }, [scrollToPlayer])
 
   const togglePlayer = useCallback((playerId: string) => {
+    if (isTransitioning) return; // Não permitir cliques durante transição
+    
     setOpenedPlayers(prev =>
       prev.includes(playerId)
         ? prev.filter(id => id !== playerId)
         : [...prev, playerId]
     )
-  }, [])
+  }, [isTransitioning])
 
   const [searchName, setSearchName] = useState('')
   const [filterPosition, setFilterPosition] = useState('Todas')
@@ -283,55 +311,82 @@ export default function ListaJogadores() {
     gk_clearing: null, gk_reflexes: null, gk_reach: null,
   })
 
-  // NOVO useEffect: Detectar hash da URL para navegação do chat
+  // useEffect MELHORADO: Detectar hash da URL para navegação do chat
   useEffect(() => {
+    const handleHashNavigation = (playerId: string, isInitialLoad = false) => {
+      // Evitar processar a mesma navegação múltiplas vezes
+      if (navigationProcessedRef.current.has(playerId) && !isInitialLoad) {
+        return;
+      }
+      
+      navigationProcessedRef.current.add(playerId);
+      setLastNavigatedPlayer(playerId);
+      
+      console.log('Processando navegação para jogador:', playerId, 'initial:', isInitialLoad);
+      
+      // Garantir que está na view de lista
+      setViewMode('list');
+      
+      // Abrir o card do jogador
+      setOpenedPlayers(prev => 
+        prev.includes(playerId) ? prev : [...prev, playerId]
+      );
+      
+      // Scroll para o jogador após um delay para garantir o render
+      const scrollDelay = isInitialLoad ? 1000 : 800;
+      
+      setTimeout(() => {
+        const success = scrollToPlayer(playerId);
+        if (!success && !isInitialLoad) {
+          // Se não encontrou, tentar novamente com mais delay
+          setTimeout(() => scrollToPlayer(playerId), 500);
+        }
+      }, scrollDelay);
+    };
+
     const handleHashChange = () => {
       if (typeof window === 'undefined') return;
       
       const hash = window.location.hash;
       if (hash && hash.startsWith('#player-')) {
         const playerId = hash.replace('#player-', '');
-        
-        console.log('Navegando para jogador via URL:', playerId);
-        
-        // Garantir que está na view de lista
-        setViewMode('list');
-        
-        // Abrir o card do jogador
-        setOpenedPlayers([playerId]);
-        
-        // Scroll para o jogador após um delay para garantir o render
-        setTimeout(() => {
-          const element = document.getElementById(`player-${playerId}`);
-          if (element) {
-            console.log('Elemento encontrado, fazendo scroll');
-            element.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'center'
-            });
-            
-            // Adicionar destaque visual
-            element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-300');
-            setTimeout(() => {
-              element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
-            }, 3000);
-          } else {
-            console.log('Elemento não encontrado:', `player-${playerId}`);
-          }
-        }, 800);
+        console.log('Hash change detectado:', playerId);
+        handleHashNavigation(playerId, false);
       }
     };
 
     // Executar na montagem inicial se já tiver hash
-    handleHashChange();
+    if (typeof window !== 'undefined') {
+      const initialHash = window.location.hash;
+      if (initialHash && initialHash.startsWith('#player-')) {
+        const playerId = initialHash.replace('#player-', '');
+        console.log('Hash inicial detectado:', playerId);
+        handleHashNavigation(playerId, true);
+      }
+    }
     
     // Ouvir mudanças no hash (quando navegar via chat)
     window.addEventListener('hashchange', handleHashChange);
     
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
+      navigationProcessedRef.current.clear();
     };
-  }, []); // Removida a dependência filteredPlayers
+  }, [scrollToPlayer]);
+
+  // useEffect ADICIONAL: Tentar scroll novamente quando os filteredPlayers mudarem
+  useEffect(() => {
+    if (lastNavigatedPlayer && filteredPlayers.length > 0) {
+      // Verificar se o jogador está na lista filtrada
+      const playerExists = filteredPlayers.some(p => p.id === lastNavigatedPlayer);
+      if (playerExists) {
+        console.log('Jogador encontrado na lista filtrada, tentando scroll novamente:', lastNavigatedPlayer);
+        setTimeout(() => {
+          scrollToPlayer(lastNavigatedPlayer);
+        }, 500);
+      }
+    }
+  }, [filteredPlayers, lastNavigatedPlayer, scrollToPlayer]);
 
   useEffect(() => {
     const checkAdmin = async () => {
@@ -431,6 +486,9 @@ export default function ListaJogadores() {
     setSelectedSkills([])
     setFilterMinHeight('all')
     setAttrFilters(Object.fromEntries(Object.keys(attrFilters).map(k => [k, null])))
+    // Limpar também a navegação
+    setLastNavigatedPlayer(null)
+    navigationProcessedRef.current.clear()
   }, [attrFilters])
 
   const renderClubLogo = useCallback((url: string | null, name: string) =>
@@ -444,12 +502,11 @@ export default function ListaJogadores() {
     ) : null
   , [])
 
-  // ... (o restante do JSX permanece igual)
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white">
-      {/* Overlay de transição */}
+      {/* Overlay de transição - CORRIGIDO para não bloquear cliques */}
       {isTransitioning && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 flex items-center justify-center pointer-events-none">
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="w-12 h-12 animate-spin text-purple-400" />
             <p className="text-lg text-white">Carregando detalhes do jogador...</p>
@@ -692,7 +749,7 @@ export default function ListaJogadores() {
             {filteredPlayers.map(j => (
               <div
                 key={j.id}
-                onClick={() => handleGridCardClick(j.id)}
+                onClick={() => !isTransitioning && handleGridCardClick(j.id)}
                 className="group relative bg-zinc-900/90 rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer"
               >
                 {userRole === 'admin' && (
@@ -771,10 +828,10 @@ export default function ListaJogadores() {
                   id={`player-${j.id}`}
                   className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-xl hover:shadow-purple-600/20"
                 >
-                  {/* Linha principal */}
+                  {/* Linha principal - CORRIGIDO: não permite cliques durante transição */}
                   <div
                     className="p-6 flex items-center gap-8 cursor-pointer select-none"
-                    onClick={() => togglePlayer(j.id)}
+                    onClick={() => !isTransitioning && togglePlayer(j.id)}
                   >
                     <div className="w-24 h-24 rounded-full overflow-hidden ring-4 ring-purple-500/50 flex-shrink-0">
                       {j.photo_url ? (

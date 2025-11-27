@@ -301,7 +301,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
       weak_foot_usage: 2,
       weak_foot_accuracy: 2,
       form: 5,
-      injury_resistance: 1,
+      injury_resistance: 2,
       alternative_positions: null,
       skills: null,
       inspiring_ball_carry: 0,
