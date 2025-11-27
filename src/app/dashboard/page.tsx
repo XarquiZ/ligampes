@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COMPLETA COM CHAT POPUP
+// src/app/dashboard/page.tsx - VERSÃO COMPLETA E CORRIGIDA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -14,6 +14,22 @@ import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
 import ChatPopup from '@/components/Chatpopup'
 
+// Definir tipos para user e team
+interface User {
+  id: string;
+  email?: string;
+  user_metadata?: {
+    full_name?: string;
+  };
+}
+
+interface Team {
+  id: string;
+  name: string;
+  logo_url?: string;
+  balance?: number;
+}
+
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
   if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1).replace('.0', '')}M`
@@ -24,7 +40,7 @@ function formatBalance(value: number): string {
 export default function Dashboard() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const [team, setTeam] = useState<any>(null)
+  const [team, setTeam] = useState<Team | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
@@ -164,6 +180,19 @@ export default function Dashboard() {
 
   const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
+
+  // Criar objeto user compatível com os componentes de chat
+  const chatUser = {
+    id: user?.id || '',
+    name: displayName,
+    email: user?.email || ''
+  }
+
+  // Criar objeto team compatível com os componentes de chat
+  const chatTeam = {
+    id: team?.id || '',
+    name: team?.name || 'Sem time'
+  }
 
   const tiles = [
     { title: 'SALDO', icon: DollarSign, color: 'green', value: formatBalance(team?.balance || 0), subtitle: 'disponível para gastar', link: '/dashboard/saldo' },
@@ -305,8 +334,8 @@ export default function Dashboard() {
       {user && team && (
         <>
           <FloatingChatButton 
-            currentUser={user}
-            currentTeam={team}
+            currentUser={chatUser}
+            currentTeam={chatTeam}
             unreadCount={unreadCount}
             onOpenChat={() => setIsChatOpen(true)}
           />
@@ -314,8 +343,8 @@ export default function Dashboard() {
           <ChatPopup
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
-            currentUser={user}
-            currentTeam={team}
+            currentUser={chatUser}
+            currentTeam={chatTeam}
           />
         </>
       )}
