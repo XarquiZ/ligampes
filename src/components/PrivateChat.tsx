@@ -1,4 +1,4 @@
-// components/PrivateChat.tsx - DESIGN MODERNO E CORRIGIDO
+// components/PrivateChat.tsx - DESIGN ESTILO FACEBOOK/WHATSAPP
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, MessageCircle, X, Users, Search, Clock } from 'lucide-react'
+import { Send, MessageCircle, X, Users, Search, ArrowLeft, MoreVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
@@ -42,6 +42,7 @@ interface Conversation {
   updated_at: string
   other_user: Profile
   unread_count?: number
+  last_message?: PrivateMessage
 }
 
 interface PrivateChatProps {
@@ -67,18 +68,31 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
   const [searchTerm, setSearchTerm] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const [activeConversation, setActiveConversation] = useState<string | null>(null)
+  const [view, setView] = useState<'list' | 'chat'>('list') // 'list' ou 'chat'
 
   // Carregar dados quando abrir
   useEffect(() => {
     if (isOpen) {
       loadCoaches()
       loadConversations()
+      setView('list')
+      setSelectedCoach(null)
+    }
+  }, [isOpen])
+
+  // Quando fechar, resetar tudo
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedCoach(null)
+      setView('list')
+      setMessages([])
     }
   }, [isOpen])
 
   // Carregar mensagens quando selecionar um treinador
   useEffect(() => {
     if (selectedCoach && isOpen) {
+      setView('chat')
       loadMessages(selectedCoach.id)
     }
   }, [selectedCoach, isOpen])
@@ -137,6 +151,15 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
             .eq('id', otherUserId)
             .single()
 
+          // Buscar última mensagem
+          const { data: lastMessage } = await supabase
+            .from('private_messages')
+            .select('*')
+            .eq('conversation_id', conv.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
           // Buscar contagem de mensagens não lidas
           const { count: unreadCount } = await supabase
             .from('private_messages')
@@ -148,7 +171,8 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
           return {
             ...conv,
             other_user: userData,
-            unread_count: unreadCount || 0
+            unread_count: unreadCount || 0,
+            last_message: lastMessage
           }
         })
       )
@@ -233,7 +257,7 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
         },
         (payload) => {
           setMessages(prev => [...prev, payload.new as PrivateMessage])
-          loadConversations() // Atualizar contagem de não lidas
+          loadConversations()
         }
       )
       .subscribe()
@@ -295,19 +319,24 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
     })
   }
 
-  const formatDate = (dateString: string) => {
+  const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    
+    if (diffMins < 1) return 'Agora'
+    if (diffMins < 60) return `${diffMins} min`
+    if (diffHours < 24) return `${diffHours} h`
+    
+    return date.toLocaleDateString('pt-BR')
+  }
 
-    if (date.toDateString() === today.toDateString()) {
-      return 'Hoje'
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return 'Ontem'
-    } else {
-      return date.toLocaleDateString('pt-BR')
-    }
+  const handleBackToList = () => {
+    setView('list')
+    setSelectedCoach(null)
+    setMessages([])
   }
 
   const filteredCoaches = coaches.filter(coach =>
@@ -320,15 +349,12 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
     return profile.coach_name || profile.full_name || profile.email?.split('@')[0] || 'Treinador'
   }
 
-  // Agrupar mensagens por data
-  const groupedMessages = messages.reduce((groups, message) => {
-    const date = formatDate(message.created_at)
-    if (!groups[date]) {
-      groups[date] = []
-    }
-    groups[date].push(message)
-    return groups
-  }, {} as Record<string, PrivateMessage[]>)
+  const getLastMessagePreview = (conversation: Conversation) => {
+    if (!conversation.last_message) return 'Iniciar conversa'
+    
+    const message = conversation.last_message.message
+    return message.length > 30 ? message.substring(0, 30) + '...' : message
+  }
 
   return (
     <>
@@ -337,10 +363,10 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
         <Button
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "rounded-full w-14 h-14 shadow-2xl transition-all duration-300 transform hover:scale-110",
+            "rounded-full w-14 h-14 shadow-2xl transition-all duration-300 transform hover:scale-110 border-2",
             isOpen 
-              ? "bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-red-500/25" 
-              : "bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 shadow-blue-500/25"
+              ? "bg-red-500 hover:bg-red-600 border-red-400 shadow-red-500/25" 
+              : "bg-green-500 hover:bg-green-600 border-green-400 shadow-green-500/25"
           )}
         >
           {isOpen ? (
@@ -349,7 +375,7 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
             <>
               <MessageCircle className="w-6 h-6" />
               {conversations.some(conv => conv.unread_count > 0) && (
-                <Badge className="absolute -top-1 -right-1 bg-red-500 text-white px-1.5 py-0.5 text-xs min-w-[18px] h-[18px] flex items-center justify-center">
+                <Badge className="absolute -top-1 -right-1 bg-red-500 text-white px-1.5 py-0.5 text-xs min-w-[18px] h-[18px] flex items-center justify-center border-2 border-white">
                   {conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0)}
                 </Badge>
               )}
@@ -361,255 +387,253 @@ export default function PrivateChat({ currentUser, currentTeam }: PrivateChatPro
       {/* Modal do Chat */}
       {isOpen && (
         <div className="fixed bottom-24 right-6 z-50 w-96 h-[600px] flex">
-          <Card className="flex flex-1 bg-gradient-to-br from-zinc-900 via-zinc-800 to-zinc-900 border-zinc-700 shadow-2xl overflow-hidden">
-            {/* Lista de Treinadores */}
-            <div className={cn(
-              "flex flex-col w-full md:w-80 border-r border-zinc-700 transition-all duration-300 bg-zinc-900/50 backdrop-blur-sm",
-              selectedCoach ? "hidden md:flex" : "flex"
-            )}>
-              {/* Header */}
-              <div className="p-4 border-b border-zinc-700 bg-zinc-800/50">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-white text-lg flex items-center gap-2">
-                    <MessageCircle className="w-5 h-5 text-blue-400" />
-                    Mensagens
-                  </h3>
-                  <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
-                    {coaches.length} treinadores
-                  </Badge>
+          <Card className="flex flex-1 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 shadow-2xl overflow-hidden">
+            
+            {/* LISTA DE CONVERSAS (View = 'list') */}
+            {view === 'list' && (
+              <div className="flex flex-col w-full h-full">
+                {/* Header da Lista */}
+                <div className="p-4 border-b border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-lg text-gray-900 dark:text-white">
+                      Mensagens
+                    </h3>
+                    <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                      {coaches.length} online
+                    </Badge>
+                  </div>
+                  
+                  {/* Barra de Pesquisa */}
+                  <div className="relative">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                    <Input
+                      placeholder="Buscar treinadores..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 bg-gray-50 dark:bg-zinc-700 border-gray-200 dark:border-zinc-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-zinc-400"
+                    />
+                  </div>
                 </div>
-                <div className="mt-3 relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" />
-                  <Input
-                    placeholder="Buscar treinador..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-400"
-                  />
-                </div>
-              </div>
 
-              {/* Lista */}
-              <ScrollArea className="flex-1">
-                <div className="p-2">
-                  {/* Conversas recentes */}
-                  {conversations.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider px-3 py-2">
-                        Conversas Recentes
+                {/* Lista de Conversas */}
+                <ScrollArea className="flex-1">
+                  <div className="p-2">
+                    {/* Conversas Recentes */}
+                    {conversations.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-sm font-semibold text-gray-500 dark:text-zinc-400 px-3 py-2">
+                          Conversas
+                        </p>
+                        {conversations.map((conversation) => (
+                          <div
+                            key={conversation.id}
+                            onClick={() => setSelectedCoach(conversation.other_user)}
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50 dark:hover:bg-zinc-800/50",
+                              selectedCoach?.id === conversation.other_user.id && "bg-blue-50 dark:bg-blue-900/20"
+                            )}
+                          >
+                            <div className="relative">
+                              {conversation.other_user.teams?.logo_url ? (
+                                <Image 
+                                  src={conversation.other_user.teams.logo_url}
+                                  alt={conversation.other_user.teams.name}
+                                  width={48}
+                                  height={48}
+                                  className="rounded-full border-2 border-gray-200 dark:border-zinc-600"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
+                                  <Users className="w-6 h-6 text-white" />
+                                </div>
+                              )}
+                              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-zinc-900"></div>
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <p className="text-gray-900 dark:text-white font-semibold text-sm">
+                                  {getDisplayName(conversation.other_user)}
+                                </p>
+                                {conversation.last_message && (
+                                  <span className="text-xs text-gray-500 dark:text-zinc-400">
+                                    {formatMessageTime(conversation.last_message.created_at)}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center justify-between">
+                                <p className="text-gray-600 dark:text-zinc-300 text-sm truncate">
+                                  {getLastMessagePreview(conversation)}
+                                </p>
+                                {conversation.unread_count > 0 && (
+                                  <Badge className="bg-green-500 text-white px-2 py-0.5 text-xs">
+                                    {conversation.unread_count}
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              <p className="text-gray-500 dark:text-zinc-400 text-xs">
+                                {conversation.other_user.teams?.name || 'Sem time'}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Todos os Treinadores */}
+                    <div>
+                      <p className="text-sm font-semibold text-gray-500 dark:text-zinc-400 px-3 py-2">
+                        Todos os Treinadores
                       </p>
-                      {conversations.map((conversation) => (
+                      {filteredCoaches.map((coach) => (
                         <div
-                          key={conversation.id}
-                          onClick={() => setSelectedCoach(conversation.other_user)}
+                          key={coach.id}
+                          onClick={() => setSelectedCoach(coach)}
                           className={cn(
-                            "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 group hover:bg-zinc-800/50 border border-transparent hover:border-zinc-600",
-                            selectedCoach?.id === conversation.other_user.id && "bg-blue-500/10 border-blue-500/20"
+                            "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-gray-50 dark:hover:bg-zinc-800/50 mb-1",
+                            selectedCoach?.id === coach.id && "bg-blue-50 dark:bg-blue-900/20"
                           )}
                         >
                           <div className="relative">
-                            {conversation.other_user.teams?.logo_url ? (
+                            {coach.teams?.logo_url ? (
                               <Image 
-                                src={conversation.other_user.teams.logo_url}
-                                alt={conversation.other_user.teams.name}
-                                width={44}
-                                height={44}
-                                className="rounded-full border-2 border-zinc-600 group-hover:border-zinc-400 transition-colors"
+                                src={coach.teams.logo_url}
+                                alt={coach.teams.name}
+                                width={48}
+                                height={48}
+                                className="rounded-full border-2 border-gray-200 dark:border-zinc-600"
                               />
                             ) : (
-                              <div className="w-11 h-11 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-600 flex items-center justify-center border-2 border-zinc-600 group-hover:border-zinc-400 transition-colors">
-                                <Users className="w-5 h-5 text-zinc-400" />
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
+                                <Users className="w-6 h-6 text-white" />
                               </div>
                             )}
-                            {conversation.unread_count > 0 && (
-                              <Badge className="absolute -top-1 -right-1 bg-red-500 text-white px-1.5 py-0.5 text-xs min-w-[20px] h-[20px] flex items-center justify-center border-2 border-zinc-900">
-                                {conversation.unread_count}
-                              </Badge>
-                            )}
+                            <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-zinc-900"></div>
                           </div>
+                          
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <p className="text-white font-semibold text-sm truncate">
-                                {getDisplayName(conversation.other_user)}
-                              </p>
-                              <Clock className="w-3 h-3 text-zinc-500 flex-shrink-0" />
-                            </div>
-                            <p className="text-zinc-400 text-xs truncate">
-                              {conversation.other_user.teams?.name || 'Sem time'}
+                            <p className="text-gray-900 dark:text-white font-semibold text-sm">
+                              {getDisplayName(coach)}
+                            </p>
+                            <p className="text-gray-500 dark:text-zinc-400 text-xs">
+                              {coach.teams?.name || 'Sem time'}
                             </p>
                           </div>
                         </div>
                       ))}
                     </div>
-                  )}
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
 
-                  {/* Todos os treinadores */}
-                  <div>
-                    <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider px-3 py-2">
-                      Todos os Treinadores
+            {/* CHAT INDIVIDUAL (View = 'chat') */}
+            {view === 'chat' && selectedCoach && (
+              <div className="flex flex-col w-full h-full">
+                {/* Header do Chat */}
+                <div className="flex items-center gap-3 p-4 border-b border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleBackToList}
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700"
+                  >
+                    <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-zinc-300" />
+                  </Button>
+                  
+                  <div className="relative">
+                    {selectedCoach.teams?.logo_url ? (
+                      <Image 
+                        src={selectedCoach.teams.logo_url}
+                        alt={selectedCoach.teams.name}
+                        width={44}
+                        height={44}
+                        className="rounded-full border-2 border-gray-200 dark:border-zinc-600"
+                      />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
+                        <Users className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-zinc-900"></div>
+                  </div>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-gray-900 dark:text-white font-bold text-lg">
+                      {getDisplayName(selectedCoach)}
                     </p>
-                    {filteredCoaches.map((coach) => (
+                    <p className="text-green-600 dark:text-green-400 text-sm font-medium">
+                      {selectedCoach.teams?.name || 'Sem time'} • Online
+                    </p>
+                  </div>
+                  
+                  <Button variant="ghost" size="sm" className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700">
+                    <MoreVertical className="w-5 h-5 text-gray-600 dark:text-zinc-300" />
+                  </Button>
+                </div>
+
+                {/* Área de Mensagens */}
+                <ScrollArea className="flex-1 p-4 bg-gray-50 dark:bg-zinc-800/30">
+                  <div className="space-y-3">
+                    {messages.map((message) => (
                       <div
-                        key={coach.id}
-                        onClick={() => setSelectedCoach(coach)}
+                        key={message.id}
                         className={cn(
-                          "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 group hover:bg-zinc-800/50 border border-transparent hover:border-zinc-600 mb-1",
-                          selectedCoach?.id === coach.id && "bg-blue-500/10 border-blue-500/20"
+                          "flex flex-col max-w-[80%]",
+                          message.sender_id === currentUser.id
+                            ? "ml-auto" 
+                            : "mr-auto"
                         )}
                       >
-                        {coach.teams?.logo_url ? (
-                          <Image 
-                            src={coach.teams.logo_url}
-                            alt={coach.teams.name}
-                            width={44}
-                            height={44}
-                            className="rounded-full border-2 border-zinc-600 group-hover:border-zinc-400 transition-colors"
-                          />
-                        ) : (
-                          <div className="w-11 h-11 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-600 flex items-center justify-center border-2 border-zinc-600 group-hover:border-zinc-400 transition-colors">
-                            <Users className="w-5 h-5 text-zinc-400" />
+                        <div className={cn(
+                          "p-3 rounded-2xl",
+                          message.sender_id === currentUser.id
+                            ? "bg-blue-500 text-white rounded-br-md"
+                            : "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white rounded-bl-md border border-gray-200 dark:border-zinc-600"
+                        )}>
+                          <p className="text-sm leading-relaxed break-words">
+                            {message.message}
+                          </p>
+                          <div className={cn(
+                            "flex items-center gap-1 mt-1 text-xs",
+                            message.sender_id === currentUser.id 
+                              ? "text-blue-100 justify-end" 
+                              : "text-gray-500 dark:text-zinc-400"
+                          )}>
+                            {formatTime(message.created_at)}
                           </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-white font-semibold text-sm truncate">
-                            {getDisplayName(coach)}
-                          </p>
-                          <p className="text-zinc-400 text-xs truncate">
-                            {coach.teams?.name || 'Sem time'}
-                          </p>
                         </div>
                       </div>
                     ))}
+                    <div ref={messagesEndRef} />
                   </div>
-                </div>
-              </ScrollArea>
-            </div>
+                </ScrollArea>
 
-            {/* Área de Chat */}
-            <div className={cn(
-              "flex flex-col flex-1 transition-all duration-300 bg-gradient-to-b from-zinc-900 to-zinc-800",
-              selectedCoach ? "flex" : "hidden md:flex"
-            )}>
-              {selectedCoach ? (
-                <>
-                  {/* Header do Chat */}
-                  <div className="flex items-center gap-3 p-4 border-b border-zinc-700 bg-zinc-800/50 backdrop-blur-sm">
+                {/* Input de Mensagem */}
+                <div className="p-4 border-t border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
+                  <div className="flex gap-3">
+                    <Input
+                      placeholder="Digite uma mensagem..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      disabled={isLoading}
+                      className="flex-1 bg-gray-50 dark:bg-zinc-700 border-gray-200 dark:border-zinc-600 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-zinc-400"
+                    />
                     <Button
-                      variant="ghost"
+                      onClick={sendMessage}
+                      disabled={isLoading || !newMessage.trim()}
+                      className="bg-green-500 hover:bg-green-600 text-white px-4 transition-all duration-200 disabled:opacity-50"
                       size="sm"
-                      onClick={() => setSelectedCoach(null)}
-                      className="md:hidden text-zinc-400 hover:text-white hover:bg-zinc-700/50"
                     >
-                      <X className="w-4 h-4" />
+                      <Send className="w-4 h-4" />
                     </Button>
-                    <div className="relative">
-                      {selectedCoach.teams?.logo_url ? (
-                        <Image 
-                          src={selectedCoach.teams.logo_url}
-                          alt={selectedCoach.teams.name}
-                          width={44}
-                          height={44}
-                          className="rounded-full border-2 border-blue-500/30"
-                        />
-                      ) : (
-                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center border-2 border-blue-500/30">
-                          <Users className="w-5 h-5 text-white" />
-                        </div>
-                      )}
-                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-zinc-900"></div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-bold text-lg">
-                        {getDisplayName(selectedCoach)}
-                      </p>
-                      <p className="text-blue-400 text-sm font-medium">
-                        {selectedCoach.teams?.name || 'Sem time'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Área de Mensagens */}
-                  <ScrollArea className="flex-1 p-4">
-                    <div className="space-y-6">
-                      {Object.entries(groupedMessages).map(([date, dateMessages]) => (
-                        <div key={date}>
-                          {/* Divider com data */}
-                          <div className="flex items-center justify-center my-6">
-                            <div className="bg-zinc-700/50 px-3 py-1 rounded-full">
-                              <span className="text-xs text-zinc-400 font-medium">{date}</span>
-                            </div>
-                          </div>
-                          
-                          {/* Mensagens do dia */}
-                          {dateMessages.map((message) => (
-                            <div
-                              key={message.id}
-                              className={cn(
-                                "flex flex-col max-w-[85%] transition-all duration-200",
-                                message.sender_id === currentUser.id
-                                  ? "ml-auto" 
-                                  : "mr-auto"
-                              )}
-                            >
-                              <div className={cn(
-                                "p-3 rounded-2xl shadow-lg border backdrop-blur-sm",
-                                message.sender_id === currentUser.id
-                                  ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white border-blue-400/30 rounded-br-md"
-                                  : "bg-zinc-800/80 text-white border-zinc-600/30 rounded-bl-md"
-                              )}>
-                                <p className="text-sm leading-relaxed break-words">
-                                  {message.message}
-                                </p>
-                                <div className={cn(
-                                  "flex items-center gap-1 mt-2 text-xs",
-                                  message.sender_id === currentUser.id 
-                                    ? "text-blue-100/70 justify-end" 
-                                    : "text-zinc-400"
-                                )}>
-                                  <Clock className="w-3 h-3" />
-                                  {formatTime(message.created_at)}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                      <div ref={messagesEndRef} />
-                    </div>
-                  </ScrollArea>
-
-                  {/* Input */}
-                  <div className="p-4 border-t border-zinc-700 bg-zinc-800/30 backdrop-blur-sm">
-                    <div className="flex gap-3">
-                      <Input
-                        placeholder="Digite sua mensagem..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        disabled={isLoading}
-                        className="flex-1 bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-400 focus:border-blue-500/50 transition-colors"
-                      />
-                      <Button
-                        onClick={sendMessage}
-                        disabled={isLoading || !newMessage.trim()}
-                        className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:transform-none"
-                        size="sm"
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center text-zinc-400">
-                    <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg font-semibold mb-2">Selecione um treinador</p>
-                    <p className="text-sm">Escolha um treinador para iniciar uma conversa</p>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </Card>
         </div>
       )}
