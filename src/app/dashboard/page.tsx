@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COM CHAT
+// src/app/dashboard/page.tsx - VERSÃO COM CHAT PRIVADO
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import ChatGlobal from '@/components/ChatGlobal' // Importe o componente
+import PrivateChat from '@/components/PrivateChat' // Chat privado agora
 
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
@@ -244,8 +244,10 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Chat Global Component */}
-      <ChatGlobal team={team} user={user} />
+      {/* Chat Privado - apenas quando tiver dados do usuário e time */}
+      {user && team && (
+        <PrivateChat currentUser={user} currentTeam={team} />
+      )}
     </>
   )
 }
