@@ -30,12 +30,12 @@ export default function FloatingChatButton({
   return (
     <button
       onClick={onOpenChat}
-      className="fixed bottom-4 right-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-2xl transition-all duration-300 z-40 flex items-center justify-center group hover:scale-105 hover:shadow-purple-600/40 border border-white/10 backdrop-blur-xl"
+      className="fixed bottom-3 right-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white p-2 rounded-lg shadow-2xl transition-all duration-300 z-40 flex items-center justify-center group hover:scale-105 hover:shadow-purple-600/40 border border-white/10 backdrop-blur-xl"
       aria-label="Abrir chat"
     >
-      <MessageCircle size={20} className="sm:w-6 sm:h-6 group-hover:scale-110 transition-transform" />
+      <MessageCircle size={18} className="group-hover:scale-110 transition-transform" />
       {unreadCount > 0 && (
-        <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 text-[10px] sm:text-xs flex items-center justify-center font-bold shadow-lg border border-zinc-900">
+        <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-bold shadow-lg border border-zinc-900">
           {unreadCount}
         </span>
       )}

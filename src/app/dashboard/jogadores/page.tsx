@@ -146,7 +146,7 @@ export default function ListaJogadores() {
     gk_clearing: null, gk_reflexes: null, gk_reach: null,
   })
 
-  const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'PTE', 'PTD', 'CA']
+  const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
   const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
 
   // HABILIDADES ORGANIZADAS EM ORDEM ALFABÉTICA E COM "Especialista em Pênaltis" incluída
