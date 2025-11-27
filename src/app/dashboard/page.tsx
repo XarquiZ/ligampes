@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COMPLETA COM SIDEBAR
+// src/app/dashboard/page.tsx - VERSÃO ATUALIZADA COM LAYOUT PROPORCIONAL
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
@@ -160,15 +160,6 @@ export default function Dashboard() {
     }
   }, [user])
 
-  const handleSignOut = async () => {
-    try {
-      console.log('[Dashboard] Fazendo logout...')
-      await supabase.auth.signOut()
-    } catch (error) {
-      console.error('[Dashboard] Erro no logout:', error)
-    }
-  }
-
   if (authLoading || dataLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -209,46 +200,46 @@ export default function Dashboard() {
       <Sidebar user={user!} profile={profile} team={team} />
 
       {/* Conteúdo Principal */}
-      <div className="flex-1 lg:ml-0">
-        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
-          <div className="mx-auto max-w-7xl space-y-12">
+      <div className="flex-1 transition-all duration-300 lg:ml-0">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-6 lg:p-8">
+          <div className="mx-auto space-y-8 lg:space-y-12">
             {/* Header do conteúdo */}
-            <div className="flex flex-col md:flex-row items-center gap-8 pt-8">
+            <div className="flex flex-col md:flex-row items-center gap-6 lg:gap-8 pt-6 lg:pt-8">
               {team?.logo_url ? (
                 <Image 
                   src={team.logo_url} 
                   alt={team.name} 
-                  width={160} 
-                  height={160} 
-                  className="rounded-3xl border-8 border-purple-600/30 shadow-2xl object-cover" 
+                  width={120} 
+                  height={120} 
+                  className="rounded-3xl border-6 lg:border-8 border-purple-600/30 shadow-2xl object-cover" 
                 />
               ) : (
-                <Avatar className="h-40 w-40 border-8 border-purple-600/30">
-                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-7xl font-black">
+                <Avatar className="h-32 w-32 lg:h-40 lg:w-40 border-6 lg:border-8 border-purple-600/30">
+                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-5xl lg:text-7xl font-black">
                     {displayName[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               )}
 
               <div className="text-center md:text-left">
-                <h2 className="text-5xl font-black text-white">{displayName}</h2>
-                <p className="mt-3 text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <h2 className="text-3xl lg:text-5xl font-black text-white">{displayName}</h2>
+                <p className="mt-2 lg:mt-3 text-xl lg:text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                   {team?.name || 'Sem time ainda'}
                 </p>
                 {isAdmin && (
-                  <p className="mt-3 text-lg font-medium text-yellow-500 flex items-center justify-center md:justify-start gap-2">
-                    <Crown className="h-6 w-6" /> ADMINISTRADOR SUPREMO <Crown className="h-6 w-6" />
+                  <p className="mt-2 lg:mt-3 text-sm lg:text-lg font-medium text-yellow-500 flex items-center justify-center md:justify-start gap-2">
+                    <Crown className="h-4 w-4 lg:h-6 lg:w-6" /> ADMINISTRADOR SUPREMO <Crown className="h-4 w-4 lg:h-6 lg:w-6" />
                   </p>
                 )}
               </div>
             </div>
 
             {/* Grid de Tiles */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
               {tiles.map((tile) => (
                 <Card
                   key={tile.title}
-                  className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl transition-all duration-700 cursor-pointer ${
+                  className={`group relative overflow-hidden rounded-2xl lg:rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-xl lg:shadow-2xl transition-all duration-700 cursor-pointer ${
                     expandedTile === tile.title
                       ? 'row-span-2 lg:col-span-2 scale-105 shadow-3xl z-10'
                       : 'hover:scale-105 hover:shadow-purple-600/40'
@@ -257,37 +248,37 @@ export default function Dashboard() {
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
-                  <CardHeader className="pb-4 relative z-10">
-                    <CardTitle className="text-2xl font-bold text-white flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <tile.icon className={`h-12 w-12 text-${tile.color}-400 drop-shadow-lg`} />
+                  <CardHeader className="pb-3 lg:pb-4 relative z-10">
+                    <CardTitle className="text-lg lg:text-2xl font-bold text-white flex items-center justify-between">
+                      <div className="flex items-center gap-3 lg:gap-4">
+                        <tile.icon className={`h-8 w-8 lg:h-12 lg:w-12 text-${tile.color}-400 drop-shadow-lg`} />
                         {tile.title}
                       </div>
-                      {expandedTile === tile.title ? <ChevronUp className="h-8 w-8" /> : <ChevronDown className="h-8 w-8" />}
+                      {expandedTile === tile.title ? <ChevronUp className="h-6 w-6 lg:h-8 lg:w-8" /> : <ChevronDown className="h-6 w-6 lg:h-8 lg:w-8" />}
                     </CardTitle>
                   </CardHeader>
 
-                  <CardContent className="relative z-10 space-y-6">
+                  <CardContent className="relative z-10 space-y-4 lg:space-y-6">
                     <div className="transition-all duration-700">
-                      <p className={`font-black text-white ${expandedTile === tile.title ? 'text-6xl' : 'text-5xl'}`}>
+                      <p className={`font-black text-white ${expandedTile === tile.title ? 'text-4xl lg:text-6xl' : 'text-3xl lg:text-5xl'}`}>
                         {tile.value}
                       </p>
-                      <p className={`font-medium text-${tile.color}-400 ${expandedTile === tile.title ? 'text-2xl mt-4' : 'text-lg'}`}>
+                      <p className={`font-medium text-${tile.color}-400 ${expandedTile === tile.title ? 'text-lg lg:text-2xl mt-3 lg:mt-4' : 'text-sm lg:text-lg'}`}>
                         {tile.subtitle}
                       </p>
                     </div>
 
                     {expandedTile === tile.title && (
-                      <div className="mt-6 pt-6 border-t border-white/10 animate-in slide-in-from-top-4 duration-500">
-                        <div className="p-6 bg-white/5 rounded-2xl border border-white/10 text-center">
-                          <p className="text-zinc-400 italic">Em breve: dados reais aqui</p>
+                      <div className="mt-4 lg:mt-6 pt-4 lg:pt-6 border-t border-white/10 animate-in slide-in-from-top-4 duration-500">
+                        <div className="p-4 lg:p-6 bg-white/5 rounded-xl lg:rounded-2xl border border-white/10 text-center">
+                          <p className="text-zinc-400 italic text-sm lg:text-base">Em breve: dados reais aqui</p>
                         </div>
                       </div>
                     )}
 
-                    <Link href={tile.link} onClick={(e) => e.stopPropagation()} className="block mt-6">
-                      <Button className="w-full bg-gradient-to-r from-white/10 to-white/20 hover:from-white/20 hover:to-white/30 border border-white/20 text-white font-bold text-lg py-6">
-                        Ver {tile.title.toLowerCase()} completo <ArrowRight className="ml-3 h-6 w-6" />
+                    <Link href={tile.link} onClick={(e) => e.stopPropagation()} className="block mt-4 lg:mt-6">
+                      <Button className="w-full bg-gradient-to-r from-white/10 to-white/20 hover:from-white/20 hover:to-white/30 border border-white/20 text-white font-bold text-sm lg:text-lg py-4 lg:py-6">
+                        Ver {tile.title.toLowerCase()} completo <ArrowRight className="ml-2 lg:ml-3 h-4 w-4 lg:h-6 lg:w-6" />
                       </Button>
                     </Link>
                   </CardContent>
