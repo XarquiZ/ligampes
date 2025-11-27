@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO ATUALIZADA COM LAYOUT PROPORCIONAL
+// src/app/dashboard/page.tsx - VERSÃO CORRIGIDA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -187,11 +187,51 @@ export default function Dashboard() {
   }
 
   const tiles = [
-    { title: 'SALDO', icon: DollarSign, color: 'green', value: formatBalance(team?.balance || 0), subtitle: 'disponível para gastar', link: '/dashboard/saldo' },
-    { title: 'MEU ELENCO', icon: Shirt, color: 'blue', value: '0/25', subtitle: 'meus jogadores', link: '/dashboard/elenco' },
-    { title: 'JOGADORES', icon: Users, color: 'pink', value: 'Pool', subtitle: 'todos os atletas', link: '/dashboard/jogadores' },
-    { title: 'LEILÃO', icon: Calendar, color: 'red', value: 'EM BREVE', subtitle: 'próximo evento', link: '/dashboard/leilao' },
-    { title: 'TRANSFERÊNCIAS', icon: ArrowLeftRight, color: 'purple', value: 'Mercado', subtitle: 'negociações ativas', link: '/dashboard/transferencias' },
+    { 
+      title: 'SALDO', 
+      icon: DollarSign, 
+      color: 'green', 
+      value: formatBalance(team?.balance || 0), 
+      subtitle: 'disponível para gastar', 
+      link: '/dashboard/saldo',
+      buttonText: 'Ver saldo'
+    },
+    { 
+      title: 'MEU ELENCO', 
+      icon: Shirt, 
+      color: 'blue', 
+      value: '0/25', 
+      subtitle: 'meus jogadores', 
+      link: '/dashboard/elenco',
+      buttonText: 'Ver elenco'
+    },
+    { 
+      title: 'JOGADORES', 
+      icon: Users, 
+      color: 'pink', 
+      value: 'Pool', 
+      subtitle: 'todos os atletas', 
+      link: '/dashboard/jogadores',
+      buttonText: 'Ver jogadores'
+    },
+    { 
+      title: 'LEILÃO', 
+      icon: Calendar, 
+      color: 'red', 
+      value: 'EM BREVE', 
+      subtitle: 'próximo evento', 
+      link: '/dashboard/leilao',
+      buttonText: 'Ver leilão'
+    },
+    { 
+      title: 'TRANSFERÊNCIAS', 
+      icon: ArrowLeftRight, 
+      color: 'purple', 
+      value: 'Mercado', 
+      subtitle: 'negociações ativas', 
+      link: '/dashboard/transferencias',
+      buttonText: 'Ver mercado'
+    },
   ]
 
   return (
@@ -201,84 +241,85 @@ export default function Dashboard() {
 
       {/* Conteúdo Principal */}
       <div className="flex-1 transition-all duration-300 lg:ml-0">
-        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-6 lg:p-8">
-          <div className="mx-auto space-y-8 lg:space-y-12">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-4 lg:p-6">
+          <div className="mx-auto space-y-6 lg:space-y-8 max-w-7xl">
             {/* Header do conteúdo */}
-            <div className="flex flex-col md:flex-row items-center gap-6 lg:gap-8 pt-6 lg:pt-8">
+            <div className="flex flex-col md:flex-row items-center gap-4 lg:gap-6 pt-4 lg:pt-6">
               {team?.logo_url ? (
                 <Image 
                   src={team.logo_url} 
                   alt={team.name} 
-                  width={120} 
-                  height={120} 
-                  className="rounded-3xl border-6 lg:border-8 border-purple-600/30 shadow-2xl object-cover" 
+                  width={100} 
+                  height={100} 
+                  className="rounded-2xl lg:rounded-3xl border-4 lg:border-6 border-purple-600/30 shadow-xl lg:shadow-2xl object-cover" 
                 />
               ) : (
-                <Avatar className="h-32 w-32 lg:h-40 lg:w-40 border-6 lg:border-8 border-purple-600/30">
-                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-5xl lg:text-7xl font-black">
+                <Avatar className="h-24 w-24 lg:h-32 lg:w-32 border-4 lg:border-6 border-purple-600/30">
+                  <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 text-3xl lg:text-5xl font-black">
                     {displayName[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               )}
 
               <div className="text-center md:text-left">
-                <h2 className="text-3xl lg:text-5xl font-black text-white">{displayName}</h2>
-                <p className="mt-2 lg:mt-3 text-xl lg:text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                <h2 className="text-2xl lg:text-4xl font-black text-white">{displayName}</h2>
+                <p className="mt-1 lg:mt-2 text-lg lg:text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                   {team?.name || 'Sem time ainda'}
                 </p>
                 {isAdmin && (
-                  <p className="mt-2 lg:mt-3 text-sm lg:text-lg font-medium text-yellow-500 flex items-center justify-center md:justify-start gap-2">
-                    <Crown className="h-4 w-4 lg:h-6 lg:w-6" /> ADMINISTRADOR SUPREMO <Crown className="h-4 w-4 lg:h-6 lg:w-6" />
+                  <p className="mt-1 lg:mt-2 text-xs lg:text-sm font-medium text-yellow-500 flex items-center justify-center md:justify-start gap-1 lg:gap-2">
+                    <Crown className="h-3 w-3 lg:h-4 lg:w-4" /> ADMINISTRADOR <Crown className="h-3 w-3 lg:h-4 lg:w-4" />
                   </p>
                 )}
               </div>
             </div>
 
             {/* Grid de Tiles */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
               {tiles.map((tile) => (
                 <Card
                   key={tile.title}
-                  className={`group relative overflow-hidden rounded-2xl lg:rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-xl lg:shadow-2xl transition-all duration-700 cursor-pointer ${
+                  className={`group relative overflow-hidden rounded-xl lg:rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg lg:shadow-xl transition-all duration-700 cursor-pointer ${
                     expandedTile === tile.title
-                      ? 'row-span-2 lg:col-span-2 scale-105 shadow-3xl z-10'
+                      ? 'row-span-2 lg:col-span-2 scale-105 shadow-2xl z-10'
                       : 'hover:scale-105 hover:shadow-purple-600/40'
                   }`}
                   onClick={() => setExpandedTile(expandedTile === tile.title ? null : tile.title)}
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
-                  <CardHeader className="pb-3 lg:pb-4 relative z-10">
-                    <CardTitle className="text-lg lg:text-2xl font-bold text-white flex items-center justify-between">
-                      <div className="flex items-center gap-3 lg:gap-4">
-                        <tile.icon className={`h-8 w-8 lg:h-12 lg:w-12 text-${tile.color}-400 drop-shadow-lg`} />
-                        {tile.title}
+                  <CardHeader className="pb-2 lg:pb-3 relative z-10">
+                    <CardTitle className="text-base lg:text-lg font-bold text-white flex items-center justify-between">
+                      <div className="flex items-center gap-2 lg:gap-3">
+                        <tile.icon className={`h-6 w-6 lg:h-8 lg:w-8 text-${tile.color}-400 drop-shadow-lg`} />
+                        <span className="truncate">{tile.title}</span>
                       </div>
-                      {expandedTile === tile.title ? <ChevronUp className="h-6 w-6 lg:h-8 lg:w-8" /> : <ChevronDown className="h-6 w-6 lg:h-8 lg:w-8" />}
+                      {expandedTile === tile.title ? <ChevronUp className="h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0" />}
                     </CardTitle>
                   </CardHeader>
 
-                  <CardContent className="relative z-10 space-y-4 lg:space-y-6">
+                  <CardContent className="relative z-10 space-y-3 lg:space-y-4">
                     <div className="transition-all duration-700">
-                      <p className={`font-black text-white ${expandedTile === tile.title ? 'text-4xl lg:text-6xl' : 'text-3xl lg:text-5xl'}`}>
+                      <p className={`font-black text-white break-words ${expandedTile === tile.title ? 'text-2xl lg:text-4xl' : 'text-xl lg:text-3xl'}`}>
                         {tile.value}
                       </p>
-                      <p className={`font-medium text-${tile.color}-400 ${expandedTile === tile.title ? 'text-lg lg:text-2xl mt-3 lg:mt-4' : 'text-sm lg:text-lg'}`}>
+                      <p className={`font-medium text-${tile.color}-400 ${expandedTile === tile.title ? 'text-sm lg:text-base mt-2 lg:mt-3' : 'text-xs lg:text-sm'}`}>
                         {tile.subtitle}
                       </p>
                     </div>
 
                     {expandedTile === tile.title && (
-                      <div className="mt-4 lg:mt-6 pt-4 lg:pt-6 border-t border-white/10 animate-in slide-in-from-top-4 duration-500">
-                        <div className="p-4 lg:p-6 bg-white/5 rounded-xl lg:rounded-2xl border border-white/10 text-center">
-                          <p className="text-zinc-400 italic text-sm lg:text-base">Em breve: dados reais aqui</p>
+                      <div className="mt-3 lg:mt-4 pt-3 lg:pt-4 border-t border-white/10 animate-in slide-in-from-top-4 duration-500">
+                        <div className="p-3 lg:p-4 bg-white/5 rounded-lg lg:rounded-xl border border-white/10 text-center">
+                          <p className="text-zinc-400 italic text-xs lg:text-sm">Em breve: dados reais aqui</p>
                         </div>
                       </div>
                     )}
 
-                    <Link href={tile.link} onClick={(e) => e.stopPropagation()} className="block mt-4 lg:mt-6">
-                      <Button className="w-full bg-gradient-to-r from-white/10 to-white/20 hover:from-white/20 hover:to-white/30 border border-white/20 text-white font-bold text-sm lg:text-lg py-4 lg:py-6">
-                        Ver {tile.title.toLowerCase()} completo <ArrowRight className="ml-2 lg:ml-3 h-4 w-4 lg:h-6 lg:w-6" />
+                    <Link href={tile.link} onClick={(e) => e.stopPropagation()} className="block mt-3 lg:mt-4">
+                      <Button className="w-full bg-gradient-to-r from-white/10 to-white/20 hover:from-white/20 hover:to-white/30 border border-white/20 text-white font-bold text-xs lg:text-sm py-2 lg:py-3 h-auto min-h-0">
+                        <span className="truncate">{tile.buttonText}</span>
+                        <ArrowRight className="ml-1 lg:ml-2 h-3 w-3 lg:h-4 lg:w-4 flex-shrink-0" />
                       </Button>
                     </Link>
                   </CardContent>
