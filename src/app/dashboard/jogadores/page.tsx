@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation' // ADICIONE ESTE IMPORT
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -103,7 +104,7 @@ function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null;
 }
 
 export default function ListaJogadores() {
-  const router = useRouter()
+  const router = useRouter() // AGORA ESTÁ DEFINIDO
   const { user, loading: authLoading } = useAuth()
   const [jogadores, setJogadores] = useState<Player[]>([])
   const [teams, setTeams] = useState<Team[]>([])
