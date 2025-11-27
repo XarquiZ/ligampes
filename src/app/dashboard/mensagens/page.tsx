@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Send, ArrowLeft, Users, Search, MoreVertical, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import FloatingChatButton from '@/components/FloatingChatButton'
 
 interface Profile {
   id: string

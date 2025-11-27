@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button'
 import { DollarSign, Shirt, Trophy, Calendar, LogOut, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
+import FloatingChatButton from '@/components/FloatingChatButton'
+
 
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
@@ -244,8 +246,8 @@ export default function Dashboard() {
       </div>
 
       // E no final do return, adicione:
-{user && (
-  <FloatingChatButton currentUser={user} />
+      {user && (
+  <FloatingChatButton />
 )}
     </>
   )
