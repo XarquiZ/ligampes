@@ -7,7 +7,6 @@ import { usePathname } from 'next/navigation'
 import { 
   DollarSign, 
   Shirt, 
-  Trophy, 
   Calendar, 
   LogOut, 
   Crown, 
