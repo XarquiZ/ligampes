@@ -109,17 +109,34 @@ export default function ListaJogadores() {
     }), []
   );
 
+  // FUNÇÃO ATUALIZADA: Para navegação via chat
   const handleGridCardClick = (playerId: string) => {
     setIsTransitioning(true)
     setViewMode('list')
     
     setTimeout(() => {
       setOpenedPlayers([playerId])
-      const element = document.getElementById(`player-${playerId}`)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-      setIsTransitioning(false)
+      
+      // Atualizar a URL para manter consistência com o chat
+      window.history.replaceState(null, '', `#player-${playerId}`);
+      
+      setTimeout(() => {
+        const element = document.getElementById(`player-${playerId}`)
+        if (element) {
+          element.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center',
+            inline: 'nearest'
+          })
+          
+          // Adicionar destaque visual
+          element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-300')
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl')
+          }, 3000)
+        }
+        setIsTransitioning(false)
+      }, 100)
     }, 150)
   }
 
@@ -233,6 +250,54 @@ export default function ListaJogadores() {
       </div>
     )
   }
+
+  // NOVO useEffect: Detectar hash da URL para navegação do chat
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#player-')) {
+        const playerId = hash.replace('#player-', '');
+        
+        console.log('Navegando para jogador via URL:', playerId);
+        
+        // Garantir que está na view de lista
+        setViewMode('list');
+        
+        // Abrir o card do jogador
+        setOpenedPlayers([playerId]);
+        
+        // Scroll para o jogador após um delay para garantir o render
+        setTimeout(() => {
+          const element = document.getElementById(`player-${playerId}`);
+          if (element) {
+            console.log('Elemento encontrado, fazendo scroll');
+            element.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center'
+            });
+            
+            // Adicionar destaque visual
+            element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-300');
+            setTimeout(() => {
+              element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
+            }, 3000);
+          } else {
+            console.log('Elemento não encontrado:', `player-${playerId}`);
+          }
+        }, 800);
+      }
+    };
+
+    // Executar na montagem inicial se já tiver hash
+    handleHashChange();
+    
+    // Ouvir mudanças no hash (quando navegar via chat)
+    window.addEventListener('hashchange', handleHashChange);
+    
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [filteredPlayers]); // Adicione filteredPlayers como dependência
 
   useEffect(() => {
     const checkAdmin = async () => {
