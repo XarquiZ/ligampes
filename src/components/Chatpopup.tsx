@@ -86,6 +86,9 @@ export default function ChatPopup({
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // CORREÇÃO: Estado para controlar se já estamos processando uma conversa
+  const [isProcessingConversation, setIsProcessingConversation] = useState(false);
+
   // Calcular total de mensagens não lidas
   const calculateTotalUnread = (conversations: Conversation[]) => {
     return conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0);
@@ -126,8 +129,13 @@ export default function ChatPopup({
     loadData();
   }, [isOpen, currentUser.id]);
 
-  // CORREÇÃO CRÍTICA: Carregar conversas do usuário
-  const loadConversations = async () => {
+  // CORREÇÃO: Carregar conversas do usuário - versão otimizada
+  const loadConversations = async (skipUnreadUpdate = false) => {
+    if (isProcessingConversation) {
+      console.log('Ignorando loadConversations - já processando uma conversa');
+      return;
+    }
+
     try {
       console.log('Carregando conversas para usuário:', currentUser.id);
       
@@ -144,7 +152,9 @@ export default function ChatPopup({
 
       if (!conversationsData?.length) {
         setConversations([]);
-        notifyUnreadCountChange(0);
+        if (!skipUnreadUpdate) {
+          notifyUnreadCountChange(0);
+        }
         return;
       }
 
@@ -172,9 +182,20 @@ export default function ChatPopup({
         return;
       }
 
-      // CORREÇÃO: Carregar contagem de mensagens não lidas de forma mais eficiente
+      // CORREÇÃO: Carregar contagem de mensagens não lidas apenas se necessário
       const conversationsWithUnread = await Promise.all(
         conversationsData.map(async (conv) => {
+          // Se skipUnreadUpdate é true, mantenha o unread_count atual se possível
+          if (skipUnreadUpdate) {
+            const existingConv = conversations.find(c => c.id === conv.id);
+            if (existingConv) {
+              return {
+                ...conv,
+                unread_count: existingConv.unread_count
+              };
+            }
+          }
+
           try {
             const { count, error: countError } = await supabase
               .from('private_messages')
@@ -238,10 +259,12 @@ export default function ChatPopup({
 
       setConversations(formattedConversations);
       
-      // Calcular e notificar o total de mensagens não lidas
-      const totalUnread = calculateTotalUnread(formattedConversations);
-      console.log('Total de mensagens não lidas calculado:', totalUnread);
-      notifyUnreadCountChange(totalUnread);
+      // Calcular e notificar o total de mensagens não lidas apenas se necessário
+      if (!skipUnreadUpdate) {
+        const totalUnread = calculateTotalUnread(formattedConversations);
+        console.log('Total de mensagens não lidas calculado:', totalUnread);
+        notifyUnreadCountChange(totalUnread);
+      }
       
     } catch (error) {
       console.error('Erro ao processar conversas:', error);
@@ -312,13 +335,10 @@ export default function ChatPopup({
     }
   };
 
-  // CORREÇÃO CRÍTICA: Carregar mensagens de uma conversa
+  // CORREÇÃO CRÍTICA: Carregar mensagens de uma conversa - SEM chamar loadConversations
   const loadMessages = async (conversationId: string) => {
     try {
       console.log('Carregando mensagens da conversa:', conversationId);
-
-      // PRIMEIRO: Marcar mensagens como lidas
-      await markMessagesAsRead(conversationId);
 
       // DEPOIS: Carregar as mensagens
       const { data: messagesData, error } = await supabase
@@ -357,11 +377,6 @@ export default function ChatPopup({
       });
 
       setMessages(formattedMessages);
-      
-      // ATUALIZADO: Recarregar conversas para atualizar o unread_count
-      setTimeout(async () => {
-        await loadConversations();
-      }, 300);
       
     } catch (error) {
       console.error('Erro ao processar mensagens:', error);
@@ -454,7 +469,7 @@ export default function ChatPopup({
     player.name.toLowerCase().includes(playerSearch.toLowerCase())
   );
 
-  // Compartilhar jogador no chat
+  // CORREÇÃO: Compartilhar jogador - versão otimizada
   const sharePlayer = async () => {
     if (!selectedPlayer || !selectedConversation) return;
 
@@ -483,9 +498,20 @@ export default function ChatPopup({
         })
         .eq('id', selectedConversation.id);
 
-      // Recarregar mensagens e conversas
+      // CORREÇÃO: Recarregar apenas as mensagens
       await loadMessages(selectedConversation.id);
-      await loadConversations();
+      
+      // Atualizar localmente
+      const updatedConversations = conversations.map(conv => 
+        conv.id === selectedConversation.id 
+          ? { 
+              ...conv, 
+              last_message: `Compartilhou: ${selectedPlayer.name}`,
+              last_message_at: new Date().toISOString()
+            }
+          : conv
+      );
+      setConversations(updatedConversations);
       
       // Fechar seletor e limpar seleções
       setShowPlayerSelector(false);
@@ -564,7 +590,7 @@ export default function ChatPopup({
     }
   };
 
-  // Enviar mensagem
+  // CORREÇÃO: Enviar mensagem - versão otimizada
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -601,9 +627,20 @@ export default function ChatPopup({
         return;
       }
 
-      // Recarregar mensagens e conversas
+      // CORREÇÃO: Recarregar apenas as mensagens, não as conversas
       await loadMessages(selectedConversation.id);
-      await loadConversations();
+      
+      // Atualizar a última mensagem localmente
+      const updatedConversations = conversations.map(conv => 
+        conv.id === selectedConversation.id 
+          ? { 
+              ...conv, 
+              last_message: messageText,
+              last_message_at: new Date().toISOString()
+            }
+          : conv
+      );
+      setConversations(updatedConversations);
       
       setNewMessage('');
     } catch (error) {
@@ -633,31 +670,48 @@ export default function ChatPopup({
 
   // CORREÇÃO CRÍTICA: Função para selecionar conversa
   const handleSelectConversation = async (conversation: Conversation) => {
+    if (isProcessingConversation) {
+      console.log('Já processando uma conversa, ignorando...');
+      return;
+    }
+
     console.log('Selecionando conversa:', conversation.id, 'unread_count:', conversation.unread_count);
     
-    // Atualizar UI imediatamente
-    setSelectedConversation(conversation);
+    setIsProcessingConversation(true);
     
-    // Se há mensagens não lidas, marcar como lidas ANTES de carregar as mensagens
-    if (conversation.unread_count && conversation.unread_count > 0) {
-      console.log('Conversa tem mensagens não lidas, marcando como lidas...');
-      await markMessagesAsRead(conversation.id);
+    try {
+      // Atualizar UI imediatamente
+      setSelectedConversation(conversation);
       
-      // Atualizar a conversa localmente para remover o badge imediatamente
-      const updatedConversations = conversations.map(conv => 
-        conv.id === conversation.id 
-          ? { ...conv, unread_count: 0 }
-          : conv
-      );
-      setConversations(updatedConversations);
+      // Se há mensagens não lidas, marcar como lidas ANTES de carregar as mensagens
+      if (conversation.unread_count && conversation.unread_count > 0) {
+        console.log('Conversa tem mensagens não lidas, marcando como lidas...');
+        const success = await markMessagesAsRead(conversation.id);
+        
+        if (success) {
+          // ATUALIZAÇÃO CRÍTICA: Atualizar a conversa localmente para remover o badge
+          const updatedConversations = conversations.map(conv => 
+            conv.id === conversation.id 
+              ? { ...conv, unread_count: 0 }
+              : conv
+          );
+          setConversations(updatedConversations);
+          
+          // Notificar mudança no contador IMEDIATAMENTE
+          const totalUnread = calculateTotalUnread(updatedConversations);
+          console.log('Total atualizado após marcar como lida:', totalUnread);
+          notifyUnreadCountChange(totalUnread);
+        }
+      }
       
-      // Notificar mudança no contador
-      const totalUnread = calculateTotalUnread(updatedConversations);
-      notifyUnreadCountChange(totalUnread);
+      // Carregar mensagens (SEM chamar loadConversations novamente)
+      await loadMessages(conversation.id);
+      
+    } catch (error) {
+      console.error('Erro ao selecionar conversa:', error);
+    } finally {
+      setIsProcessingConversation(false);
     }
-    
-    // Carregar mensagens
-    await loadMessages(conversation.id);
   };
 
   const scrollToBottom = () => {
