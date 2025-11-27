@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import Sidebar from '@/components/Sidebar'
 
 // Função de formatar valor
 function formatBalance(value: number): string {
@@ -26,6 +27,21 @@ function formatDateTime(dateString: string) {
   }
 }
 
+interface UserProfile {
+  id: string
+  email?: string
+  user_metadata?: {
+    full_name?: string
+  }
+}
+
+interface Team {
+  id: string
+  name: string
+  logo_url: string
+  balance: number
+}
+
 export default function PaginaTransferencias() {
   const [transfers, setTransfers] = useState<any[]>([])
   const [allTransfers, setAllTransfers] = useState<any[]>([])
@@ -34,6 +50,9 @@ export default function PaginaTransferencias() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
   const [exchangePlayersDetails, setExchangePlayersDetails] = useState<{[key: string]: any[]}>({})
+  const [user, setUser] = useState<UserProfile | null>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [team, setTeam] = useState<Team | null>(null)
 
   useEffect(() => {
     loadData()
@@ -75,15 +94,27 @@ export default function PaginaTransferencias() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
+    setUser(session.user)
+
     // 1. Pega perfil do usuário (team_id e se é admin)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('team_id, role')
+      .select('*, teams(*)')
       .eq('id', session.user.id)
       .single()
 
-    setUserTeamId(profile?.team_id || null)
-    setIsAdmin(profile?.role === 'admin')
+    if (profile) {
+      setProfile(profile)
+      setUserTeamId(profile?.team_id || null)
+      setIsAdmin(profile?.role === 'admin')
+      
+      // Definir time diretamente do perfil
+      if (profile.teams) {
+        setTeam(profile.teams)
+      } else {
+        setTeam(null)
+      }
+    }
 
     // 2. Carrega TODAS as negociações
     const { data: transferData } = await supabase
@@ -304,391 +335,403 @@ export default function PaginaTransferencias() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
-      <div className="mx-auto max-w-6xl">
-        <h1 className="text-5xl font-black text-white mb-2 text-center md:text-left">
-          NEGOCIAÇÕES DE JOGADORES
-        </h1>
-        <p className="text-zinc-400 mb-8 text-center md:text-left">Gerencie todas as transferências do campeonato</p>
+    <div className="flex min-h-screen bg-zinc-950">
+      {/* Sidebar */}
+      <Sidebar 
+        user={user!}
+        profile={profile}
+        team={team}
+      />
 
-        {/* Seletor de Abas */}
-        <div className="flex gap-4 mb-8 justify-center md:justify-start">
-          <Button
-            onClick={() => setActiveTab('pending')}
-            variant={activeTab === 'pending' ? 'default' : 'outline'}
-            className={cn(
-              "flex items-center gap-2",
-              activeTab === 'pending' ? "bg-purple-600 hover:bg-purple-700" : "bg-zinc-800/50 border-zinc-600"
-            )}
-          >
-            <Clock className="w-4 h-4" />
-            Em Andamento
-            <Badge variant="secondary" className="ml-2 bg-zinc-700">
-              {pendingCount}
-            </Badge>
-          </Button>
-          
-          <Button
-            onClick={() => setActiveTab('completed')}
-            variant={activeTab === 'completed' ? 'default' : 'outline'}
-            className={cn(
-              "flex items-center gap-2",
-              activeTab === 'completed' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
-            )}
-          >
-            <CheckCircle className="w-4 h-4" />
-            Finalizadas
-            <Badge variant="secondary" className="ml-2 bg-zinc-700">
-              {completedCount}
-            </Badge>
-          </Button>
-        </div>
+      {/* Conteúdo Principal */}
+      <div className="flex-1 lg:ml-0">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
+          <div className="mx-auto max-w-6xl">
+            <h1 className="text-5xl font-black text-white mb-2 text-center md:text-left">
+              NEGOCIAÇÕES DE JOGADORES
+            </h1>
+            <p className="text-zinc-400 mb-8 text-center md:text-left">Gerencie todas as transferências do campeonato</p>
 
-        {transfers.length === 0 ? (
-          <Card className="p-16 text-center bg-white/5 border-white/10">
-            <p className="text-xl text-zinc-400">
-              {activeTab === 'pending' 
-                ? 'Nenhuma negociação pendente no momento.' 
-                : 'Nenhuma transferência finalizada.'
-              }
-            </p>
-            <p className="text-zinc-500 mt-2">
-              {activeTab === 'pending' 
-                ? 'O mercado está calmo... por enquanto.' 
-                : 'Todas as negociações estão em andamento.'
-              }
-            </p>
-          </Card>
-        ) : (
-          <div className={cn(
-            "gap-6",
-            activeTab === 'completed' ? "grid grid-cols-1 md:grid-cols-2" : "space-y-6"
-          )}>
-            {transfers.map((t) => (
-              <Card
-                key={t.id}
+            {/* Seletor de Abas */}
+            <div className="flex gap-4 mb-8 justify-center md:justify-start">
+              <Button
+                onClick={() => setActiveTab('pending')}
+                variant={activeTab === 'pending' ? 'default' : 'outline'}
                 className={cn(
-                  "bg-white/5 backdrop-blur-xl border transition-all",
-                  t.status === 'approved' 
-                    ? "border-green-500/20 hover:border-green-500/40 p-4" 
-                    : "border-white/10 hover:border-white/20 p-6",
-                  t.is_exchange && "border-blue-500/20 hover:border-blue-500/40"
+                  "flex items-center gap-2",
+                  activeTab === 'pending' ? "bg-purple-600 hover:bg-purple-700" : "bg-zinc-800/50 border-zinc-600"
                 )}
               >
-                {/* Badge de tipo de transferência */}
-                <div className="flex justify-between items-start mb-4">
-                  <Badge className={cn(
-                    t.is_exchange ? "bg-blue-600" : "bg-purple-600"
-                  )}>
-                    {t.is_exchange ? (
-                      <>
-                        <ArrowRightLeft className="w-3 h-3 mr-1" />
-                        Troca
-                      </>
-                    ) : (
-                      <>
-                        <DollarSign className="w-3 h-3 mr-1" />
-                        Venda
-                      </>
+                <Clock className="w-4 h-4" />
+                Em Andamento
+                <Badge variant="secondary" className="ml-2 bg-zinc-700">
+                  {pendingCount}
+                </Badge>
+              </Button>
+              
+              <Button
+                onClick={() => setActiveTab('completed')}
+                variant={activeTab === 'completed' ? 'default' : 'outline'}
+                className={cn(
+                  "flex items-center gap-2",
+                  activeTab === 'completed' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
+                )}
+              >
+                <CheckCircle className="w-4 h-4" />
+                Finalizadas
+                <Badge variant="secondary" className="ml-2 bg-zinc-700">
+                  {completedCount}
+                </Badge>
+              </Button>
+            </div>
+
+            {transfers.length === 0 ? (
+              <Card className="p-16 text-center bg-white/5 border-white/10">
+                <p className="text-xl text-zinc-400">
+                  {activeTab === 'pending' 
+                    ? 'Nenhuma negociação pendente no momento.' 
+                    : 'Nenhuma transferência finalizada.'
+                  }
+                </p>
+                <p className="text-zinc-500 mt-2">
+                  {activeTab === 'pending' 
+                    ? 'O mercado está calmo... por enquanto.' 
+                    : 'Todas as negociações estão em andamento.'
+                  }
+                </p>
+              </Card>
+            ) : (
+              <div className={cn(
+                "gap-6",
+                activeTab === 'completed' ? "grid grid-cols-1 md:grid-cols-2" : "space-y-6"
+              )}>
+                {transfers.map((t) => (
+                  <Card
+                    key={t.id}
+                    className={cn(
+                      "bg-white/5 backdrop-blur-xl border transition-all",
+                      t.status === 'approved' 
+                        ? "border-green-500/20 hover:border-green-500/40 p-4" 
+                        : "border-white/10 hover:border-white/20 p-6",
+                      t.is_exchange && "border-blue-500/20 hover:border-blue-500/40"
                     )}
-                  </Badge>
-                  {t.status === 'approved' && (
-                    <Badge className="bg-green-600 text-white">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Concluída
-                    </Badge>
-                  )}
-                </div>
-
-                {t.status === 'pending' ? (
-                  // LAYOUT PARA TRANSFERÊNCIAS PENDENTES (completo)
-                  <>
-                    {/* ANÚNCIO CENTRALIZADO */}
-                    <div className="flex flex-col lg:flex-row items-center justify-center gap-6 mb-6">
-                      {/* Time Vendedor */}
-                      <div className="flex flex-col items-center text-center">
-                        {t.from_team.logo_url ? (
-                          <img 
-                            src={t.from_team.logo_url} 
-                            alt={t.from_team.name}
-                            className="w-16 h-16 rounded-full object-cover border-2 border-red-500/50 mb-2"
-                          />
+                  >
+                    {/* Badge de tipo de transferência */}
+                    <div className="flex justify-between items-start mb-4">
+                      <Badge className={cn(
+                        t.is_exchange ? "bg-blue-600" : "bg-purple-600"
+                      )}>
+                        {t.is_exchange ? (
+                          <>
+                            <ArrowRightLeft className="w-3 h-3 mr-1" />
+                            Troca
+                          </>
                         ) : (
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center mb-2">
-                            <span className="text-sm font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
-                          </div>
+                          <>
+                            <DollarSign className="w-3 h-3 mr-1" />
+                            Venda
+                          </>
                         )}
-                        <div>
-                          <p className="text-zinc-400 text-sm mb-1">Vendedor</p>
-                          <p className="text-white font-bold text-lg">{t.from_team.name}</p>
-                        </div>
-                      </div>
+                      </Badge>
+                      {t.status === 'approved' && (
+                        <Badge className="bg-green-600 text-white">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Concluída
+                        </Badge>
+                      )}
+                    </div>
 
-                      {/* Seta e Valor - CENTRO */}
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-center gap-4">
-                          <ArrowRight className="w-8 h-8 text-yellow-400" />
-                          
-                          {/* Valor */}
+                    {t.status === 'pending' ? (
+                      // LAYOUT PARA TRANSFERÊNCIAS PENDENTES (completo)
+                      <>
+                        {/* ANÚNCIO CENTRALIZADO */}
+                        <div className="flex flex-col lg:flex-row items-center justify-center gap-6 mb-6">
+                          {/* Time Vendedor */}
+                          <div className="flex flex-col items-center text-center">
+                            {t.from_team.logo_url ? (
+                              <img 
+                                src={t.from_team.logo_url} 
+                                alt={t.from_team.name}
+                                className="w-16 h-16 rounded-full object-cover border-2 border-red-500/50 mb-2"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center mb-2">
+                                <span className="text-sm font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-zinc-400 text-sm mb-1">Vendedor</p>
+                              <p className="text-white font-bold text-lg">{t.from_team.name}</p>
+                            </div>
+                          </div>
+
+                          {/* Seta e Valor - CENTRO */}
                           <div className="flex flex-col items-center">
-                            <div className="flex items-center gap-1">
-                              {t.is_exchange ? (
-                                <ArrowRightLeft className="w-5 h-5 text-blue-400" />
-                              ) : (
-                                <DollarSign className="w-5 h-5 text-emerald-400" />
-                              )}
-                              <span className={cn(
-                                "font-bold text-2xl",
-                                t.is_exchange ? "text-blue-400" : "text-emerald-400"
-                              )}>
-                                {formatBalance(t.value)}
+                            <div className="flex items-center gap-4">
+                              <ArrowRight className="w-8 h-8 text-yellow-400" />
+                              
+                              {/* Valor */}
+                              <div className="flex flex-col items-center">
+                                <div className="flex items-center gap-1">
+                                  {t.is_exchange ? (
+                                    <ArrowRightLeft className="w-5 h-5 text-blue-400" />
+                                  ) : (
+                                    <DollarSign className="w-5 h-5 text-emerald-400" />
+                                  )}
+                                  <span className={cn(
+                                    "font-bold text-2xl",
+                                    t.is_exchange ? "text-blue-400" : "text-emerald-400"
+                                  )}>
+                                    {formatBalance(t.value)}
+                                  </span>
+                                </div>
+                                <p className="text-zinc-400 text-sm mt-1">
+                                  {t.is_exchange ? 'Valor Total da Troca' : 'Valor da Transferência'}
+                                </p>
+                              </div>
+                              
+                              <ArrowRight className="w-8 h-8 text-yellow-400" />
+                            </div>
+                          </div>
+
+                          {/* Time Comprador */}
+                          <div className="flex flex-col items-center text-center">
+                            {t.to_team.logo_url ? (
+                              <img 
+                                src={t.to_team.logo_url} 
+                                alt={t.to_team.name}
+                                className="w-16 h-16 rounded-full object-cover border-2 border-green-500/50 mb-2"
+                              />
+                            ) : (
+                              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center mb-2">
+                                <span className="text-sm font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-zinc-400 text-sm mb-1">Comprador</p>
+                              <p className="text-white font-bold text-lg">{t.to_team.name}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Jogador Principal */}
+                        <div className="flex flex-col items-center gap-4 p-4 bg-zinc-800/30 rounded-lg mb-6">
+                          {t.player.photo_url ? (
+                            <img 
+                              src={t.player.photo_url} 
+                              alt={t.player.name}
+                              className="w-20 h-20 rounded-full object-cover border-2 border-purple-500"
+                            />
+                          ) : (
+                            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                              <span className="text-xl font-black text-white">{t.player.position}</span>
+                            </div>
+                          )}
+                          <div className="text-center">
+                            <h3 className="text-2xl font-bold text-white mb-2">{t.player.name}</h3>
+                            <div className="flex items-center gap-2 justify-center">
+                              <Badge className="bg-purple-600 text-base py-1 px-3">{t.player.position}</Badge>
+                              <span className="text-yellow-400 text-sm font-semibold">
+                                ⏳ Aguardando Aprovações
                               </span>
                             </div>
-                            <p className="text-zinc-400 text-sm mt-1">
-                              {t.is_exchange ? 'Valor Total da Troca' : 'Valor da Transferência'}
-                            </p>
                           </div>
-                          
-                          <ArrowRight className="w-8 h-8 text-yellow-400" />
                         </div>
-                      </div>
 
-                      {/* Time Comprador */}
-                      <div className="flex flex-col items-center text-center">
-                        {t.to_team.logo_url ? (
-                          <img 
-                            src={t.to_team.logo_url} 
-                            alt={t.to_team.name}
-                            className="w-16 h-16 rounded-full object-cover border-2 border-green-500/50 mb-2"
-                          />
-                        ) : (
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center mb-2">
-                            <span className="text-sm font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
+                        {/* Jogadores da Troca (se for troca) */}
+                        {t.is_exchange && <ExchangePlayers transfer={t} />}
+
+                        {/* Aprovações */}
+                        <div className="flex gap-8 items-center justify-center mb-6">
+                          {/* Vendedor */}
+                          <div className="text-center group relative">
+                            <CheckCircle2
+                              className={cn(
+                                "h-12 w-12 transition-all",
+                                t.approved_by_seller ? "text-green-400" : "text-zinc-600"
+                              )}
+                            />
+                            <p className="text-sm text-zinc-400 mt-1">Vendedor</p>
+                            <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
+                              {t.from_team.name}
+                            </div>
                           </div>
-                        )}
-                        <div>
-                          <p className="text-zinc-400 text-sm mb-1">Comprador</p>
-                          <p className="text-white font-bold text-lg">{t.to_team.name}</p>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Jogador Principal */}
-                    <div className="flex flex-col items-center gap-4 p-4 bg-zinc-800/30 rounded-lg mb-6">
-                      {t.player.photo_url ? (
-                        <img 
-                          src={t.player.photo_url} 
-                          alt={t.player.name}
-                          className="w-20 h-20 rounded-full object-cover border-2 border-purple-500"
-                        />
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-xl font-black text-white">{t.player.position}</span>
-                        </div>
-                      )}
-                      <div className="text-center">
-                        <h3 className="text-2xl font-bold text-white mb-2">{t.player.name}</h3>
-                        <div className="flex items-center gap-2 justify-center">
-                          <Badge className="bg-purple-600 text-base py-1 px-3">{t.player.position}</Badge>
-                          <span className="text-yellow-400 text-sm font-semibold">
-                            ⏳ Aguardando Aprovações
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Jogadores da Troca (se for troca) */}
-                    {t.is_exchange && <ExchangePlayers transfer={t} />}
-
-                    {/* Aprovações */}
-                    <div className="flex gap-8 items-center justify-center mb-6">
-                      {/* Vendedor */}
-                      <div className="text-center group relative">
-                        <CheckCircle2
-                          className={cn(
-                            "h-12 w-12 transition-all",
-                            t.approved_by_seller ? "text-green-400" : "text-zinc-600"
-                          )}
-                        />
-                        <p className="text-sm text-zinc-400 mt-1">Vendedor</p>
-                        <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
-                          {t.from_team.name}
-                        </div>
-                      </div>
-
-                      {/* Comprador */}
-                      <div className="text-center group relative">
-                        <CheckCircle2
-                          className={cn(
-                            "h-12 w-12 transition-all",
-                            t.approved_by_buyer ? "text-green-400" : "text-zinc-600"
-                          )}
-                        />
-                        <p className="text-sm text-zinc-400 mt-1">Comprador</p>
-                        <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
-                          {t.to_team.name}
-                        </div>
-                      </div>
-
-                      {/* Admin */}
-                      <div className="text-center group relative">
-                        <CheckCircle2
-                          className={cn(
-                            "h-12 w-12 transition-all",
-                            t.approved_by_admin ? "text-green-400" : "text-zinc-600"
-                          )}
-                        />
-                        <p className="text-sm text-zinc-400 mt-1">Admin</p>
-                        <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
-                          Sistema
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Botões de aprovação */}
-                    {(userTeamId === t.from_team_id || userTeamId === t.to_team_id || isAdmin) && (
-                      <div className="mt-6 flex flex-wrap gap-4 justify-center">
-                        {userTeamId === t.from_team_id && !t.approved_by_seller && (
-                          <Button
-                            onClick={() => aprovar(t.id, 'seller')}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            Aprovar como Vendedor
-                          </Button>
-                        )}
-                        {userTeamId === t.to_team_id && !t.approved_by_buyer && (
-                          <Button
-                            onClick={() => aprovar(t.id, 'buyer')}
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            Aprovar como Comprador
-                          </Button>
-                        )}
-                        {isAdmin && !t.approved_by_admin && (
-                          <Button
-                            onClick={() => aprovar(t.id, 'admin')}
-                            className="bg-purple-600 hover:bg-purple-700"
-                          >
-                            Aprovar como Admin
-                          </Button>
-                        )}
-                        {/* Mensagem se já aprovou */}
-                        {((userTeamId === t.from_team_id && t.approved_by_seller) ||
-                          (userTeamId === t.to_team_id && t.approved_by_buyer) ||
-                          (isAdmin && t.approved_by_admin)) && (
-                          <p className="text-green-400 font-bold flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" />
-                            Você já aprovou esta negociação
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  // LAYOUT PARA TRANSFERÊNCIAS FINALIZADAS (compacto)
-                  <div className="space-y-4">
-                    {/* Header com data/hora */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-zinc-400">
-                        <Calendar className="w-4 h-4" />
-                        <span className="text-sm">
-                          {formatDateTime(t.created_at).date} às {formatDateTime(t.created_at).time}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Conteúdo principal */}
-                    <div className="flex items-center justify-between">
-                      {/* Time Vendedor */}
-                      <div className="flex items-center gap-3">
-                        {t.from_team.logo_url ? (
-                          <img 
-                            src={t.from_team.logo_url} 
-                            alt={t.from_team.name}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-red-500/50"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
+                          {/* Comprador */}
+                          <div className="text-center group relative">
+                            <CheckCircle2
+                              className={cn(
+                                "h-12 w-12 transition-all",
+                                t.approved_by_buyer ? "text-green-400" : "text-zinc-600"
+                              )}
+                            />
+                            <p className="text-sm text-zinc-400 mt-1">Comprador</p>
+                            <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
+                              {t.to_team.name}
+                            </div>
                           </div>
-                        )}
-                        <div className="text-right">
-                          <p className="text-white font-semibold text-sm">{t.from_team.name}</p>
-                          <p className="text-zinc-400 text-xs">Vendedor</p>
-                        </div>
-                      </div>
 
-                      {/* Setas e Valor */}
-                      <div className="flex flex-col items-center flex-1 mx-4">
-                        <div className="flex items-center gap-2">
-                          <ArrowRight className="w-5 h-5 text-yellow-400" />
-                          <div className="flex items-center gap-1">
-                            {t.is_exchange ? (
-                              <ArrowRightLeft className="w-4 h-4 text-blue-400" />
-                            ) : (
-                              <DollarSign className="w-4 h-4 text-emerald-400" />
+                          {/* Admin */}
+                          <div className="text-center group relative">
+                            <CheckCircle2
+                              className={cn(
+                                "h-12 w-12 transition-all",
+                                t.approved_by_admin ? "text-green-400" : "text-zinc-600"
+                              )}
+                            />
+                            <p className="text-sm text-zinc-400 mt-1">Admin</p>
+                            <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
+                              Sistema
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Botões de aprovação */}
+                        {(userTeamId === t.from_team_id || userTeamId === t.to_team_id || isAdmin) && (
+                          <div className="mt-6 flex flex-wrap gap-4 justify-center">
+                            {userTeamId === t.from_team_id && !t.approved_by_seller && (
+                              <Button
+                                onClick={() => aprovar(t.id, 'seller')}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                Aprovar como Vendedor
+                              </Button>
                             )}
-                            <span className={cn(
-                              "font-bold text-lg",
-                              t.is_exchange ? "text-blue-400" : "text-emerald-400"
-                            )}>
-                              {formatBalance(t.value)}
+                            {userTeamId === t.to_team_id && !t.approved_by_buyer && (
+                              <Button
+                                onClick={() => aprovar(t.id, 'buyer')}
+                                className="bg-blue-600 hover:bg-blue-700"
+                              >
+                                Aprovar como Comprador
+                              </Button>
+                            )}
+                            {isAdmin && !t.approved_by_admin && (
+                              <Button
+                                onClick={() => aprovar(t.id, 'admin')}
+                                className="bg-purple-600 hover:bg-purple-700"
+                              >
+                                Aprovar como Admin
+                              </Button>
+                            )}
+                            {/* Mensagem se já aprovou */}
+                            {((userTeamId === t.from_team_id && t.approved_by_seller) ||
+                              (userTeamId === t.to_team_id && t.approved_by_buyer) ||
+                              (isAdmin && t.approved_by_admin)) && (
+                              <p className="text-green-400 font-bold flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4" />
+                                Você já aprovou esta negociação
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      // LAYOUT PARA TRANSFERÊNCIAS FINALIZADAS (compacto)
+                      <div className="space-y-4">
+                        {/* Header com data/hora */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-zinc-400">
+                            <Calendar className="w-4 h-4" />
+                            <span className="text-sm">
+                              {formatDateTime(t.created_at).date} às {formatDateTime(t.created_at).time}
                             </span>
                           </div>
-                          <ArrowRight className="w-5 h-5 text-yellow-400" />
                         </div>
-                        <p className="text-zinc-400 text-xs mt-1">
-                          {t.is_exchange ? 'Troca' : 'Venda'}
-                        </p>
-                      </div>
 
-                      {/* Time Comprador */}
-                      <div className="flex items-center gap-3">
-                        <div className="text-left">
-                          <p className="text-white font-semibold text-sm">{t.to_team.name}</p>
-                          <p className="text-zinc-400 text-xs">Comprador</p>
-                        </div>
-                        {t.to_team.logo_url ? (
-                          <img 
-                            src={t.to_team.logo_url} 
-                            alt={t.to_team.name}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-green-500/50"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
+                        {/* Conteúdo principal */}
+                        <div className="flex items-center justify-between">
+                          {/* Time Vendedor */}
+                          <div className="flex items-center gap-3">
+                            {t.from_team.logo_url ? (
+                              <img 
+                                src={t.from_team.logo_url} 
+                                alt={t.from_team.name}
+                                className="w-12 h-12 rounded-full object-cover border-2 border-red-500/50"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                                <span className="text-xs font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
+                              </div>
+                            )}
+                            <div className="text-right">
+                              <p className="text-white font-semibold text-sm">{t.from_team.name}</p>
+                              <p className="text-zinc-400 text-xs">Vendedor</p>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* Jogador Principal */}
-                    <div className="flex items-center gap-3 pt-3 border-t border-zinc-700/50">
-                      {t.player.photo_url ? (
-                        <img 
-                          src={t.player.photo_url} 
-                          alt={t.player.name}
-                          className="w-10 h-10 rounded-full object-cover border-2 border-purple-500"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-sm font-black text-white">{t.player.position}</span>
+                          {/* Setas e Valor */}
+                          <div className="flex flex-col items-center flex-1 mx-4">
+                            <div className="flex items-center gap-2">
+                              <ArrowRight className="w-5 h-5 text-yellow-400" />
+                              <div className="flex items-center gap-1">
+                                {t.is_exchange ? (
+                                  <ArrowRightLeft className="w-4 h-4 text-blue-400" />
+                                ) : (
+                                  <DollarSign className="w-4 h-4 text-emerald-400" />
+                                )}
+                                <span className={cn(
+                                  "font-bold text-lg",
+                                  t.is_exchange ? "text-blue-400" : "text-emerald-400"
+                                )}>
+                                  {formatBalance(t.value)}
+                                </span>
+                              </div>
+                              <ArrowRight className="w-5 h-5 text-yellow-400" />
+                            </div>
+                            <p className="text-zinc-400 text-xs mt-1">
+                              {t.is_exchange ? 'Troca' : 'Venda'}
+                            </p>
+                          </div>
+
+                          {/* Time Comprador */}
+                          <div className="flex items-center gap-3">
+                            <div className="text-left">
+                              <p className="text-white font-semibold text-sm">{t.to_team.name}</p>
+                              <p className="text-zinc-400 text-xs">Comprador</p>
+                            </div>
+                            {t.to_team.logo_url ? (
+                              <img 
+                                src={t.to_team.logo_url} 
+                                alt={t.to_team.name}
+                                className="w-12 h-12 rounded-full object-cover border-2 border-green-500/50"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                                <span className="text-xs font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      <div>
-                        <p className="text-white font-semibold">{t.player.name}</p>
-                        <Badge className="bg-purple-600 text-xs">{t.player.position}</Badge>
-                      </div>
-                    </div>
 
-                    {/* Jogadores da Troca (se for troca) */}
-                    {t.is_exchange && <ExchangePlayers transfer={t} />}
-                  </div>
-                )}
-              </Card>
-            ))}
+                        {/* Jogador Principal */}
+                        <div className="flex items-center gap-3 pt-3 border-t border-zinc-700/50">
+                          {t.player.photo_url ? (
+                            <img 
+                              src={t.player.photo_url} 
+                              alt={t.player.name}
+                              className="w-10 h-10 rounded-full object-cover border-2 border-purple-500"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                              <span className="text-sm font-black text-white">{t.player.position}</span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-white font-semibold">{t.player.name}</p>
+                            <Badge className="bg-purple-600 text-xs">{t.player.position}</Badge>
+                          </div>
+                        </div>
+
+                        {/* Jogadores da Troca (se for troca) */}
+                        {t.is_exchange && <ExchangePlayers transfer={t} />}
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   )
