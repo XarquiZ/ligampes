@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageCircle, Search, User, Crown } from 'lucide-react';
+import { X, Send, MessageCircle, Search, User, Crown, Paperclip, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface User {
@@ -27,6 +27,19 @@ interface Message {
   timestamp: Date;
   senderId?: string;
   conversationId?: string;
+  type?: 'text' | 'player';
+  playerData?: PlayerData;
+}
+
+interface PlayerData {
+  id: string;
+  name: string;
+  overall: number;
+  position: string;
+  photo_url?: string;
+  team_id?: string;
+  team_name?: string;
+  team_logo?: string;
 }
 
 interface Conversation {
@@ -63,6 +76,12 @@ export default function ChatPopup({
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showPlayerSelector, setShowPlayerSelector] = useState(false);
+  const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<string>('');
+  const [players, setPlayers] = useState<PlayerData[]>([]);
+  const [playerSearch, setPlayerSearch] = useState('');
+  const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Carregar conversas e treinadores
@@ -119,6 +138,7 @@ export default function ChatPopup({
           email, 
           role,
           teams (
+            id,
             name,
             logo_url
           )
@@ -195,6 +215,7 @@ export default function ChatPopup({
           email, 
           role,
           teams (
+            id,
             name,
             logo_url
           )
@@ -244,14 +265,29 @@ export default function ChatPopup({
         .eq('read', false)
         .neq('sender_id', currentUser.id);
 
-      const formattedMessages: Message[] = messagesData.map(msg => ({
-        id: msg.id,
-        text: msg.message,
-        sender: msg.sender_id === currentUser.id ? 'user' : 'other',
-        timestamp: new Date(msg.created_at),
-        senderId: msg.sender_id,
-        conversationId: msg.conversation_id
-      }));
+      const formattedMessages: Message[] = messagesData.map(msg => {
+        let messageData: Message = {
+          id: msg.id,
+          text: msg.message,
+          sender: msg.sender_id === currentUser.id ? 'user' : 'other',
+          timestamp: new Date(msg.created_at),
+          senderId: msg.sender_id,
+          conversationId: msg.conversation_id,
+          type: 'text'
+        };
+
+        // Se a mensagem contém dados de jogador
+        if (msg.player_data) {
+          messageData = {
+            ...messageData,
+            type: 'player',
+            playerData: msg.player_data,
+            text: `Jogador: ${msg.player_data.name}`
+          };
+        }
+
+        return messageData;
+      });
 
       setMessages(formattedMessages);
       
@@ -259,6 +295,155 @@ export default function ChatPopup({
       await loadConversations();
     } catch (error) {
       console.error('Erro ao processar mensagens:', error);
+    }
+  };
+
+  // Carregar times disponíveis para seleção de jogadores
+  const loadAvailableTeams = async () => {
+    if (!selectedConversation) return;
+
+    const teams: Team[] = [];
+    
+    // Time do usuário atual
+    if (currentTeam.id) {
+      teams.push(currentTeam);
+    }
+
+    // Time do outro usuário
+    const otherUser = getOtherUser(selectedConversation);
+    if (otherUser.team_name) {
+      teams.push({
+        id: otherUser.id, // Usando ID do usuário como chave temporária
+        name: otherUser.team_name,
+        logo_url: otherUser.team_logo
+      });
+    }
+
+    setAvailableTeams(teams);
+    if (teams.length > 0) {
+      setSelectedTeam(teams[0].id);
+    }
+  };
+
+  // Carregar jogadores do time selecionado
+  const loadPlayers = async (teamId: string) => {
+    try {
+      // Se for o time do usuário atual
+      if (teamId === currentTeam.id) {
+        const { data: playersData, error } = await supabase
+          .from('players')
+          .select('id, name, overall, position, photo_url, team_id, teams(name, logo_url)')
+          .eq('team_id', teamId)
+          .order('overall', { ascending: false });
+
+        if (error) {
+          console.error('Erro ao carregar jogadores:', error);
+          return;
+        }
+
+        const formattedPlayers: PlayerData[] = playersData.map(player => ({
+          id: player.id,
+          name: player.name,
+          overall: player.overall,
+          position: player.position,
+          photo_url: player.photo_url,
+          team_id: player.team_id,
+          team_name: player.teams?.name,
+          team_logo: player.teams?.logo_url
+        }));
+
+        setPlayers(formattedPlayers);
+      } else {
+        // Se for o time do outro usuário
+        const otherUser = getOtherUser(selectedConversation!);
+        const { data: playersData, error } = await supabase
+          .from('players')
+          .select('id, name, overall, position, photo_url, team_id, teams(name, logo_url)')
+          .eq('team_id', otherUser.id) // Assumindo que o ID do time é o mesmo do usuário
+          .order('overall', { ascending: false });
+
+        if (error) {
+          console.error('Erro ao carregar jogadores:', error);
+          return;
+        }
+
+        const formattedPlayers: PlayerData[] = playersData.map(player => ({
+          id: player.id,
+          name: player.name,
+          overall: player.overall,
+          position: player.position,
+          photo_url: player.photo_url,
+          team_id: player.team_id,
+          team_name: player.teams?.name,
+          team_logo: player.teams?.logo_url
+        }));
+
+        setPlayers(formattedPlayers);
+      }
+    } catch (error) {
+      console.error('Erro ao processar jogadores:', error);
+    }
+  };
+
+  // Abrir seletor de jogadores
+  const openPlayerSelector = async () => {
+    if (!selectedConversation) return;
+    
+    setShowPlayerSelector(true);
+    await loadAvailableTeams();
+  };
+
+  // Selecionar time e carregar jogadores
+  useEffect(() => {
+    if (selectedTeam && showPlayerSelector) {
+      loadPlayers(selectedTeam);
+    }
+  }, [selectedTeam, showPlayerSelector]);
+
+  // Filtrar jogadores pela busca
+  const filteredPlayers = players.filter(player =>
+    player.name.toLowerCase().includes(playerSearch.toLowerCase())
+  );
+
+  // Compartilhar jogador no chat
+  const sharePlayer = async () => {
+    if (!selectedPlayer || !selectedConversation) return;
+
+    try {
+      // Enviar mensagem com dados do jogador
+      const { error: messageError } = await supabase
+        .from('private_messages')
+        .insert({
+          conversation_id: selectedConversation.id,
+          sender_id: currentUser.id,
+          message: `Jogador: ${selectedPlayer.name}`,
+          player_data: selectedPlayer
+        });
+
+      if (messageError) {
+        console.error('Erro ao enviar jogador:', messageError);
+        return;
+      }
+
+      // Atualizar última mensagem na conversa
+      await supabase
+        .from('conversations')
+        .update({
+          last_message: `Compartilhou: ${selectedPlayer.name}`,
+          last_message_at: new Date().toISOString()
+        })
+        .eq('id', selectedConversation.id);
+
+      // Recarregar mensagens e conversas
+      await loadMessages(selectedConversation.id);
+      await loadConversations();
+      
+      // Fechar seletor e limpar seleções
+      setShowPlayerSelector(false);
+      setSelectedPlayer(null);
+      setPlayerSearch('');
+    } catch (error) {
+      console.error('Erro ao processar compartilhamento:', error);
     }
   };
 
@@ -405,7 +590,14 @@ export default function ChatPopup({
   // Função para navegar entre abas mesmo com conversa aberta
   const handleTabClick = (tab: TabType) => {
     setActiveTab(tab);
-    // Não limpa a conversa selecionada, apenas muda a aba
+  };
+
+  // Função para navegar para o jogador
+  const navigateToPlayer = (playerId: string) => {
+    // Aqui você pode implementar a navegação para a página do jogador
+    // Por exemplo, usando window.location ou seu router
+    console.log('Navegar para jogador:', playerId);
+    // window.location.href = `/dashboard/jogadores#player-${playerId}`;
   };
 
   if (!isOpen) return null;
@@ -514,24 +706,62 @@ export default function ChatPopup({
                       message.sender === 'user' ? 'justify-end' : 'justify-start'
                     }`}
                   >
-                    <div
-                      className={`max-w-[85%] rounded-lg p-2 backdrop-blur-xl ${
-                        message.sender === 'user'
-                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-br-none shadow-lg'
-                          : 'bg-white/10 text-white rounded-bl-none border border-white/10'
-                      }`}
-                    >
-                      <p className="text-xs font-medium break-words">{message.text}</p>
-                      <p
-                        className={`text-[10px] mt-1 font-medium ${
+                    {message.type === 'player' && message.playerData ? (
+                      // Mensagem de jogador compartilhado
+                      <div
+                        className="max-w-[85%] rounded-lg p-3 backdrop-blur-xl bg-white/10 border border-white/10 cursor-pointer hover:bg-white/20 transition-all"
+                        onClick={() => navigateToPlayer(message.playerData!.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {message.playerData.photo_url ? (
+                            <img 
+                              src={message.playerData.photo_url} 
+                              alt={message.playerData.name}
+                              className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/50"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">{message.playerData.position}</span>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-white text-sm truncate">{message.playerData.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-0.5 rounded">
+                                OVR {message.playerData.overall}
+                              </span>
+                              <span className="text-purple-400 text-xs">{message.playerData.position}</span>
+                            </div>
+                            {message.playerData.team_name && (
+                              <p className="text-gray-400 text-xs mt-1 truncate">{message.playerData.team_name}</p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-2 text-right">
+                          {formatTime(message.timestamp)}
+                        </p>
+                      </div>
+                    ) : (
+                      // Mensagem de texto normal
+                      <div
+                        className={`max-w-[85%] rounded-lg p-2 backdrop-blur-xl ${
                           message.sender === 'user'
-                            ? 'text-purple-200'
-                            : 'text-gray-400'
+                            ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-br-none shadow-lg'
+                            : 'bg-white/10 text-white rounded-bl-none border border-white/10'
                         }`}
                       >
-                        {formatTime(message.timestamp)}
-                      </p>
-                    </div>
+                        <p className="text-xs font-medium break-words">{message.text}</p>
+                        <p
+                          className={`text-[10px] mt-1 font-medium ${
+                            message.sender === 'user'
+                              ? 'text-purple-200'
+                              : 'text-gray-400'
+                          }`}
+                        >
+                          {formatTime(message.timestamp)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -544,6 +774,15 @@ export default function ChatPopup({
               className="p-2 border-t border-white/10 bg-zinc-800/50 shrink-0"
             >
               <div className="flex space-x-2">
+                <button
+                  type="button"
+                  onClick={openPlayerSelector}
+                  className="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-lg transition-all duration-300 flex-shrink-0"
+                  title="Compartilhar jogador"
+                >
+                  <Paperclip size={14} />
+                </button>
+                
                 <input
                   type="text"
                   value={newMessage}
@@ -699,6 +938,109 @@ export default function ChatPopup({
           </>
         )}
       </div>
+
+      {/* Modal de seleção de jogadores */}
+      {showPlayerSelector && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 rounded-xl border border-white/10 w-full max-w-md max-h-[80vh] overflow-hidden">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4">
+              <h3 className="font-bold text-sm">Compartilhar Jogador</h3>
+              <p className="text-purple-200 text-xs">Selecione um jogador para compartilhar</p>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-4 space-y-4">
+              {/* Seletor de time */}
+              <div>
+                <label className="text-xs text-zinc-400 font-medium mb-1 block">Selecionar Time</label>
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                >
+                  {availableTeams.map(team => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Busca de jogadores */}
+              <div className="relative">
+                <Search size={12} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar jogador..."
+                  value={playerSearch}
+                  onChange={(e) => setPlayerSearch(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder-zinc-400"
+                />
+              </div>
+
+              {/* Lista de jogadores */}
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {filteredPlayers.map(player => (
+                  <button
+                    key={player.id}
+                    onClick={() => setSelectedPlayer(player)}
+                    className={`w-full p-3 rounded-lg border transition-all ${
+                      selectedPlayer?.id === player.id
+                        ? 'bg-purple-600/20 border-purple-500'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {player.photo_url ? (
+                        <img 
+                          src={player.photo_url} 
+                          alt={player.name}
+                          className="w-10 h-10 rounded-full object-cover border border-purple-500/50"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">{player.position}</span>
+                        </div>
+                      )}
+                      <div className="flex-1 text-left">
+                        <p className="font-bold text-white text-sm truncate">{player.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded">
+                            OVR {player.overall}
+                          </span>
+                          <span className="text-purple-400 text-xs">{player.position}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Ações */}
+              <div className="flex gap-2 pt-4 border-t border-white/10">
+                <button
+                  onClick={() => {
+                    setShowPlayerSelector(false);
+                    setSelectedPlayer(null);
+                    setPlayerSearch('');
+                  }}
+                  className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg transition-all text-xs font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={sharePlayer}
+                  disabled={!selectedPlayer}
+                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white py-2 rounded-lg transition-all text-xs font-medium disabled:cursor-not-allowed"
+                >
+                  Compartilhar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
