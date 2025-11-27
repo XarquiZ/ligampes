@@ -243,7 +243,7 @@ export default function ChatPopup({
     }
   };
 
-  // Carregar mensagens de uma conversa
+  // Carregar mensagens de uma conversa - CORRIGIDO para marcar como lidas
   const loadMessages = async (conversationId: string) => {
     try {
       const { data: messagesData, error } = await supabase
@@ -257,13 +257,22 @@ export default function ChatPopup({
         return;
       }
 
-      // Marcar mensagens como lidas
-      await supabase
-        .from('private_messages')
-        .update({ read: true })
-        .eq('conversation_id', conversationId)
-        .eq('read', false)
-        .neq('sender_id', currentUser.id);
+      // CORREÇÃO: Marcar TODAS as mensagens não lidas como lidas
+      const unreadMessages = messagesData?.filter(msg => 
+        !msg.read && msg.sender_id !== currentUser.id
+      );
+
+      if (unreadMessages && unreadMessages.length > 0) {
+        const messageIds = unreadMessages.map(msg => msg.id);
+        
+        await supabase
+          .from('private_messages')
+          .update({ read: true })
+          .in('id', messageIds);
+
+        // Atualizar contagem de não lidas após marcar como lidas
+        await loadConversations();
+      }
 
       const formattedMessages: Message[] = messagesData.map(msg => {
         let messageData: Message = {
@@ -291,8 +300,6 @@ export default function ChatPopup({
 
       setMessages(formattedMessages);
       
-      // Atualizar contagem de não lidas
-      await loadConversations();
     } catch (error) {
       console.error('Erro ao processar mensagens:', error);
     }
@@ -311,11 +318,19 @@ export default function ChatPopup({
 
     // Time do outro usuário
     const otherUser = getOtherUser(selectedConversation);
-    if (otherUser.team_name) {
+    
+    // Buscar o time do outro usuário
+    const { data: otherUserTeam } = await supabase
+      .from('profiles')
+      .select('teams(id, name, logo_url)')
+      .eq('id', otherUser.id)
+      .single();
+
+    if (otherUserTeam?.teams) {
       teams.push({
-        id: otherUser.id, // Usando ID do usuário como chave temporária
-        name: otherUser.team_name,
-        logo_url: otherUser.team_logo
+        id: otherUserTeam.teams.id,
+        name: otherUserTeam.teams.name,
+        logo_url: otherUserTeam.teams.logo_url
       });
     }
 
@@ -325,61 +340,32 @@ export default function ChatPopup({
     }
   };
 
-  // Carregar jogadores do time selecionado
+  // Carregar jogadores do time selecionado - CORRIGIDO
   const loadPlayers = async (teamId: string) => {
     try {
-      // Se for o time do usuário atual
-      if (teamId === currentTeam.id) {
-        const { data: playersData, error } = await supabase
-          .from('players')
-          .select('id, name, overall, position, photo_url, team_id, teams(name, logo_url)')
-          .eq('team_id', teamId)
-          .order('overall', { ascending: false });
+      const { data: playersData, error } = await supabase
+        .from('players')
+        .select('id, name, overall, position, photo_url, team_id, teams!inner(id, name, logo_url)')
+        .eq('team_id', teamId)
+        .order('overall', { ascending: false });
 
-        if (error) {
-          console.error('Erro ao carregar jogadores:', error);
-          return;
-        }
-
-        const formattedPlayers: PlayerData[] = playersData.map(player => ({
-          id: player.id,
-          name: player.name,
-          overall: player.overall,
-          position: player.position,
-          photo_url: player.photo_url,
-          team_id: player.team_id,
-          team_name: player.teams?.name,
-          team_logo: player.teams?.logo_url
-        }));
-
-        setPlayers(formattedPlayers);
-      } else {
-        // Se for o time do outro usuário
-        const otherUser = getOtherUser(selectedConversation!);
-        const { data: playersData, error } = await supabase
-          .from('players')
-          .select('id, name, overall, position, photo_url, team_id, teams(name, logo_url)')
-          .eq('team_id', otherUser.id) // Assumindo que o ID do time é o mesmo do usuário
-          .order('overall', { ascending: false });
-
-        if (error) {
-          console.error('Erro ao carregar jogadores:', error);
-          return;
-        }
-
-        const formattedPlayers: PlayerData[] = playersData.map(player => ({
-          id: player.id,
-          name: player.name,
-          overall: player.overall,
-          position: player.position,
-          photo_url: player.photo_url,
-          team_id: player.team_id,
-          team_name: player.teams?.name,
-          team_logo: player.teams?.logo_url
-        }));
-
-        setPlayers(formattedPlayers);
+      if (error) {
+        console.error('Erro ao carregar jogadores:', error);
+        return;
       }
+
+      const formattedPlayers: PlayerData[] = playersData.map(player => ({
+        id: player.id,
+        name: player.name,
+        overall: player.overall,
+        position: player.position,
+        photo_url: player.photo_url,
+        team_id: player.team_id,
+        team_name: player.teams.name,
+        team_logo: player.teams.logo_url
+      }));
+
+      setPlayers(formattedPlayers);
     } catch (error) {
       console.error('Erro ao processar jogadores:', error);
     }
@@ -405,7 +391,7 @@ export default function ChatPopup({
     player.name.toLowerCase().includes(playerSearch.toLowerCase())
   );
 
-  // Compartilhar jogador no chat
+  // Compartilhar jogador no chat - CORRIGIDO
   const sharePlayer = async () => {
     if (!selectedPlayer || !selectedConversation) return;
 
@@ -939,7 +925,7 @@ export default function ChatPopup({
         )}
       </div>
 
-      {/* Modal de seleção de jogadores */}
+      {/* Modal de seleção de jogadores - CORRIGIDO cor do texto */}
       {showPlayerSelector && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-900 rounded-xl border border-white/10 w-full max-w-md max-h-[80vh] overflow-hidden">
@@ -951,7 +937,7 @@ export default function ChatPopup({
 
             {/* Conteúdo */}
             <div className="p-4 space-y-4">
-              {/* Seletor de time */}
+              {/* Seletor de time - CORRIGIDO cor do texto */}
               <div>
                 <label className="text-xs text-zinc-400 font-medium mb-1 block">Selecionar Time</label>
                 <select
@@ -960,7 +946,7 @@ export default function ChatPopup({
                   className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
                 >
                   {availableTeams.map(team => (
-                    <option key={team.id} value={team.id}>
+                    <option key={team.id} value={team.id} className="bg-zinc-900 text-white">
                       {team.name}
                     </option>
                   ))}
