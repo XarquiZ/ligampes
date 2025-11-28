@@ -316,7 +316,7 @@ const TransferModal: React.FC<TransferModalProps> = ({
           <div className="bg-zinc-800/30 p-3 rounded-lg">
             <p className="text-zinc-400 text-sm">Valor Base</p>
             <p className="text-emerald-400 font-bold text-lg">
-              R$ {player.base_price.toLocaleString('pt-BR')}
+              R$ ${player.base_price.toLocaleString('pt-BR')}
             </p>
           </div>
 
@@ -2201,7 +2201,175 @@ export default function ElencoPage() {
                           {/* Detalhes expandidos (apenas para elenco) */}
                           {isOpen && activeSection === 'elenco' && (
                             <div className="border-t border-zinc-800 bg-zinc-900/50 px-4 lg:px-6 py-4 lg:py-6">
-                              {/* ... (mantenha o conteúdo existente dos detalhes expandidos) */}
+                              <div className="space-y-4 lg:space-y-6">
+                                {/* Linha 1: básicos - Altura na mesma linha da idade */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm">
+                                  <div>
+                                    <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-500 flex items-center gap-2">
+                                      <Ruler className="w-3 h-3 lg:w-4 lg:h-4" />
+                                      Altura: <strong className="ml-1 lg:ml-2">{formatHeight(j.height)}</strong>
+                                    </span> 
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
+                                  </div>
+                                </div>
+
+                                {/* NOVO: Estatísticas da Temporada - ADICIONADO */}
+                                <div>
+                                  <p className="text-zinc-500 font-medium mb-2 lg:mb-3 text-sm lg:text-base">Estatísticas da Temporada:</p>
+                                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 text-xs lg:text-sm">
+                                    <div><span className="text-zinc-500">Gols:</span> <strong>{stats.goals}</strong></div>
+                                    <div><span className="text-zinc-500">Assistências:</span> <strong>{stats.assists}</strong></div>
+                                    <div><span className="text-zinc-500">Partidas:</span> <strong>{j.total_matches || 0}</strong></div>
+                                    <div><span className="text-zinc-500">Cartões Amarelos:</span> <strong>{stats.yellowCards}</strong></div>
+                                    <div><span className="text-zinc-500">Cartões Vermelhos:</span> <strong>{stats.redCards}</strong></div>
+                                    <div><span className="text-zinc-500">Nota Média:</span> <strong>{stats.averageRating}</strong></div>
+                                  </div>
+                                </div>
+
+                                {/* Posições alternativas (APENAS QUANDO EXPANDIDO) */}
+                                {j.alternative_positions && j.alternative_positions.length > 0 && (
+                                  <div>
+                                    <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
+                                    <div className="flex gap-2 flex-wrap">
+                                      {j.alternative_positions.map(p => (
+                                        <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Atributos */}
+                                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-4 lg:gap-x-6 gap-y-3 lg:gap-y-4 text-xs">
+                                  {[
+                                    { k: 'offensive_talent', l: 'Tal. Ofensivo' },
+                                    { k: 'ball_control', l: 'Controle de bola' },
+                                    { k: 'dribbling', l: 'Drible' },
+                                    { k: 'tight_possession', l: 'Condução Firme' },
+                                    { k: 'low_pass', l: 'Passe rasteiro' },
+                                    { k: 'lofted_pass', l: 'Passe Alto' },
+                                    { k: 'finishing', l: 'Finalização' },
+                                    { k: 'heading', l: 'Cabeceio' },
+                                    { k: 'place_kicking', l: 'Chute colocado' },
+                                    { k: 'curl', l: 'Curva' },
+                                    { k: 'speed', l: 'Velocidade' },
+                                    { k: 'acceleration', l: 'Aceleração' },
+                                    { k: 'kicking_power', l: 'Força do chute' },
+                                    { k: 'jump', l: 'Impulsão' },
+                                    { k: 'physical_contact', l: 'Contato Físico' },
+                                    { k: 'balance', l: 'Equilíbrio' },
+                                    { k: 'stamina', l: 'Resistência' },
+                                    { k: 'defensive_awareness', l: 'Talento defensivo' },
+                                    { k: 'ball_winning', l: 'Desarme' },
+                                    { k: 'aggression', l: 'Agressividade' },
+                                    { k: 'gk_awareness', l: 'Talento de GO' },
+                                    { k: 'gk_catching', l: 'Firmeza de GO' },
+                                    { k: 'gk_clearing', l: 'Afast. de bola de GO' },
+                                    { k: 'gk_reflexes', l: 'Reflexos de GO' },
+                                    { k: 'gk_reach', l: 'Alcance de GO' },
+                                  ].map(({ k, l }) => {
+                                    const value = j[k as keyof Player] as number | null
+                                    const display = (value ?? 40)
+                                    const color = getAttrColorHex(display)
+                                    return (
+                                      <div key={k} className="text-center">
+                                        <p className="text-zinc-500 font-medium text-xs">{l}</p>
+                                        <p className="text-lg lg:text-xl font-black" style={{ color }}>{display}</p>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+
+                                {/* Pé fraco, Frequência, Forma física e Resistência a Lesão */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm items-center">
+                                  <div>
+                                    <p className="text-zinc-500">Pé Fraco (Uso)</p>
+                                    <div className="flex items-center gap-2 lg:gap-3">
+                                      <LevelBars value={j.weak_foot_usage ?? 0} max={4} size="sm" />
+                                      <span className="font-bold">{j.weak_foot_usage ?? '-'}</span>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <p className="text-zinc-500">Pé Fraco (Precisão)</p>
+                                    <div className="flex items-center gap-2 lg:gap-3">
+                                      <LevelBars value={j.weak_foot_accuracy ?? 0} max={4} size="sm" />
+                                      <span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <p className="text-zinc-500">Forma Física</p>
+                                    <div className="flex items-center gap-2 lg:gap-3">
+                                      <LevelBars value={j.form ?? 0} max={8} size="md" />
+                                      <span className="font-bold">{j.form ?? '-'}</span>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <p className="text-zinc-500">Resistência a Lesão</p>
+                                    <div className="flex items-center gap-2 lg:gap-3">
+                                      <LevelBars value={j.injury_resistance ?? 0} max={3} size="sm" />
+                                      <span className="font-bold">{j.injury_resistance ?? '-'}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Inspirador */}
+                                <div>
+                                  <p className="text-zinc-500 font-medium mb-2">Inspirador</p>
+                                  <div className="flex items-center gap-4 lg:gap-6">
+                                    <div className="text-xs lg:text-sm">
+                                      <div className="text-zinc-400">Carregando</div>
+                                      <div className="flex gap-1 mt-1">
+                                        {Array.from({ length: 2 }).map((_, idx) => {
+                                          const filled = (j.inspiring_ball_carry ?? 0) > idx
+                                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                        })}
+                                      </div>
+                                    </div>
+
+                                    <div className="text-xs lg:text-sm">
+                                      <div className="text-zinc-400">Passe Rasteiro</div>
+                                      <div className="flex gap-1 mt-1">
+                                        {Array.from({ length: 2 }).map((_, idx) => {
+                                          const filled = (j.inspiring_low_pass ?? 0) > idx
+                                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                        })}
+                                      </div>
+                                    </div>
+
+                                    <div className="text-xs lg:text-sm">
+                                      <div className="text-zinc-400">Passe Alto</div>
+                                      <div className="flex gap-1 mt-1">
+                                        {Array.from({ length: 2 }).map((_, idx) => {
+                                          const filled = (j.inspiring_lofted_pass ?? 0) > idx
+                                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                        })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Habilidades especiais */}
+                                {j.skills && j.skills.length > 0 && (
+                                  <div>
+                                    <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {j.skills.map(s => (
+                                        <Badge key={s} className="bg-purple-600/20 text-purple-300 border-purple-600/40 text-xs">{s}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -2228,7 +2396,6 @@ export default function ElencoPage() {
               onClose={() => setDismissModalOpen(false)}
               onConfirm={handleConfirmDismiss}
             />
-
           </div>
         </div>
       </div>

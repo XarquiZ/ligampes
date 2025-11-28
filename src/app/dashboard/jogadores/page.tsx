@@ -917,13 +917,13 @@ export default function ListaJogadores() {
                     onClick={() => !isTransitioning && handleGridCardClick(j.id)}
                     className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer"
                   >
-                    {/* BOTÃO DE FAVORITO - NOVO */}
+                    {/* BOTÃO DE FAVORITO - AGORA NO TOPO DIREITO */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         toggleFavorite(j.id)
                       }}
-                      className="absolute top-2 lg:top-3 left-2 lg:left-3 z-20 bg-black/70 backdrop-blur p-1.5 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all"
+                      className="absolute top-2 lg:top-3 right-2 lg:right-3 z-20 bg-black/70 backdrop-blur p-1.5 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all"
                     >
                       <Star 
                         className={cn(
@@ -941,7 +941,7 @@ export default function ListaJogadores() {
                           e.stopPropagation()
                           openEditPlayer(j)
                         }}
-                        className="absolute top-2 lg:top-3 right-2 lg:right-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-2 rounded-full backdrop-blur"
+                        className="absolute top-2 lg:top-3 left-2 lg:left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-2 rounded-full backdrop-blur"
                       >
                         <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
                       </button>
@@ -1016,25 +1016,7 @@ export default function ListaJogadores() {
                         className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
                         onClick={() => !isTransitioning && togglePlayer(j.id)}
                       >
-                        <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0 relative">
-                          {/* BOTÃO DE FAVORITO NA FOTO - NOVO */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleFavorite(j.id)
-                            }}
-                            className="absolute -top-1 -right-1 z-20 bg-black/80 backdrop-blur p-1.5 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all"
-                          >
-                            <Star 
-                              className={cn(
-                                "w-3 h-3 lg:w-4 lg:h-4 transition-all",
-                                favoritePlayers.includes(j.id) 
-                                  ? "fill-yellow-400 text-yellow-400" 
-                                  : "text-zinc-400 hover:text-yellow-400"
-                              )} 
-                            />
-                          </button>
-
+                        <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
                           {j.photo_url ? (
                             <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
                           ) : (
@@ -1066,12 +1048,37 @@ export default function ListaJogadores() {
                             <p className="text-zinc-500">Overall</p>
                             <p className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
                           </div>
+                          
+                          {/* BOTÃO DE FAVORITO - AGORA ENTRE OVERALL E VALOR BASE */}
+                          <div className="flex flex-col items-center justify-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleFavorite(j.id)
+                              }}
+                              className="bg-black/70 backdrop-blur p-2 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all mb-2"
+                            >
+                              <Star 
+                                className={cn(
+                                  "w-4 h-4 lg:w-5 lg:h-5 transition-all",
+                                  favoritePlayers.includes(j.id) 
+                                    ? "fill-yellow-400 text-yellow-400" 
+                                    : "text-zinc-400 hover:text-yellow-400"
+                                )} 
+                              />
+                            </button>
+                            <span className="text-xs text-zinc-500 text-center">
+                              {favoritePlayers.includes(j.id) ? 'Favorito' : 'Favoritar'}
+                            </span>
+                          </div>
+
                           <div className="flex flex-col items-end min-w-[140px] lg:min-w-[180px]">
                             <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
                             <p className="text-emerald-400 font-bold text-base lg:text-xl whitespace-nowrap">
                               R$ {Number(j.base_price).toLocaleString('pt-BR')}
                             </p>
                           </div>
+                          
                           <div className="flex items-center justify-end gap-3 lg:gap-4">
                             {userRole === 'admin' && (
                               <Button
