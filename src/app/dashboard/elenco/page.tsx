@@ -901,8 +901,17 @@ export default function ElencoPage() {
         total_matches: p.total_matches || 0,
         average_rating: p.average_rating || 0
       }))
-      setPlayers(mapped)
-      setFilteredPlayers(mapped)
+      
+      // ORDENAR JOGADORES POR OVERALL (DECRESCENTE) E NOME (CRESCENTE)
+      const sortedPlayers = mapped.sort((a, b) => {
+        if (b.overall !== a.overall) {
+          return b.overall - a.overall // Ordena por overall (decrescente)
+        }
+        return a.name.localeCompare(b.name) // Em caso de empate, ordena por nome (crescente)
+      })
+      
+      setPlayers(sortedPlayers)
+      setFilteredPlayers(sortedPlayers)
     } catch (e) {
       console.error(e)
     } finally {
@@ -1201,6 +1210,14 @@ export default function ElencoPage() {
     if (selectedPlaystyles.length > 0) {
       f = f.filter(p => p.playstyle && selectedPlaystyles.includes(p.playstyle))
     }
+    
+    // ORDENAR POR OVERALL (DECRESCENTE) E NOME (CRESCENTE) - MESMA LÓGICA DO loadPlayers
+    f = f.sort((a, b) => {
+      if (b.overall !== a.overall) {
+        return b.overall - a.overall // Ordena por overall (decrescente)
+      }
+      return a.name.localeCompare(b.name) // Em caso de empate, ordena por nome (crescente)
+    })
     
     setFilteredPlayers(f)
   }, [search, selectedPositions, selectedPlaystyles, players])
