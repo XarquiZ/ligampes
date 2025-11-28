@@ -742,8 +742,8 @@ export default function ElencoPage() {
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
 
-  const POSITIONS = ['GO','ZC','LE','LD','VOL','MLG','MAT','SA','PTE','PTD','CA']
-  const PLAYSTYLES = ['Artilheiro', 'Puxa marcação', 'Homem de área', 'Pivô', 'Armador criativo', 'Jog. de Lado de Campo', 'Lateral móvel', 'Especialista em cruz.', 'Clássica nº 10', 'Jog. de infiltração', 'Meia versátil', 'Volantão', 'Orquestrador', 'Primeiro volante', 'Zagueiro ofensivo', 'Ponta velocista', 'Zagueiro defensivo', 'Provocador', 'Atacante surpresa', 'Goleiro ofensivo', 'Goleiro defensivo']
+  const POSITIONS = ['GO','ZC','LE','LD','VOL','MLG','MAT','MLE','MLD','PTE','PTD','SA','CA']
+  const PLAYSTYLES = ['Artilheiro', 'Armador criativo', 'Atacante surpresa', 'Clássica nº 10', 'Especialista em cruz.', 'Goleiro defensivo', 'Goleiro ofensivo', 'Homem de área', 'Jog. de infiltração', 'Jog. de Lado de Campo', 'Lateral móvel', 'Meia versátil', 'Nenhum', 'Orquestrador', 'Pivô', 'Ponta velocista', 'Primeiro volante', 'Provocador', 'Puxa marcação', 'Volantão', 'Zagueiro defensivo', 'Zagueiro ofensivo']
 
   // color map like PES mapping requested
   const getAttrColorHex = (value:number) => {
@@ -1170,6 +1170,24 @@ export default function ElencoPage() {
     )
   }, [isTransitioning])
 
+  // NOVA FUNÇÃO: Handle click no card do grid para expandir na lista
+  const handleGridCardClick = useCallback((player: Player) => {
+    // Mudar para vista de lista
+    setViewMode('list')
+    
+    // Aguardar um pouco para a transição de vista e depois expandir o jogador
+    setTimeout(() => {
+      // Fechar todos os outros e abrir apenas este jogador
+      setOpenedPlayers([player.id])
+      
+      // Scroll para o jogador
+      const element = document.getElementById(`player-${player.id}`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
+  }, [])
+
   useEffect(() => {
     let f = [...players]
     if (search) f = f.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
@@ -1449,7 +1467,7 @@ export default function ElencoPage() {
               </div>
             )}
 
-            {/* GRID VIEW - ATUALIZADO COM BOTÃO DE DISPENSA */}
+            {/* GRID VIEW - ATUALIZADO COM CLICK PARA EXPANDIR NA LISTA E BOTÕES CORRIGIDOS */}
             {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 lg:gap-6">
                 {filteredPlayers.map(j => {
@@ -1458,12 +1476,9 @@ export default function ElencoPage() {
                     <div
                       key={j.id}
                       className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer select-none"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                      }}
+                      onClick={() => handleGridCardClick(j)}
                       onMouseDown={(e) => e.preventDefault()}
-                      tabIndex={-1}
+                      tabIndex={0}
                       style={{ WebkitTapHighlightColor: 'transparent' }}
                     >
                       {/* FOTO MENOR + OVR DESTACADO SEM NOME EM CIMA */}
@@ -1530,25 +1545,24 @@ export default function ElencoPage() {
                           />
                         </div>
 
-                        {/* Valor e Botões - LAYOUT CORRIGIDO */}
+                        {/* Valor e Botões - LAYOUT CORRIGIDO E PROPORCIONAL */}
                         <div className="space-y-2">
                           <p className="text-center text-lg lg:text-xl font-black text-emerald-400">
                             R$ {Number(j.base_price).toLocaleString('pt-BR')}
                           </p>
                           
-                          {/* Container para os dois botões lado a lado - AJUSTADO */}
+                          {/* Container para os dois botões lado a lado - AJUSTADO E PROPORCIONAL */}
                           <div className="flex gap-2 w-full">
-                            {/* Botão Negociar - redimensionado */}
+                            {/* Botão Negociar - redimensionado e proporcional */}
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSellPlayer(j)
                               }}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 h-7 lg:h-8 min-w-0"
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 lg:h-8 min-w-0 px-2"
                               size="sm"
                             >
-                              <DollarSign className="w-3 h-3 mr-1" />
-                              Negociar
+                              <DollarSign className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
                             </Button>
                             
                             {/* Botão Dispensar - só aparece para overall <= 74 */}
@@ -1558,11 +1572,10 @@ export default function ElencoPage() {
                                   e.stopPropagation()
                                   handleDismissPlayer(j)
                                 }}
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1 h-7 lg:h-8 min-w-0"
+                                className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs h-7 lg:h-8 min-w-0 px-2"
                                 size="sm"
                               >
-                                <X className="w-3 h-3 mr-1" />
-                                Dispensar
+                                <X className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
                               </Button>
                             )}
                           </div>
@@ -1574,7 +1587,7 @@ export default function ElencoPage() {
               </div>
             )}
 
-            {/* LIST VIEW - ATUALIZADO COM BOTÃO DE DISPENSA E LAYOUT CORRIGIDO */}
+            {/* LIST VIEW - ATUALIZADO COM BOTÕES CORRIGIDOS E PROPORCIONAIS */}
             {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
               <div className="space-y-4 lg:space-y-6">
                 {filteredPlayers.map(j => {
@@ -1584,6 +1597,7 @@ export default function ElencoPage() {
                   return (
                     <div
                       key={j.id}
+                      id={`player-${j.id}`}
                       className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-lg lg:hover:shadow-xl hover:shadow-purple-600/20"
                     >
                       {/* Linha principal */}
@@ -1630,7 +1644,7 @@ export default function ElencoPage() {
                             </p>
                           </div>
                           
-                          {/* COLUNA DOS BOTÕES - CORRIGIDA E ALINHADA À DIREITA */}
+                          {/* COLUNA DOS BOTÕES - CORRIGIDA, PROPORCIONAL E ALINHADA À DIREITA */}
                           <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-2 lg:gap-3">
                             <div className="flex items-center gap-2 lg:gap-3">
                               <Button
@@ -1639,10 +1653,10 @@ export default function ElencoPage() {
                                   e.stopPropagation()
                                   handleSellPlayer(j)
                                 }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs lg:text-sm h-8 lg:h-9 whitespace-nowrap min-w-[80px] lg:min-w-[90px]"
+                                className="bg-blue-600 hover:bg-blue-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
+                                title="Negociar"
                               >
-                                <DollarSign className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                                Negociar
+                                <DollarSign className="w-4 h-4 lg:w-4 lg:h-4" />
                               </Button>
 
                               {/* Botão Dispensar - só aparece para overall <= 74 */}
@@ -1653,10 +1667,10 @@ export default function ElencoPage() {
                                     e.stopPropagation()
                                     handleDismissPlayer(j)
                                   }}
-                                  className="bg-red-600 hover:bg-red-700 text-white text-xs lg:text-sm h-8 lg:h-9 whitespace-nowrap min-w-[80px] lg:min-w-[90px]"
+                                  className="bg-red-600 hover:bg-red-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
+                                  title="Dispensar"
                                 >
-                                  <X className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                                  Dispensar
+                                  <X className="w-4 h-4 lg:w-4 lg:h-4" />
                                 </Button>
                               )}
 
