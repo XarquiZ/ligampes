@@ -1578,7 +1578,7 @@ export default function ElencoPage() {
     router.push(`/dashboard/jogadores#player-${player.id}`)
   }
 
-  // CORREÇÃO: Função para buscar informações do time - QUERY SIMPLIFICADA
+  // FUNÇÃO CORRIGIDA: Proposta para o técnico
   const handleProposeToCoach = async (player: Player) => {
     if (!player.team_id) {
       alert('Este jogador não tem um time associado.')
@@ -1586,49 +1586,78 @@ export default function ElencoPage() {
     }
 
     try {
-      // Buscar informações do time CORRETAMENTE - QUERY SIMPLIFICADA
-      const { data: teamData, error: teamError } = await supabase
+      console.log('🔍 Iniciando proposta para:', player.name, 'Time ID:', player.team_id)
+
+      // 1. Buscar informações do time do jogador
+      const { data: playerTeamData, error: teamError } = await supabase
         .from('teams')
-        .select(`
-          id,
-          name,
-          logo_url,
-          user_id
-        `)
+        .select('id, name, logo_url')
         .eq('id', player.team_id)
         .single()
 
-      if (teamError || !teamData) {
-        console.error('Erro ao buscar informações do time:', teamError)
-        alert('Erro ao buscar informações do técnico.')
+      if (teamError || !playerTeamData) {
+        console.error('❌ Erro ao buscar time do jogador:', teamError)
+        alert('Erro ao buscar informações do time do jogador.')
         return
       }
 
-      // Buscar perfil do técnico
+      console.log('🏟️ Time do jogador encontrado:', playerTeamData.name)
+
+      // 2. Buscar o perfil do técnico DONO do time
       const { data: coachProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, coach_name, user_id')
-        .eq('user_id', teamData.user_id)
+        .select('id, coach_name, full_name, team_id')
+        .eq('team_id', player.team_id)
         .single()
 
       if (profileError || !coachProfile) {
-        alert('Não foi possível encontrar o técnico deste time.')
+        console.error('❌ Time sem técnico associado:', playerTeamData.name)
+        
+        // Lista de times com técnicos disponíveis (baseado na sua query)
+        const teamsWithCoaches = [
+          'Cruzeiro EC',
+          'Fortaleza EC', 
+          'SC Internacional',
+          'Sport Club do Recife'
+        ]
+        
+        if (teamsWithCoaches.includes(playerTeamData.name)) {
+          // Time deveria ter técnico mas não encontrou - erro inesperado
+          alert(`Erro: O time ${playerTeamData.name} deveria ter um técnico, mas não foi possível encontrá-lo. Contate o administrador.`)
+        } else {
+          // Time realmente não tem técnico
+          alert(`O time ${playerTeamData.name} não tem um técnico associado no momento. Você só pode fazer propostas para times que tenham técnicos cadastrados.`)
+        }
         return
       }
 
-      // Verificar se já existe uma conversa com este técnico
+      console.log('👨‍💼 Técnico encontrado:', coachProfile.coach_name)
+
+      // 3. Criar ou abrir conversa
+      await createOrOpenConversation(player, playerTeamData, coachProfile)
+
+    } catch (error) {
+      console.error('💥 Erro inesperado:', error)
+      alert('Erro inesperado ao processar proposta.')
+    }
+  }
+
+  // FUNÇÃO AUXILIAR: Criar ou abrir conversa
+  const createOrOpenConversation = async (player: Player, playerTeamData: any, coachProfile: any) => {
+    try {
+      // Verificar se já existe uma conversa
       const { data: existingConversation, error: conversationError } = await supabase
         .from('conversations')
         .select('id')
         .or(`user1_id.eq.${user?.id},user2_id.eq.${user?.id}`)
-        .or(`user1_id.eq.${coachProfile.user_id},user2_id.eq.${coachProfile.user_id}`)
+        .or(`user1_id.eq.${coachProfile.id},user2_id.eq.${coachProfile.id}`)
         .single()
 
       let conversationId
 
-      if (existingConversation) {
-        // Usar conversa existente
+      if (existingConversation && !conversationError) {
         conversationId = existingConversation.id
+        console.log('💬 Conversa existente encontrada:', conversationId)
       } else {
         // Criar nova conversa
         const { data: newConversation, error: newConversationError } = await supabase
@@ -1636,11 +1665,11 @@ export default function ElencoPage() {
           .insert([
             {
               user1_id: user?.id,
-              user2_id: coachProfile.user_id,
+              user2_id: coachProfile.id,
               team1_id: team?.id,
-              team2_id: teamData.id,
+              team2_id: playerTeamData.id,
               created_at: new Date().toISOString(),
-              last_message: 'Conversa iniciada via proposta de jogador',
+              last_message: `Interesse em ${player.name}`,
               last_message_at: new Date().toISOString()
             }
           ])
@@ -1648,14 +1677,15 @@ export default function ElencoPage() {
           .single()
 
         if (newConversationError) {
-          console.error('Erro ao criar conversa:', newConversationError)
+          console.error('❌ Erro ao criar conversa:', newConversationError)
           alert('Erro ao iniciar conversa com o técnico.')
           return
         }
 
         conversationId = newConversation.id
+        console.log('✅ Nova conversa criada:', conversationId)
         
-        // Enviar mensagem inicial com o jogador automaticamente
+        // Enviar mensagem inicial com o jogador
         const playerData = {
           id: player.id,
           name: player.name,
@@ -1663,31 +1693,39 @@ export default function ElencoPage() {
           position: player.position,
           photo_url: player.photo_url,
           team_id: player.team_id,
-          team_name: teamData.name,
-          team_logo: teamData.logo_url
+          team_name: playerTeamData.name,
+          team_logo: playerTeamData.logo_url
         }
 
-        await supabase
+        const { error: messageError } = await supabase
           .from('private_messages')
           .insert({
             conversation_id: conversationId,
             sender_id: user?.id,
-            message: `Olá! Tenho interesse no jogador ${player.name}`,
-            player_data: playerData
+            message: `Olá! Tenho interesse no jogador ${player.name} (${player.position} - OVR ${player.overall})`,
+            player_data: playerData,
+            created_at: new Date().toISOString()
           })
+
+        if (messageError) {
+          console.error('⚠️ Erro ao enviar mensagem inicial:', messageError)
+        } else {
+          console.log('✅ Mensagem inicial enviada')
+        }
       }
 
       // Abrir o chat popup
       setIsChatOpen(true)
+      console.log('🚀 Chat aberto com sucesso')
       
-      // Recarregar conversas para garantir que a nova apareça
+      // Recarregar conversas
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('forceReloadConversations'))
-      }, 500)
+      }, 1000)
 
     } catch (error) {
-      console.error('Erro ao processar proposta:', error)
-      alert('Erro ao processar a proposta.')
+      console.error('💥 Erro ao criar/abrir conversa:', error)
+      throw error
     }
   }
 
