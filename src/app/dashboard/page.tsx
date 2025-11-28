@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA COM DADOS REAIS
+// src/app/dashboard/page.tsx - VERSÃO COMPLETA CORRIGIDA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -75,6 +75,7 @@ export default function Dashboard() {
   })
   const [activeAuctions, setActiveAuctions] = useState<any[]>([])
   const [pendingTransfers, setPendingTransfers] = useState(0)
+  const [completedTransfers, setCompletedTransfers] = useState(0) // NOVO ESTADO
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -168,6 +169,7 @@ export default function Dashboard() {
       loadPlayersStats()
       loadActiveAuctions()
       loadPendingTransfers()
+      loadCompletedTransfers() // NOVA FUNÇÃO
     }
   }, [team?.id])
 
@@ -281,10 +283,28 @@ export default function Dashboard() {
       if (!error) {
         setPendingTransfers(count || 0)
       } else {
-        console.error('Erro ao carregar transferências:', error)
+        console.error('Erro ao carregar transferências pendentes:', error)
       }
     } catch (error) {
-      console.error('Erro ao carregar transferências:', error)
+      console.error('Erro ao carregar transferências pendentes:', error)
+    }
+  }
+
+  // NOVA FUNÇÃO: Carregar transferências completadas
+  const loadCompletedTransfers = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('player_transfers')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'approved')
+
+      if (!error) {
+        setCompletedTransfers(count || 0)
+      } else {
+        console.error('Erro ao carregar transferências completadas:', error)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar transferências completadas:', error)
     }
   }
 
@@ -707,7 +727,7 @@ export default function Dashboard() {
                 </div>
                 <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
                   <TrendingUp className="w-4 h-4 text-green-400 mx-auto mb-1" />
-                  <div className="text-green-400 font-semibold">0</div>
+                  <div className="text-green-400 font-semibold">{completedTransfers}</div>
                   <div className="text-zinc-400 text-xs">Concluídas</div>
                 </div>
               </div>
@@ -716,6 +736,8 @@ export default function Dashboard() {
                 <div className="text-zinc-400 text-xs">
                   {pendingTransfers > 0 
                     ? `${pendingTransfers} negociação${pendingTransfers > 1 ? 'ões' : ''} aguardando aprovação`
+                    : completedTransfers > 0
+                    ? `${completedTransfers} transferência${completedTransfers > 1 ? 's' : ''} concluída${completedTransfers > 1 ? 's' : ''}`
                     : 'Nenhuma negociação pendente'
                   }
                 </div>
