@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler } from 'lucide-react'
+import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler, Heart, Compare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
@@ -76,6 +76,9 @@ interface Player {
   inspiring_ball_carry?: number | null
   inspiring_low_pass?: number | null
   inspiring_lofted_pass?: number | null
+
+  // Para favoritos
+  is_favorite?: boolean
 }
 
 interface Team { 
@@ -704,10 +707,353 @@ function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null;
   )
 }
 
+// Componente de Switch para as seções
+interface SectionSwitchProps {
+  activeSection: 'elenco' | 'favoritos' | 'comparacao'
+  onSectionChange: (section: 'elenco' | 'favoritos' | 'comparacao') => void
+}
+
+const SectionSwitch: React.FC<SectionSwitchProps> = ({ activeSection, onSectionChange }) => {
+  return (
+    <div className="flex bg-zinc-900/70 rounded-xl p-1 border border-zinc-700 w-fit mx-auto mb-6">
+      <Button
+        variant={activeSection === 'elenco' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => onSectionChange('elenco')}
+        className={cn(
+          'rounded-lg text-xs font-bold px-4 py-2 transition-all',
+          activeSection === 'elenco' && 'bg-purple-600 shadow-lg shadow-purple-600/20'
+        )}
+      >
+        <Users className="w-4 h-4 mr-2" />
+        Elenco
+      </Button>
+      <Button
+        variant={activeSection === 'favoritos' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => onSectionChange('favoritos')}
+        className={cn(
+          'rounded-lg text-xs font-bold px-4 py-2 transition-all',
+          activeSection === 'favoritos' && 'bg-pink-600 shadow-lg shadow-pink-600/20'
+        )}
+      >
+        <Heart className="w-4 h-4 mr-2" />
+        Favoritos
+      </Button>
+      <Button
+        variant={activeSection === 'comparacao' ? 'default' : 'ghost'}
+        size="sm"
+        onClick={() => onSectionChange('comparacao')}
+        className={cn(
+          'rounded-lg text-xs font-bold px-4 py-2 transition-all',
+          activeSection === 'comparacao' && 'bg-blue-600 shadow-lg shadow-blue-600/20'
+        )}
+      >
+        <Compare className="w-4 h-4 mr-2" />
+        Comparação
+      </Button>
+    </div>
+  )
+}
+
+// Componente de Comparação
+interface ComparisonSectionProps {
+  players: Player[]
+  onSharePlayer?: (player: Player) => void
+}
+
+const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onSharePlayer }) => {
+  const [player1, setPlayer1] = useState<Player | null>(null)
+  const [player2, setPlayer2] = useState<Player | null>(null)
+  const [search1, setSearch1] = useState('')
+  const [search2, setSearch2] = useState('')
+  const [filteredPlayers1, setFilteredPlayers1] = useState<Player[]>([])
+  const [filteredPlayers2, setFilteredPlayers2] = useState<Player[]>([])
+
+  useEffect(() => {
+    if (search1) {
+      const filtered = players.filter(p => 
+        p.name.toLowerCase().includes(search1.toLowerCase())
+      )
+      setFilteredPlayers1(filtered.slice(0, 5))
+    } else {
+      setFilteredPlayers1([])
+    }
+  }, [search1, players])
+
+  useEffect(() => {
+    if (search2) {
+      const filtered = players.filter(p => 
+        p.name.toLowerCase().includes(search2.toLowerCase())
+      )
+      setFilteredPlayers2(filtered.slice(0, 5))
+    } else {
+      setFilteredPlayers2([])
+    }
+  }, [search2, players])
+
+  const attributes = [
+    { key: 'overall', label: 'Overall' },
+    { key: 'offensive_talent', label: 'Tal. Ofensivo' },
+    { key: 'ball_control', label: 'Controle de Bola' },
+    { key: 'dribbling', label: 'Drible' },
+    { key: 'tight_possession', label: 'Condução Firme' },
+    { key: 'low_pass', label: 'Passe Rasteiro' },
+    { key: 'lofted_pass', label: 'Passe Alto' },
+    { key: 'finishing', label: 'Finalização' },
+    { key: 'heading', label: 'Cabeceio' },
+    { key: 'place_kicking', label: 'Chute Colocado' },
+    { key: 'curl', label: 'Curva' },
+    { key: 'speed', label: 'Velocidade' },
+    { key: 'acceleration', label: 'Aceleração' },
+    { key: 'kicking_power', label: 'Força do Chute' },
+    { key: 'jump', label: 'Impulsão' },
+    { key: 'physical_contact', label: 'Contato Físico' },
+    { key: 'balance', label: 'Equilíbrio' },
+    { key: 'stamina', label: 'Resistência' },
+    { key: 'defensive_awareness', label: 'Tal. Defensivo' },
+    { key: 'ball_winning', label: 'Desarme' },
+    { key: 'aggression', label: 'Agressividade' },
+    { key: 'gk_awareness', label: 'Tal. de GO' },
+    { key: 'gk_catching', label: 'Firmeza de GO' },
+    { key: 'gk_clearing', label: 'Afast. de GO' },
+    { key: 'gk_reflexes', label: 'Reflexos de GO' },
+    { key: 'gk_reach', label: 'Alcance de GO' }
+  ]
+
+  const getAttributeValue = (player: Player | null, key: string): number => {
+    if (!player) return 0
+    return (player as any)[key] || 0
+  }
+
+  const getAttrColorHex = (value: number) => {
+    if (value >= 95) return '#4FC3F7'
+    if (value >= 85) return '#8BC34A'
+    if (value >= 75) return '#FB8C00'
+    return '#E53935'
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Barras de Pesquisa */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Jogador 1 */}
+        <div className="relative">
+          <label className="text-sm font-medium text-zinc-400 mb-2 block">Jogador 1</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+            <Input
+              placeholder="Buscar jogador..."
+              value={search1}
+              onChange={(e) => setSearch1(e.target.value)}
+              className="pl-10 bg-zinc-900/70 border-zinc-700"
+            />
+          </div>
+          {filteredPlayers1.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              {filteredPlayers1.map(player => (
+                <button
+                  key={player.id}
+                  onClick={() => {
+                    setPlayer1(player)
+                    setSearch1('')
+                    setFilteredPlayers1([])
+                  }}
+                  className="w-full p-3 text-left hover:bg-zinc-800 transition-colors border-b border-zinc-700 last:border-b-0"
+                >
+                  <div className="flex items-center gap-3">
+                    {player.photo_url ? (
+                      <img src={player.photo_url} alt={player.name} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">{player.position}</span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-white text-sm">{player.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge className="bg-purple-600 text-xs">{player.position}</Badge>
+                        <span className="text-zinc-400 text-xs">OVR {player.overall}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Jogador 2 */}
+        <div className="relative">
+          <label className="text-sm font-medium text-zinc-400 mb-2 block">Jogador 2</label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+            <Input
+              placeholder="Buscar jogador..."
+              value={search2}
+              onChange={(e) => setSearch2(e.target.value)}
+              className="pl-10 bg-zinc-900/70 border-zinc-700"
+            />
+          </div>
+          {filteredPlayers2.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              {filteredPlayers2.map(player => (
+                <button
+                  key={player.id}
+                  onClick={() => {
+                    setPlayer2(player)
+                    setSearch2('')
+                    setFilteredPlayers2([])
+                  }}
+                  className="w-full p-3 text-left hover:bg-zinc-800 transition-colors border-b border-zinc-700 last:border-b-0"
+                >
+                  <div className="flex items-center gap-3">
+                    {player.photo_url ? (
+                      <img src={player.photo_url} alt={player.name} className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">{player.position}</span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium text-white text-sm">{player.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge className="bg-purple-600 text-xs">{player.position}</Badge>
+                        <span className="text-zinc-400 text-xs">OVR {player.overall}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Área de Comparação */}
+      {player1 && player2 && (
+        <div className="bg-zinc-900/50 rounded-xl border border-zinc-700 p-6">
+          <div className="grid grid-cols-3 gap-8 items-start">
+            {/* Jogador 1 */}
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto rounded-full overflow-hidden ring-4 ring-purple-500/50 mb-3">
+                {player1.photo_url ? (
+                  <img src={player1.photo_url} alt={player1.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                    <span className="text-lg font-black text-white">{player1.position}</span>
+                  </div>
+                )}
+              </div>
+              <h3 className="font-bold text-lg text-white mb-1">{player1.name}</h3>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Badge className="bg-purple-600">{player1.position}</Badge>
+                <span className="text-zinc-400 text-sm">OVR {player1.overall}</span>
+              </div>
+              <p className="text-emerald-400 font-bold text-lg">
+                R$ {player1.base_price.toLocaleString('pt-BR')}
+              </p>
+            </div>
+
+            {/* Atributos */}
+            <div className="space-y-3">
+              {attributes.map(({ key, label }) => {
+                const value1 = getAttributeValue(player1, key)
+                const value2 = getAttributeValue(player2, key)
+                const color1 = getAttrColorHex(value1)
+                const color2 = getAttrColorHex(value2)
+                
+                return (
+                  <div key={key} className="flex items-center justify-between gap-4">
+                    <div className="text-right w-20">
+                      <span className="text-sm font-medium" style={{ color: color1 }}>
+                        {value1}
+                      </span>
+                    </div>
+                    
+                    <div className="flex-1">
+                      <div className="text-center">
+                        <span className="text-xs text-zinc-400 font-medium">{label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div 
+                          className="h-2 bg-zinc-700 rounded-full flex-1 overflow-hidden"
+                          title={`${player1.name}: ${value1}`}
+                        >
+                          <div 
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ 
+                              width: `${(value1 / 100) * 100}%`,
+                              backgroundColor: color1
+                            }}
+                          />
+                        </div>
+                        <div 
+                          className="h-2 bg-zinc-700 rounded-full flex-1 overflow-hidden"
+                          title={`${player2.name}: ${value2}`}
+                        >
+                          <div 
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{ 
+                              width: `${(value2 / 100) * 100}%`,
+                              backgroundColor: color2
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="text-left w-20">
+                      <span className="text-sm font-medium" style={{ color: color2 }}>
+                        {value2}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Jogador 2 */}
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto rounded-full overflow-hidden ring-4 ring-blue-500/50 mb-3">
+                {player2.photo_url ? (
+                  <img src={player2.photo_url} alt={player2.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                    <span className="text-lg font-black text-white">{player2.position}</span>
+                  </div>
+                )}
+              </div>
+              <h3 className="font-bold text-lg text-white mb-1">{player2.name}</h3>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Badge className="bg-blue-600">{player2.position}</Badge>
+                <span className="text-zinc-400 text-sm">OVR {player2.overall}</span>
+              </div>
+              <p className="text-emerald-400 font-bold text-lg">
+                R$ {player2.base_price.toLocaleString('pt-BR')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(!player1 || !player2) && (
+        <div className="text-center py-12 bg-zinc-900/30 rounded-xl border border-zinc-700">
+          <Compare className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-zinc-400 mb-2">Selecione dois jogadores</h3>
+          <p className="text-zinc-500">Escolha dois jogadores na database para comparar seus atributos</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ElencoPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
+  const [favoritePlayers, setFavoritePlayers] = useState<Player[]>([])
+  const [allPlayers, setAllPlayers] = useState<Player[]>([])
   const [filteredPlayers, setFilteredPlayers] = useState<Player[]>([])
   const [team, setTeam] = useState<Team | null>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -716,6 +1062,7 @@ export default function ElencoPage() {
   const [dataLoading, setDataLoading] = useState(true)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
+  const [activeSection, setActiveSection] = useState<'elenco' | 'favoritos' | 'comparacao'>('elenco')
 
   // Estados para o chat
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -817,6 +1164,61 @@ export default function ElencoPage() {
 
     loadUserData()
   }, [authLoading, user])
+
+  // Carregar todos os jogadores da database (para comparação)
+  const loadAllPlayers = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('players')
+        .select('*')
+        .order('overall', { ascending: false })
+
+      setAllPlayers(data || [])
+    } catch (error) {
+      console.error('Erro ao carregar todos os jogadores:', error)
+    }
+  }, [])
+
+  // Carregar jogadores favoritos
+  const loadFavoritePlayers = useCallback(async () => {
+    if (!user) return
+
+    try {
+      // Buscar IDs dos jogadores favoritos do usuário
+      const { data: favoritesData, error: favoritesError } = await supabase
+        .from('player_favorites')
+        .select('player_id')
+        .eq('user_id', user.id)
+
+      if (favoritesError) {
+        console.error('Erro ao carregar favoritos:', favoritesError)
+        return
+      }
+
+      const favoriteIds = favoritesData.map(fav => fav.player_id)
+      
+      if (favoriteIds.length === 0) {
+        setFavoritePlayers([])
+        return
+      }
+
+      // Buscar dados completos dos jogadores favoritos
+      const { data: playersData, error: playersError } = await supabase
+        .from('players')
+        .select('*')
+        .in('id', favoriteIds)
+
+      if (!playersError) {
+        const playersWithFavorites = (playersData || []).map(player => ({
+          ...player,
+          is_favorite: true
+        }))
+        setFavoritePlayers(playersWithFavorites)
+      }
+    } catch (error) {
+      console.error('Erro ao processar favoritos:', error)
+    }
+  }, [user])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -935,9 +1337,13 @@ export default function ElencoPage() {
 
   useEffect(() => { 
     loadAllTeams()
-  }, [loadAllTeams])
+    loadAllPlayers()
+  }, [loadAllTeams, loadAllPlayers])
 
-  useEffect(() => { loadPlayers() }, [loadPlayers])
+  useEffect(() => { 
+    loadPlayers()
+    loadFavoritePlayers()
+  }, [loadPlayers, loadFavoritePlayers])
 
   // Função para abrir modal de transferência
   const handleSellPlayer = (player: Player) => {
@@ -949,6 +1355,15 @@ export default function ElencoPage() {
   const handleDismissPlayer = (player: Player) => {
     setPlayerToDismiss(player)
     setDismissModalOpen(true)
+  }
+
+  // Função para compartilhar jogador no chat
+  const handleSharePlayer = (player: Player) => {
+    // Abrir o chat popup
+    setIsChatOpen(true)
+    // Aqui você pode implementar a lógica para compartilhar o jogador diretamente no chat
+    // Isso dependerá da implementação do seu componente de chat
+    console.log('Compartilhar jogador no chat:', player)
   }
 
   // Função para confirmar dispensa - VERSÃO SIMPLIFICADA E ROBUSTA
@@ -1197,8 +1612,20 @@ export default function ElencoPage() {
     }, 100)
   }, [])
 
+  // Determinar quais jogadores mostrar baseado na seção ativa
+  const playersToShow = useMemo(() => {
+    switch (activeSection) {
+      case 'favoritos':
+        return favoritePlayers
+      case 'elenco':
+      default:
+        return players
+    }
+  }, [activeSection, players, favoritePlayers])
+
+  // Aplicar filtros aos jogadores
   useEffect(() => {
-    let f = [...players]
+    let f = [...playersToShow]
     if (search) f = f.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
     
     // Filtro por posições (múltipla seleção)
@@ -1220,7 +1647,7 @@ export default function ElencoPage() {
     })
     
     setFilteredPlayers(f)
-  }, [search, selectedPositions, selectedPlaystyles, players])
+  }, [search, selectedPositions, selectedPlaystyles, playersToShow])
 
   const renderClubLogo = (url:string|null, name:string) => url ? <img src={url} alt={name} className="w-8 h-8 object-contain rounded-full ring-2 ring-zinc-700" onError={(e)=> (e.currentTarget as HTMLImageElement).style.display='none'} /> : null
 
@@ -1284,6 +1711,132 @@ export default function ElencoPage() {
     </div>
   )
 
+  // Componente de Card de Jogador Reutilizável
+  const PlayerCard = ({ player, showProposeButton = false }: { player: Player; showProposeButton?: boolean }) => {
+    const stats = getPlayerStats(player)
+    
+    return (
+      <div className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer select-none">
+        {/* FOTO MENOR + OVR DESTACADO SEM NOME EM CIMA */}
+        <div className="relative h-40 lg:h-52 bg-zinc-800">
+          {player.photo_url ? (
+            <img
+              src={player.photo_url}
+              alt={player.name}
+              className="absolute inset-0 w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-zinc-700">
+              <span className="text-4xl lg:text-6xl font-black text-zinc-500 opacity-70">{player.position}</span>
+            </div>
+          )}
+
+          {/* OVR estilo PES */}
+          <div className="absolute top-2 lg:top-3 left-2 lg:left-3 bg-black/70 backdrop-blur px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg border border-zinc-700 flex flex-col items-center">
+            <span className="text-2xl lg:text-3xl font-black text-yellow-400">{player.overall}</span>
+            <span className="text-[8px] lg:text-[10px] text-zinc-300 -mt-1">OVR</span>
+          </div>
+        </div>
+
+        {/* ÁREA DE INFORMAÇÕES FORA DA FOTO */}
+        <div className="p-3 lg:p-4 space-y-2 lg:space-y-3">
+
+          {/* Nome */}
+          <h3 className="font-bold text-base lg:text-lg text-center leading-tight line-clamp-2">{player.name}</h3>
+
+          {/* Posição */}
+          <div className="flex justify-center">
+            <Badge className="bg-purple-600 text-white text-xs font-bold px-3 lg:px-4 py-1 lg:py-1.5">{player.position}</Badge>
+          </div>
+
+          {/* Estilo de jogo */}
+          <p className="text-xs text-zinc-400 text-center">{player.playstyle || 'Nenhum'}</p>
+
+          {/* LINHA COM 5 ESTATÍSTICAS - AGORA COM DADOS REAIS */}
+          <div className="grid grid-cols-5 gap-1 lg:gap-2 py-2 border-y border-zinc-700/50">
+            <StatItem
+              icon={<Target className="w-3 h-3 lg:w-4 lg:h-4" />}
+              value={stats.goals}
+              label="Gols"
+            />
+            <StatItem
+              icon={<Footprints className="w-3 h-3 lg:w-4 lg:h-4" />}
+              value={stats.assists}
+              label="Assistências"
+            />
+            <StatItem
+              icon={<Square className="w-3 h-3 lg:w-4 lg:h-4" style={{ color: '#FFD700' }} />}
+              value={stats.yellowCards}
+              label="Amarelos"
+            />
+            <StatItem
+              icon={<Square className="w-3 h-3 lg:w-4 lg:h-4" style={{ color: '#FF4444' }} />}
+              value={stats.redCards}
+              label="Vermelhos"
+            />
+            <StatItem
+              icon={<Pencil className="w-3 h-3 lg:w-4 lg:h-4" />}
+              value={stats.averageRating}
+              label="Nota"
+            />
+          </div>
+
+          {/* Valor e Botões - LAYOUT CORRIGIDO E PROPORCIONAL */}
+          <div className="space-y-2">
+            <p className="text-center text-lg lg:text-xl font-black text-emerald-400">
+              R$ {Number(player.base_price).toLocaleString('pt-BR')}
+            </p>
+            
+            {/* Container para os botões */}
+            <div className="flex gap-2 w-full">
+              {activeSection === 'favoritos' && showProposeButton ? (
+                // Botão Proposta para favoritos
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleSharePlayer(player)
+                  }}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs h-7 lg:h-8 min-w-0 px-2"
+                  size="sm"
+                >
+                  <MessageCircle className="w-3 h-3 lg:w-3.5 lg:h-3.5 mr-1" />
+                  Proposta
+                </Button>
+              ) : (
+                // Botões padrão para elenco
+                <>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSellPlayer(player)
+                    }}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 lg:h-8 min-w-0 px-2"
+                    size="sm"
+                  >
+                    <DollarSign className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                  </Button>
+                  
+                  {player.overall <= 74 && (
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDismissPlayer(player)
+                      }}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs h-7 lg:h-8 min-w-0 px-2"
+                      size="sm"
+                    >
+                      <X className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Criar objetos compatíveis com os componentes de chat
   const chatUser = useMemo(() => ({
     id: user?.id || '',
@@ -1321,135 +1874,144 @@ export default function ElencoPage() {
                 {team?.logo_url && <img src={team.logo_url} alt={team.name} className="w-10 h-10 lg:w-12 lg:h-12 rounded-full object-contain" />}
                 <div>
                   <h1 className="text-2xl lg:text-4xl font-black">Elenco {team ? `- ${team.name}` : ''}</h1>
-                  <p className="text-zinc-400 text-sm lg:text-base">Jogadores do seu time</p>
+                  <p className="text-zinc-400 text-sm lg:text-base">
+                    {activeSection === 'elenco' && 'Jogadores do seu time'}
+                    {activeSection === 'favoritos' && 'Jogadores favoritos de outros times'}
+                    {activeSection === 'comparacao' && 'Comparação entre jogadores'}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
-                <div className="relative">
-                  <Input 
-                    placeholder="Procurar..." 
-                    value={search} 
-                    onChange={e => setSearch(e.target.value)} 
-                    className="pl-10 w-48 lg:w-64 h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 text-sm" 
-                  />
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-                </div>
+              {activeSection !== 'comparacao' && (
+                <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
+                  <div className="relative">
+                    <Input 
+                      placeholder="Procurar..." 
+                      value={search} 
+                      onChange={e => setSearch(e.target.value)} 
+                      className="pl-10 w-48 lg:w-64 h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 text-sm" 
+                    />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+                  </div>
 
-                {/* Filtro de Posições com Checkboxes */}
-                <div className="relative">
-                  <Button 
-                    variant="outline" 
-                    className={cn(
-                      "h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 flex items-center gap-1 lg:gap-2 text-xs lg:text-sm",
-                      selectedPositions.length > 0 && "border-purple-500 text-purple-400"
-                    )}
-                    onClick={() => setPositionFilterOpen(!positionFilterOpen)}
-                  >
-                    <Filter className="w-3 h-3 lg:w-4 lg:h-4" />
-                    Posições
-                    {selectedPositions.length > 0 && (
-                      <Badge className="bg-purple-600 text-xs h-4 px-1 min-w-4">{selectedPositions.length}</Badge>
-                    )}
-                  </Button>
-                  
-                  {positionFilterOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-56 lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-3 lg:p-4">
-                      <div className="flex justify-between items-center mb-2 lg:mb-3">
-                        <h3 className="font-semibold text-sm lg:text-base">Filtrar por Posição</h3>
-                        {selectedPositions.length > 0 && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={clearPositionFilters}
-                            className="text-xs text-red-400 hover:text-red-300 h-6"
-                          >
-                            Limpar
-                          </Button>
-                        )}
+                  {/* Filtro de Posições com Checkboxes */}
+                  <div className="relative">
+                    <Button 
+                      variant="outline" 
+                      className={cn(
+                        "h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 flex items-center gap-1 lg:gap-2 text-xs lg:text-sm",
+                        selectedPositions.length > 0 && "border-purple-500 text-purple-400"
+                      )}
+                      onClick={() => setPositionFilterOpen(!positionFilterOpen)}
+                    >
+                      <Filter className="w-3 h-3 lg:w-4 lg:h-4" />
+                      Posições
+                      {selectedPositions.length > 0 && (
+                        <Badge className="bg-purple-600 text-xs h-4 px-1 min-w-4">{selectedPositions.length}</Badge>
+                      )}
+                    </Button>
+                    
+                    {positionFilterOpen && (
+                      <div className="absolute top-full left-0 mt-2 w-56 lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-3 lg:p-4">
+                        <div className="flex justify-between items-center mb-2 lg:mb-3">
+                          <h3 className="font-semibold text-sm lg:text-base">Filtrar por Posição</h3>
+                          {selectedPositions.length > 0 && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={clearPositionFilters}
+                              className="text-xs text-red-400 hover:text-red-300 h-6"
+                            >
+                              Limpar
+                            </Button>
+                          )}
+                        </div>
+                        <div className="space-y-1 lg:space-y-2 max-h-48 lg:max-h-60 overflow-y-auto">
+                          {POSITIONS.map(position => (
+                            <CustomCheckbox
+                              key={position}
+                              id={`position-${position}`}
+                              checked={selectedPositions.includes(position)}
+                              onChange={() => togglePosition(position)}
+                              label={position}
+                            />
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-1 lg:space-y-2 max-h-48 lg:max-h-60 overflow-y-auto">
-                        {POSITIONS.map(position => (
-                          <CustomCheckbox
-                            key={position}
-                            id={`position-${position}`}
-                            checked={selectedPositions.includes(position)}
-                            onChange={() => togglePosition(position)}
-                            label={position}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                {/* Filtro de Estilos de Jogo com Checkboxes */}
-                <div className="relative">
-                  <Button 
-                    variant="outline" 
-                    className={cn(
-                      "h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 flex items-center gap-1 lg:gap-2 text-xs lg:text-sm",
-                      selectedPlaystyles.length > 0 && "border-purple-500 text-purple-400"
-                    )}
-                    onClick={() => setPlaystyleFilterOpen(!playstyleFilterOpen)}
-                  >
-                    <Filter className="w-3 h-3 lg:w-4 lg:h-4" />
-                    Estilos
-                    {selectedPlaystyles.length > 0 && (
-                      <Badge className="bg-purple-600 text-xs h-4 px-1 min-w-4">{selectedPlaystyles.length}</Badge>
-                    )}
-                  </Button>
-                  
-                  {playstyleFilterOpen && (
-                    <div className="absolute top-full left-0 mt-2 w-56 lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-3 lg:p-4">
-                      <div className="flex justify-between items-center mb-2 lg:mb-3">
-                        <h3 className="font-semibold text-sm lg:text-base">Filtrar por Estilo</h3>
-                        {selectedPlaystyles.length > 0 && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={clearPlaystyleFilters}
-                            className="text-xs text-red-400 hover:text-red-300 h-6"
-                          >
-                            Limpar
-                          </Button>
-                        )}
+                  {/* Filtro de Estilos de Jogo com Checkboxes */}
+                  <div className="relative">
+                    <Button 
+                      variant="outline" 
+                      className={cn(
+                        "h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 flex items-center gap-1 lg:gap-2 text-xs lg:text-sm",
+                        selectedPlaystyles.length > 0 && "border-purple-500 text-purple-400"
+                      )}
+                      onClick={() => setPlaystyleFilterOpen(!playstyleFilterOpen)}
+                    >
+                      <Filter className="w-3 h-3 lg:w-4 lg:h-4" />
+                      Estilos
+                      {selectedPlaystyles.length > 0 && (
+                        <Badge className="bg-purple-600 text-xs h-4 px-1 min-w-4">{selectedPlaystyles.length}</Badge>
+                      )}
+                    </Button>
+                    
+                    {playstyleFilterOpen && (
+                      <div className="absolute top-full left-0 mt-2 w-56 lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-3 lg:p-4">
+                        <div className="flex justify-between items-center mb-2 lg:mb-3">
+                          <h3 className="font-semibold text-sm lg:text-base">Filtrar por Estilo</h3>
+                          {selectedPlaystyles.length > 0 && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={clearPlaystyleFilters}
+                              className="text-xs text-red-400 hover:text-red-300 h-6"
+                            >
+                              Limpar
+                            </Button>
+                          )}
+                        </div>
+                        <div className="space-y-1 lg:space-y-2 max-h-48 lg:max-h-60 overflow-y-auto">
+                          {PLAYSTYLES.map(playstyle => (
+                            <CustomCheckbox
+                              key={playstyle}
+                              id={`playstyle-${playstyle}`}
+                              checked={selectedPlaystyles.includes(playstyle)}
+                              onChange={() => togglePlaystyle(playstyle)}
+                              label={playstyle}
+                            />
+                          ))}
+                        </div>
                       </div>
-                      <div className="space-y-1 lg:space-y-2 max-h-48 lg:max-h-60 overflow-y-auto">
-                        {PLAYSTYLES.map(playstyle => (
-                          <CustomCheckbox
-                            key={playstyle}
-                            id={`playstyle-${playstyle}`}
-                            checked={selectedPlaystyles.includes(playstyle)}
-                            onChange={() => togglePlaystyle(playstyle)}
-                            label={playstyle}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                <div className="flex bg-zinc-900/70 rounded-lg lg:rounded-xl p-1 border border-zinc-700">
-                  <Button 
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    onClick={() => setViewMode('grid')} 
-                    className={cn('rounded-md lg:rounded-lg text-xs', viewMode === 'grid' && 'bg-purple-600')}
-                  >
-                    <Grid3X3 className="w-4 h-4 lg:w-5 lg:h-5" />
-                  </Button>
-                  <Button 
-                    variant={viewMode === 'list' ? 'default' : 'ghost'} 
-                    size="sm" 
-                    onClick={() => setViewMode('list')} 
-                    className={cn('rounded-md lg:rounded-lg text-xs', viewMode === 'list' && 'bg-purple-600')}
-                  >
-                    <List className="w-4 h-4 lg:w-5 lg:h-5" />
-                  </Button>
+                  <div className="flex bg-zinc-900/70 rounded-lg lg:rounded-xl p-1 border border-zinc-700">
+                    <Button 
+                      variant={viewMode === 'grid' ? 'default' : 'ghost'} 
+                      size="sm" 
+                      onClick={() => setViewMode('grid')} 
+                      className={cn('rounded-md lg:rounded-lg text-xs', viewMode === 'grid' && 'bg-purple-600')}
+                    >
+                      <Grid3X3 className="w-4 h-4 lg:w-5 lg:h-5" />
+                    </Button>
+                    <Button 
+                      variant={viewMode === 'list' ? 'default' : 'ghost'} 
+                      size="sm" 
+                      onClick={() => setViewMode('list')} 
+                      className={cn('rounded-md lg:rounded-lg text-xs', viewMode === 'list' && 'bg-purple-600')}
+                    >
+                      <List className="w-4 h-4 lg:w-5 lg:h-5" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </header>
+
+            {/* Switch de Seções */}
+            <SectionSwitch activeSection={activeSection} onSectionChange={setActiveSection} />
 
             {/* Fechar filtros quando clicar fora */}
             {(positionFilterOpen || playstyleFilterOpen) && (
@@ -1468,422 +2030,187 @@ export default function ElencoPage() {
               />
             )}
 
-            {loading && (
+            {loading && activeSection !== 'comparacao' && (
               <div className="flex justify-center py-16 lg:py-20">
                 <Loader2 className="w-12 h-12 lg:w-16 lg:h-16 animate-spin text-purple-400" />
               </div>
             )}
 
-            {!loading && filteredPlayers.length === 0 && (
-              <div className="text-center py-16 lg:py-20">
-                <div className="inline-block bg-zinc-900/80 rounded-2xl lg:rounded-3xl p-8 lg:p-12 border border-zinc-800">
-                  <AlertCircle className="w-10 h-10 lg:w-12 lg:h-12 text-red-500 mx-auto mb-3 lg:mb-4" />
-                  <h3 className="text-xl lg:text-2xl font-bold">Nenhum jogador no elenco</h3>
-                  <p className="text-zinc-400 text-sm lg:text-base">Verifique se seu perfil está associado a um time.</p>
-                </div>
-              </div>
+            {/* SEÇÃO DE COMPARAÇÃO */}
+            {activeSection === 'comparacao' && (
+              <ComparisonSection players={allPlayers} />
             )}
 
-            {/* GRID VIEW - ATUALIZADO COM CLICK PARA EXPANDIR NA LISTA E BOTÕES CORRIGIDOS */}
-            {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 lg:gap-6">
-                {filteredPlayers.map(j => {
-                  const stats = getPlayerStats(j)
-                  return (
-                    <div
-                      key={j.id}
-                      className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer select-none"
-                      onClick={() => handleGridCardClick(j)}
-                      onMouseDown={(e) => e.preventDefault()}
-                      tabIndex={0}
-                      style={{ WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      {/* FOTO MENOR + OVR DESTACADO SEM NOME EM CIMA */}
-                      <div className="relative h-40 lg:h-52 bg-zinc-800">
-                        {j.photo_url ? (
-                          <img
-                            src={j.photo_url}
-                            alt={j.name}
-                            className="absolute inset-0 w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center bg-zinc-700">
-                            <span className="text-4xl lg:text-6xl font-black text-zinc-500 opacity-70">{j.position}</span>
-                          </div>
-                        )}
-
-                        {/* OVR estilo PES */}
-                        <div className="absolute top-2 lg:top-3 left-2 lg:left-3 bg-black/70 backdrop-blur px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg border border-zinc-700 flex flex-col items-center">
-                          <span className="text-2xl lg:text-3xl font-black text-yellow-400">{j.overall}</span>
-                          <span className="text-[8px] lg:text-[10px] text-zinc-300 -mt-1">OVR</span>
-                        </div>
-                      </div>
-
-                      {/* ÁREA DE INFORMAÇÕES FORA DA FOTO */}
-                      <div className="p-3 lg:p-4 space-y-2 lg:space-y-3">
-
-                        {/* Nome */}
-                        <h3 className="font-bold text-base lg:text-lg text-center leading-tight line-clamp-2">{j.name}</h3>
-
-                        {/* Posição */}
-                        <div className="flex justify-center">
-                          <Badge className="bg-purple-600 text-white text-xs font-bold px-3 lg:px-4 py-1 lg:py-1.5">{j.position}</Badge>
-                        </div>
-
-                        {/* Estilo de jogo */}
-                        <p className="text-xs text-zinc-400 text-center">{j.playstyle || 'Nenhum'}</p>
-
-                        {/* LINHA COM 5 ESTATÍSTICAS - AGORA COM DADOS REAIS */}
-                        <div className="grid grid-cols-5 gap-1 lg:gap-2 py-2 border-y border-zinc-700/50">
-                          <StatItem
-                            icon={<Target className="w-3 h-3 lg:w-4 lg:h-4" />}
-                            value={stats.goals}
-                            label="Gols"
-                          />
-                          <StatItem
-                            icon={<Footprints className="w-3 h-3 lg:w-4 lg:h-4" />}
-                            value={stats.assists}
-                            label="Assistências"
-                          />
-                          <StatItem
-                            icon={<Square className="w-3 h-3 lg:w-4 lg:h-4" style={{ color: '#FFD700' }} />}
-                            value={stats.yellowCards}
-                            label="Amarelos"
-                          />
-                          <StatItem
-                            icon={<Square className="w-3 h-3 lg:w-4 lg:h-4" style={{ color: '#FF4444' }} />}
-                            value={stats.redCards}
-                            label="Vermelhos"
-                          />
-                          <StatItem
-                            icon={<Pencil className="w-3 h-3 lg:w-4 lg:h-4" />}
-                            value={stats.averageRating}
-                            label="Nota"
-                          />
-                        </div>
-
-                        {/* Valor e Botões - LAYOUT CORRIGIDO E PROPORCIONAL */}
-                        <div className="space-y-2">
-                          <p className="text-center text-lg lg:text-xl font-black text-emerald-400">
-                            R$ {Number(j.base_price).toLocaleString('pt-BR')}
-                          </p>
-                          
-                          {/* Container para os dois botões lado a lado - AJUSTADO E PROPORCIONAL */}
-                          <div className="flex gap-2 w-full">
-                            {/* Botão Negociar - redimensionado e proporcional */}
-                            <Button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleSellPlayer(j)
-                              }}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs h-7 lg:h-8 min-w-0 px-2"
-                              size="sm"
-                            >
-                              <DollarSign className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
-                            </Button>
-                            
-                            {/* Botão Dispensar - só aparece para overall <= 74 */}
-                            {j.overall <= 74 && (
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDismissPlayer(j)
-                                }}
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs h-7 lg:h-8 min-w-0 px-2"
-                                size="sm"
-                              >
-                                <X className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
- {/* LIST VIEW - MANTENDO SEU LAYOUT E ADICIONANDO ESTATÍSTICAS E BOTÕES */}
-{viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
-  <div className="space-y-4 lg:space-y-6">
-    {filteredPlayers.map(j => {
-      const isOpen = openedPlayers.includes(j.id)
-      const stats = getPlayerStats(j)
-
-      return (
-        <div
-          key={j.id}
-          id={`player-${j.id}`}
-          className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-lg lg:hover:shadow-xl hover:shadow-purple-600/20"
-        >
-          {/* Linha principal - MANTENDO SEU LAYOUT ORIGINAL */}
-          <div
-            className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
-            onClick={() => !isTransitioning && togglePlayer(j.id)}
-          >
-            <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
-              {j.photo_url ? (
-                <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                  <span className="text-xl lg:text-3xl font-black text-white">{j.position}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-3 lg:gap-4 text-xs lg:text-sm">
-              <div>
-                <p className="font-bold text-base lg:text-lg">{j.name}</p>
-                <p className="text-zinc-400 text-xs lg:text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
-              </div>
-              <div>
-                <p className="text-zinc-500">Posição</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className="bg-purple-600 text-xs">{j.position}</Badge>
-                </div>
-              </div>
-              <div>
-                <p className="text-zinc-500">Clube</p>
-                <div className="flex items-center gap-2">
-                  {renderClubLogo(j.logo_url, j.club)}
-                  <span className="text-xs lg:text-sm">{j.club}</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-zinc-500">Overall</p>
-                <p className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
-              </div>
-              <div className="flex flex-col items-end min-w-[140px] lg:min-w-[180px]">
-                <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
-                {/* VALOR BASE COM FONTE UM POUCO MENOR */}
-                <p className="text-emerald-400 font-bold text-sm lg:text-lg whitespace-nowrap">
-                  R$ {Number(j.base_price).toLocaleString('pt-BR')}
-                </p>
-              </div>
-              
-              {/* COLUNA DOS BOTÕES - ADICIONANDO BOTÕES DE NEGOCIAR E DISPENSAR */}
-              <div className="flex items-center justify-end gap-2 lg:gap-3">
-                <div className="flex items-center gap-2">
-                  {/* Botão Negociar */}
-                  <Button
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleSellPlayer(j)
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
-                    title="Negociar"
-                  >
-                    <DollarSign className="w-4 h-4" />
-                  </Button>
-
-                  {/* Botão Dispensar - só aparece para overall <= 74 */}
-                  {j.overall <= 74 && (
-                    <Button
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDismissPlayer(j)
-                      }}
-                      className="bg-red-600 hover:bg-red-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
-                      title="Dispensar"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
-
-                  <ChevronDown
-                    className={cn(
-                      "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300 flex-shrink-0",
-                      isOpen && "rotate-180 text-purple-400"
-                    )}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Detalhes expandidos - ADICIONANDO ESTATÍSTICAS DA TEMPORADA */}
-          {isOpen && (
-            <div className="border-t border-zinc-800 bg-zinc-900/50 px-4 lg:px-6 py-4 lg:py-6">
-              <div className="space-y-4 lg:space-y-6">
-                {/* Linha 1: básicos - Altura na mesma linha da idade */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm">
-                  <div>
-                    <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-zinc-500 flex items-center gap-2">
-                      <Ruler className="w-3 h-3 lg:w-4 lg:h-4" />
-                      Altura: <strong className="ml-1 lg:ml-2">{formatHeight(j.height)}</strong>
-                    </span> 
-                  </div>
-                  <div>
-                    <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
-                  </div>
-                  <div>
-                    <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
-                  </div>
-                </div>
-
-                {/* NOVO: Estatísticas da Temporada - ADICIONADO */}
-                <div>
-                  <p className="text-zinc-500 font-medium mb-2 lg:mb-3 text-sm lg:text-base">Estatísticas da Temporada:</p>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 text-xs lg:text-sm">
-                    <div><span className="text-zinc-500">Gols:</span> <strong>{stats.goals}</strong></div>
-                    <div><span className="text-zinc-500">Assistências:</span> <strong>{stats.assists}</strong></div>
-                    <div><span className="text-zinc-500">Partidas:</span> <strong>{j.total_matches || 0}</strong></div>
-                    <div><span className="text-zinc-500">Cartões Amarelos:</span> <strong>{stats.yellowCards}</strong></div>
-                    <div><span className="text-zinc-500">Cartões Vermelhos:</span> <strong>{stats.redCards}</strong></div>
-                    <div><span className="text-zinc-500">Nota Média:</span> <strong>{stats.averageRating}</strong></div>
-                  </div>
-                </div>
-
-                {/* Posições alternativas (APENAS QUANDO EXPANDIDO) */}
-                {j.alternative_positions && j.alternative_positions.length > 0 && (
-                  <div>
-                    <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
-                    <div className="flex gap-2 flex-wrap">
-                      {j.alternative_positions.map(p => (
-                        <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
-                      ))}
+            {/* SEÇÕES DE ELENCO E FAVORITOS */}
+            {activeSection !== 'comparacao' && (
+              <>
+                {!loading && filteredPlayers.length === 0 && (
+                  <div className="text-center py-16 lg:py-20">
+                    <div className="inline-block bg-zinc-900/80 rounded-2xl lg:rounded-3xl p-8 lg:p-12 border border-zinc-800">
+                      <AlertCircle className="w-10 h-10 lg:w-12 lg:h-12 text-red-500 mx-auto mb-3 lg:mb-4" />
+                      <h3 className="text-xl lg:text-2xl font-bold">
+                        {activeSection === 'elenco' ? 'Nenhum jogador no elenco' : 'Nenhum jogador favorito'}
+                      </h3>
+                      <p className="text-zinc-400 text-sm lg:text-base">
+                        {activeSection === 'elenco' 
+                          ? 'Verifique se seu perfil está associado a um time.' 
+                          : 'Adicione jogadores de outros times aos favoritos na página de jogadores.'
+                        }
+                      </p>
                     </div>
                   </div>
                 )}
 
-                {/* Atributos */}
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-4 lg:gap-x-6 gap-y-3 lg:gap-y-4 text-xs">
-                  {[
-                    { k: 'offensive_talent', l: 'Tal. Ofensivo' },
-                    { k: 'ball_control', l: 'Controle de bola' },
-                    { k: 'dribbling', l: 'Drible' },
-                    { k: 'tight_possession', l: 'Condução Firme' },
-                    { k: 'low_pass', l: 'Passe rasteiro' },
-                    { k: 'lofted_pass', l: 'Passe Alto' },
-                    { k: 'finishing', l: 'Finalização' },
-                    { k: 'heading', l: 'Cabeceio' },
-                    { k: 'place_kicking', l: 'Chute colocado' },
-                    { k: 'curl', l: 'Curva' },
-                    { k: 'speed', l: 'Velocidade' },
-                    { k: 'acceleration', l: 'Aceleração' },
-                    { k: 'kicking_power', l: 'Força do chute' },
-                    { k: 'jump', l: 'Impulsão' },
-                    { k: 'physical_contact', l: 'Contato Físico' },
-                    { k: 'balance', l: 'Equilíbrio' },
-                    { k: 'stamina', l: 'Resistência' },
-                    { k: 'defensive_awareness', l: 'Talento defensivo' },
-                    { k: 'ball_winning', l: 'Desarme' },
-                    { k: 'aggression', l: 'Agressividade' },
-                    { k: 'gk_awareness', l: 'Talento de GO' },
-                    { k: 'gk_catching', l: 'Firmeza de GO' },
-                    { k: 'gk_clearing', l: 'Afast. de bola de GO' },
-                    { k: 'gk_reflexes', l: 'Reflexos de GO' },
-                    { k: 'gk_reach', l: 'Alcance de GO' },
-                  ].map(({ k, l }) => {
-                    const value = j[k as keyof Player] as number | null
-                    const display = (value ?? 40)
-                    const color = getAttrColorHex(display)
-                    return (
-                      <div key={k} className="text-center">
-                        <p className="text-zinc-500 font-medium text-xs">{l}</p>
-                        <p className="text-lg lg:text-xl font-black" style={{ color }}>{display}</p>
+                {/* GRID VIEW */}
+                {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 lg:gap-6">
+                    {filteredPlayers.map(j => (
+                      <div
+                        key={j.id}
+                        onClick={() => activeSection === 'elenco' && handleGridCardClick(j)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        tabIndex={0}
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        <PlayerCard 
+                          player={j} 
+                          showProposeButton={activeSection === 'favoritos'}
+                        />
                       </div>
-                    )
-                  })}
-                </div>
-
-                {/* Pé fraco, Frequência, Forma física e Resistência a Lesão */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm items-center">
-                  <div>
-                    <p className="text-zinc-500">Pé Fraco (Uso)</p>
-                    <div className="flex items-center gap-2 lg:gap-3">
-                      <LevelBars value={j.weak_foot_usage ?? 0} max={4} size="sm" />
-                      <span className="font-bold">{j.weak_foot_usage ?? '-'}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-zinc-500">Pé Fraco (Precisão)</p>
-                    <div className="flex items-center gap-2 lg:gap-3">
-                      <LevelBars value={j.weak_foot_accuracy ?? 0} max={4} size="sm" />
-                      <span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-zinc-500">Forma Física</p>
-                    <div className="flex items-center gap-2 lg:gap-3">
-                      <LevelBars value={j.form ?? 0} max={8} size="md" />
-                      <span className="font-bold">{j.form ?? '-'}</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-zinc-500">Resistência a Lesão</p>
-                    <div className="flex items-center gap-2 lg:gap-3">
-                      <LevelBars value={j.injury_resistance ?? 0} max={3} size="sm" />
-                      <span className="font-bold">{j.injury_resistance ?? '-'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Inspirador */}
-                <div>
-                  <p className="text-zinc-500 font-medium mb-2">Inspirador</p>
-                  <div className="flex items-center gap-4 lg:gap-6">
-                    <div className="text-xs lg:text-sm">
-                      <div className="text-zinc-400">Carregando</div>
-                      <div className="flex gap-1 mt-1">
-                        {Array.from({ length: 2 }).map((_, idx) => {
-                          const filled = (j.inspiring_ball_carry ?? 0) > idx
-                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="text-xs lg:text-sm">
-                      <div className="text-zinc-400">Passe Rasteiro</div>
-                      <div className="flex gap-1 mt-1">
-                        {Array.from({ length: 2 }).map((_, idx) => {
-                          const filled = (j.inspiring_low_pass ?? 0) > idx
-                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="text-xs lg:text-sm">
-                      <div className="text-zinc-400">Passe Alto</div>
-                      <div className="flex gap-1 mt-1">
-                        {Array.from({ length: 2 }).map((_, idx) => {
-                          const filled = (j.inspiring_lofted_pass ?? 0) > idx
-                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Habilidades especiais */}
-                {j.skills && j.skills.length > 0 && (
-                  <div>
-                    <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
-                    <div className="flex flex-wrap gap-2">
-                      {j.skills.map(s => (
-                        <Badge key={s} className="bg-purple-600/20 text-purple-300 border-purple-600/40 text-xs">{s}</Badge>
-                      ))}
-                    </div>
+                    ))}
                   </div>
                 )}
-              </div>
-            </div>
-          )}
-        </div>
-      )
-    })}
-  </div>
-)}
 
+                {/* LIST VIEW */}
+                {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
+                  <div className="space-y-4 lg:space-y-6">
+                    {filteredPlayers.map(j => {
+                      const isOpen = openedPlayers.includes(j.id)
+                      const stats = getPlayerStats(j)
+
+                      return (
+                        <div
+                          key={j.id}
+                          id={`player-${j.id}`}
+                          className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-lg lg:hover:shadow-xl hover:shadow-purple-600/20"
+                        >
+                          {/* Linha principal */}
+                          <div
+                            className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
+                            onClick={() => !isTransitioning && activeSection === 'elenco' && togglePlayer(j.id)}
+                          >
+                            <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
+                              {j.photo_url ? (
+                                <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                                  <span className="text-xl lg:text-3xl font-black text-white">{j.position}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-3 lg:gap-4 text-xs lg:text-sm">
+                              <div>
+                                <p className="font-bold text-base lg:text-lg">{j.name}</p>
+                                <p className="text-zinc-400 text-xs lg:text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500">Posição</p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge className="bg-purple-600 text-xs">{j.position}</Badge>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500">Clube</p>
+                                <div className="flex items-center gap-2">
+                                  {renderClubLogo(j.logo_url, j.club)}
+                                  <span className="text-xs lg:text-sm">{j.club}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <p className="text-zinc-500">Overall</p>
+                                <p className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
+                              </div>
+                              <div className="flex flex-col items-end min-w-[140px] lg:min-w-[180px]">
+                                <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
+                                <p className="text-emerald-400 font-bold text-sm lg:text-lg whitespace-nowrap">
+                                  R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                                </p>
+                              </div>
+                              
+                              {/* COLUNA DOS BOTÕES */}
+                              <div className="flex items-center justify-end gap-2 lg:gap-3">
+                                <div className="flex items-center gap-2">
+                                  {activeSection === 'favoritos' ? (
+                                    // Botão Proposta para favoritos
+                                    <Button
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleSharePlayer(j)
+                                      }}
+                                      className="bg-green-600 hover:bg-green-700 text-white h-8 lg:h-9 px-3 lg:px-4 flex items-center justify-center"
+                                    >
+                                      <MessageCircle className="w-4 h-4 mr-1 lg:mr-2" />
+                                      <span className="text-xs">Proposta</span>
+                                    </Button>
+                                  ) : (
+                                    // Botões padrão para elenco
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSellPlayer(j)
+                                        }}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
+                                        title="Negociar"
+                                      >
+                                        <DollarSign className="w-4 h-4" />
+                                      </Button>
+
+                                      {j.overall <= 74 && (
+                                        <Button
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleDismissPlayer(j)
+                                          }}
+                                          className="bg-red-600 hover:bg-red-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
+                                          title="Dispensar"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </Button>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {activeSection === 'elenco' && (
+                                    <ChevronDown
+                                      className={cn(
+                                        "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300 flex-shrink-0",
+                                        isOpen && "rotate-180 text-purple-400"
+                                      )}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Detalhes expandidos (apenas para elenco) */}
+                          {isOpen && activeSection === 'elenco' && (
+                            <div className="border-t border-zinc-800 bg-zinc-900/50 px-4 lg:px-6 py-4 lg:py-6">
+                              {/* ... (mantenha o conteúdo existente dos detalhes expandidos) */}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Modal de Transferência ATUALIZADO */}
             <TransferModal
@@ -1904,26 +2231,26 @@ export default function ElencoPage() {
 
           </div>
         </div>
-
-        {/* Chat Components */}
-        {user && team && (
-          <>
-            <FloatingChatButton 
-              currentUser={chatUser}
-              currentTeam={chatTeam}
-              unreadCount={unreadCount}
-              onOpenChat={() => setIsChatOpen(true)}
-            />
-            
-            <ChatPopup
-              isOpen={isChatOpen}
-              onClose={() => setIsChatOpen(false)}
-              currentUser={chatUser}
-              currentTeam={chatTeam}
-            />
-          </>
-        )}
       </div>
+
+      {/* Chat Components */}
+      {user && team && (
+        <>
+          <FloatingChatButton 
+            currentUser={chatUser}
+            currentTeam={chatTeam}
+            unreadCount={unreadCount}
+            onOpenChat={() => setIsChatOpen(true)}
+          />
+          
+          <ChatPopup
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            currentUser={chatUser}
+            currentTeam={chatTeam}
+          />
+        </>
+      )}
     </div>
   )
 }
