@@ -1566,7 +1566,20 @@ export default function ElencoPage() {
     setDismissModalOpen(true)
   }
 
-  // NOVA FUNÇÃO: Abrir chat com o técnico dono do time do jogador
+  // NOVA FUNÇÃO: Navegar para jogador específico na página de jogadores
+  const navigateToPlayerInPlayersPage = (player: Player) => {
+    // Salvar o jogador no sessionStorage para a página de jogadores
+    sessionStorage.setItem('selectedPlayer', JSON.stringify({
+      id: player.id,
+      name: player.name,
+      shouldExpand: true
+    }))
+    
+    // Navegar para a página de jogadores
+    router.push('/dashboard/jogadores')
+  }
+
+  // NOVA FUNÇÃO: Abrir chat com o técnico dono do time do jogador - CORRIGIDA
   const handleProposeToCoach = async (player: Player) => {
     if (!player.team_id) {
       alert('Este jogador não tem um time associado.')
@@ -1574,13 +1587,14 @@ export default function ElencoPage() {
     }
 
     try {
-      // Buscar informações do time e do técnico dono
+      // Buscar informações do time CORRETAMENTE
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .select(`
           id,
           name,
-          profiles (
+          logo_url,
+          profiles!teams_user_id_fkey (
             id,
             coach_name,
             user_id
@@ -1624,7 +1638,9 @@ export default function ElencoPage() {
               user2_id: coachProfile.user_id,
               team1_id: team?.id,
               team2_id: teamData.id,
-              created_at: new Date().toISOString()
+              created_at: new Date().toISOString(),
+              last_message: 'Conversa iniciada via proposta de jogador',
+              last_message_at: new Date().toISOString()
             }
           ])
           .select()
@@ -1637,14 +1653,37 @@ export default function ElencoPage() {
         }
 
         conversationId = newConversation.id
+        
+        // Enviar mensagem inicial com o jogador automaticamente
+        const playerData = {
+          id: player.id,
+          name: player.name,
+          overall: player.overall,
+          position: player.position,
+          photo_url: player.photo_url,
+          team_id: player.team_id,
+          team_name: teamData.name,
+          team_logo: teamData.logo_url
+        }
+
+        await supabase
+          .from('private_messages')
+          .insert({
+            conversation_id: conversationId,
+            sender_id: user?.id,
+            message: `Olá! Tenho interesse no jogador ${player.name}`,
+            player_data: playerData
+          })
       }
 
-      // Abrir o chat popup com a conversa específica
+      // Abrir o chat popup
       setIsChatOpen(true)
       
-      // Aqui você pode implementar lógica adicional para focar na conversa específica
-      // Isso dependerá da implementação do seu componente de chat
-      console.log('Abrindo conversa com o técnico:', coachProfile.coach_name, 'Conversa ID:', conversationId)
+      // Recarregar conversas para garantir que a nova apareça
+      setTimeout(() => {
+        // Disparar evento para forçar recarregamento das conversas no chat
+        window.dispatchEvent(new CustomEvent('forceReloadConversations'))
+      }, 500)
 
     } catch (error) {
       console.error('Erro ao processar proposta:', error)
@@ -1652,10 +1691,18 @@ export default function ElencoPage() {
     }
   }
 
-  // Função para compartilhar jogador no chat
-  const handleSharePlayer = (player: Player) => {
-    // Usar a nova função de proposta para técnico
-    handleProposeToCoach(player)
+  // FUNÇÃO MELHORADA: Compartilhar jogador no chat
+  const handleSharePlayer = async (player: Player) => {
+    try {
+      // Primeiro, abrir o chat
+      setIsChatOpen(true)
+      
+      // Em seguida, processar a proposta
+      await handleProposeToCoach(player)
+    } catch (error) {
+      console.error('Erro ao compartilhar jogador:', error)
+      alert('Erro ao abrir chat com o técnico.')
+    }
   }
 
   // Função para confirmar dispensa - VERSÃO SIMPLIFICADA E ROBUSTA
@@ -1886,7 +1933,7 @@ export default function ElencoPage() {
     )
   }, [isTransitioning])
 
-  // NOVA FUNÇÃO: Handle click no card do grid para expandir na lista (APENAS PARA ELENCO)
+  // NOVA FUNÇÃO: Handle click no card do grid
   const handleGridCardClick = useCallback((player: Player) => {
     if (activeSection === 'elenco') {
       // Mudar para vista de lista
@@ -1904,10 +1951,20 @@ export default function ElencoPage() {
         }
       }, 100)
     } else if (activeSection === 'favoritos') {
-      // Para favoritos, navegar para a página de jogadores com o card expandido
-      router.push(`/dashboard/jogadores?playerId=${player.id}&expand=true`)
+      // Para favoritos, navegar para a página de jogadores
+      navigateToPlayerInPlayersPage(player)
     }
   }, [activeSection, router])
+
+  // NOVA FUNÇÃO: Handle click na lista de favoritos
+  const handleFavoriteListClick = useCallback((player: Player) => {
+    if (activeSection === 'favoritos') {
+      navigateToPlayerInPlayersPage(player)
+    } else {
+      // Para elenco, usar a lógica normal de toggle
+      togglePlayer(player.id)
+    }
+  }, [activeSection, togglePlayer])
 
   // Determinar quais jogadores mostrar baseado na seção ativa
   const playersToShow = useMemo(() => {
@@ -2012,8 +2069,22 @@ export default function ElencoPage() {
   const PlayerCard = ({ player, showProposeButton = false }: { player: Player; showProposeButton?: boolean }) => {
     const stats = getPlayerStats(player)
     
+    const handleCardClick = () => {
+      if (activeSection === 'favoritos') {
+        navigateToPlayerInPlayersPage(player)
+      } else {
+        handleGridCardClick(player)
+      }
+    }
+    
     return (
-      <div className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer select-none">
+      <div 
+        className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer select-none"
+        onClick={handleCardClick}
+        onMouseDown={(e) => e.preventDefault()}
+        tabIndex={0}
+        style={{ WebkitTapHighlightColor: 'transparent' }}
+      >
         {/* FOTO MENOR + OVR DESTACADO SEM NOME EM CIMA */}
         <div className="relative h-40 lg:h-52 bg-zinc-800">
           {player.photo_url ? (
@@ -2408,7 +2479,7 @@ export default function ElencoPage() {
                           {/* Linha principal */}
                           <div
                             className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
-                            onClick={() => !isTransitioning && activeSection === 'elenco' && togglePlayer(j.id)}
+                            onClick={() => handleFavoriteListClick(j)}
                           >
                             <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
                               {j.photo_url ? (
