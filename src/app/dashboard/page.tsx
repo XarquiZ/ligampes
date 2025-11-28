@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO CORRIGIDA
+// src/app/dashboard/page.tsx - VERSÃO COM BOTÃO EDITAR
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp } from 'lucide-react'
+import { DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp, Edit } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
@@ -47,6 +47,9 @@ export default function Dashboard() {
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [newCoachName, setNewCoachName] = useState('')
+  const [isUpdating, setIsUpdating] = useState(false)
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -91,10 +94,12 @@ export default function Dashboard() {
           } else {
             setProfile(newProfile)
             setTeam(newProfile?.teams || null)
+            setNewCoachName(newProfile?.coach_name || defaultName)
           }
         } else {
           setProfile(profileData)
           setTeam(profileData?.teams || null)
+          setNewCoachName(profileData?.coach_name || '')
         }
       } catch (error) {
         console.error('[Dashboard] Erro ao carregar dados:', error)
@@ -159,6 +164,59 @@ export default function Dashboard() {
       subscription.unsubscribe()
     }
   }, [user])
+
+  // Função para atualizar o nome do técnico
+  const updateCoachName = async () => {
+    if (!user || !newCoachName.trim()) return
+
+    setIsUpdating(true)
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ 
+          coach_name: newCoachName.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Erro ao atualizar nome do técnico:', error)
+        alert('Erro ao atualizar nome. Tente novamente.')
+      } else {
+        setProfile(data)
+        setIsEditingName(false)
+        console.log('Nome do técnico atualizado com sucesso!')
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar nome do técnico:', error)
+      alert('Erro ao atualizar nome. Tente novamente.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  // Função para iniciar a edição
+  const startEditing = () => {
+    setNewCoachName(profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico')
+    setIsEditingName(true)
+  }
+
+  // Função para cancelar edição
+  const cancelEditing = () => {
+    setIsEditingName(false)
+    setNewCoachName(profile?.coach_name || '')
+  }
+
+  // Função para submeter com Enter
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      updateCoachName()
+    } else if (e.key === 'Escape') {
+      cancelEditing()
+    }
+  }
 
   if (authLoading || dataLoading) {
     return (
@@ -262,7 +320,55 @@ export default function Dashboard() {
               )}
 
               <div className="text-center md:text-left">
-                <h2 className="text-2xl lg:text-4xl font-black text-white">{displayName}</h2>
+                <div className="flex items-center justify-center md:justify-start gap-2">
+                  {isEditingName ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newCoachName}
+                          onChange={(e) => setNewCoachName(e.target.value)}
+                          onKeyDown={handleKeyPress}
+                          className="text-2xl lg:text-4xl font-black text-white bg-transparent border-b-2 border-purple-500 outline-none px-2 py-1"
+                          placeholder="Digite o nome..."
+                          autoFocus
+                        />
+                      </div>
+                      <div className="flex gap-2 justify-center md:justify-start">
+                        <Button
+                          onClick={updateCoachName}
+                          disabled={isUpdating || !newCoachName.trim()}
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          {isUpdating ? 'Salvando...' : 'OK'}
+                        </Button>
+                        <Button
+                          onClick={cancelEditing}
+                          disabled={isUpdating}
+                          size="sm"
+                          variant="outline"
+                          className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="text-2xl lg:text-4xl font-black text-white">{displayName}</h2>
+                      <Button
+                        onClick={startEditing}
+                        variant="ghost"
+                        size="sm"
+                        className="p-1 h-auto text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                        title="Editar nome do técnico"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
+                </div>
                 <p className="mt-1 lg:mt-2 text-lg lg:text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                   {team?.name || 'Sem time ainda'}
                 </p>
