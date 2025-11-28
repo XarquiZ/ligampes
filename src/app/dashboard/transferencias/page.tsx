@@ -334,7 +334,7 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // NOVA FUNÇÃO: Rejeitar transferência
+  // NOVA FUNÇÃO: Rejeitar transferência (APENAS ADMIN)
   const rejeitarTransferencia = async (transferId: string) => {
     if (!confirm('Tem certeza que deseja cancelar esta transferência? Esta ação não pode ser desfeita.')) {
       return
@@ -701,7 +701,7 @@ export default function PaginaTransferencias() {
                             </div>
                           </div>
 
-                          {/* Botões de aprovação E cancelamento */}
+                          {/* Botões de aprovação E cancelamento (APENAS ADMIN PODE CANCELAR) */}
                           {(userTeamId === t.from_team_id || userTeamId === t.to_team_id || isAdmin) && (
                             <div className="mt-6 flex flex-wrap gap-4 justify-center items-center">
                               <div className="flex flex-wrap gap-4">
@@ -731,15 +731,17 @@ export default function PaginaTransferencias() {
                                 )}
                               </div>
 
-                              {/* NOVO BOTÃO: Cancelar Transferência */}
-                              <Button
-                                onClick={() => rejeitarTransferencia(t.id)}
-                                variant="outline"
-                                className="bg-red-600 hover:bg-red-700 text-white border-red-600"
-                              >
-                                <Ban className="w-4 h-4 mr-2" />
-                                Cancelar Transferência
-                              </Button>
+                              {/* BOTÃO DE CANCELAR - APENAS PARA ADMIN */}
+                              {isAdmin && (
+                                <Button
+                                  onClick={() => rejeitarTransferencia(t.id)}
+                                  variant="outline"
+                                  className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                                >
+                                  <Ban className="w-4 h-4 mr-2" />
+                                  Cancelar Transferência
+                                </Button>
+                              )}
 
                               {/* Mensagem se já aprovou */}
                               {((userTeamId === t.from_team_id && t.approved_by_seller) ||
