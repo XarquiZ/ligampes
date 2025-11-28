@@ -933,11 +933,11 @@ export default function ListaJogadores() {
                         e.stopPropagation()
                         toggleFavorite(j.id)
                       }}
-                      className="absolute top-2 lg:top-3 right-2 lg:right-3 z-20 bg-black/70 backdrop-blur p-1.5 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all"
+                      className="absolute top-2 lg:top-3 right-2 lg:right-3 z-20 bg-black/70 backdrop-blur p-1 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all"
                     >
                       <Star 
                         className={cn(
-                          "w-3 h-3 lg:w-4 lg:h-4 transition-all",
+                          "w-3 h-3 lg:w-3 lg:h-3 transition-all",
                           favoritePlayers.includes(j.id) 
                             ? "fill-yellow-400 text-yellow-400" 
                             : "text-zinc-400 hover:text-yellow-400"
@@ -951,9 +951,9 @@ export default function ListaJogadores() {
                           e.stopPropagation()
                           openEditPlayer(j)
                         }}
-                        className="absolute top-2 lg:top-3 left-2 lg:left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-2 rounded-full backdrop-blur"
+                        className="absolute top-2 lg:top-3 left-2 lg:left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-1.5 rounded-full backdrop-blur"
                       >
-                        <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
+                        <Pencil className="w-3 h-3 lg:w-3 lg:h-3" />
                       </button>
                     )}
 
@@ -1038,46 +1038,50 @@ export default function ListaJogadores() {
                         </div>
 
                         {/* Informações principais - CORREÇÃO: Grid responsivo para manter tudo na mesma linha */}
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-7 gap-3 lg:gap-4 text-xs lg:text-sm items-center">
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-8 gap-3 lg:gap-4 text-xs lg:text-sm items-center">
                           {/* Nome e Playstyle */}
                           <div className="md:col-span-2">
-                            <p className="font-bold text-base lg:text-lg">{j.name}</p>
-                            <p className="text-zinc-400 text-xs lg:text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
+                            <p className="font-bold text-base lg:text-lg leading-tight">{j.name}</p>
+                            <p className="text-zinc-400 text-xs lg:text-sm mt-1 line-clamp-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
                           </div>
                           
                           {/* Posição */}
-                          <div>
-                            <p className="text-zinc-500">Posição</p>
-                            <Badge className="bg-purple-600 text-xs mt-1">{j.position}</Badge>
+                          <div className="flex flex-col">
+                            <p className="text-zinc-500 text-xs">Posição</p>
+                            <Badge className="bg-purple-600 text-xs mt-1 w-fit">{j.position}</Badge>
                           </div>
                           
-                          {/* Clube */}
-                          <div>
-                            <p className="text-zinc-500">Clube</p>
+                          {/* Clube - CORREÇÃO: Agora mostra o nome completo */}
+                          <div className="flex flex-col">
+                            <p className="text-zinc-500 text-xs">Clube</p>
                             <div className="flex items-center gap-2 mt-1">
                               {renderClubLogo(j.logo_url, j.club)}
-                              <span className="text-xs lg:text-sm truncate max-w-[80px]">{j.club}</span>
+                              <span className="text-xs lg:text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px] lg:max-w-[120px]">
+                                {j.club}
+                              </span>
                             </div>
                           </div>
                           
                           {/* Overall */}
-                          <div>
-                            <p className="text-zinc-500">Overall</p>
-                            <p className="text-2xl lg:text-4xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
+                          <div className="flex flex-col items-center">
+                            <p className="text-zinc-500 text-xs">Overall</p>
+                            <p className="text-2xl lg:text-3xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent leading-none mt-1">
+                              {j.overall}
+                            </p>
                           </div>
                           
-                          {/* Botão de Favorito - CORREÇÃO: Agora em linha com os outros elementos */}
+                          {/* Botão de Favorito - CORREÇÃO: Diminuído e alinhado */}
                           <div className="flex flex-col items-center justify-center">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 toggleFavorite(j.id)
                               }}
-                              className="bg-black/70 backdrop-blur p-2 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all mb-1"
+                              className="bg-black/70 backdrop-blur p-1.5 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all mb-1"
                             >
                               <Star 
                                 className={cn(
-                                  "w-4 h-4 lg:w-5 lg:h-5 transition-all",
+                                  "w-3 h-3 lg:w-3.5 lg:h-3.5 transition-all",
                                   favoritePlayers.includes(j.id) 
                                     ? "fill-yellow-400 text-yellow-400" 
                                     : "text-zinc-400 hover:text-yellow-400"
@@ -1091,14 +1095,14 @@ export default function ListaJogadores() {
 
                           {/* Valor Base - CORREÇÃO: Formatado com a nova função */}
                           <div className="flex flex-col items-end">
-                            <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
-                            <p className="text-emerald-400 font-bold text-base lg:text-lg whitespace-nowrap">
+                            <p className="text-zinc-500 text-right text-xs">Valor Base</p>
+                            <p className="text-emerald-400 font-bold text-sm lg:text-base whitespace-nowrap leading-tight">
                               {formatBasePrice(j.base_price)}
                             </p>
                           </div>
                           
-                          {/* Botão de Edição e Seta - CORREÇÃO: Agora em linha */}
-                          <div className="flex items-center justify-end gap-2 lg:gap-3">
+                          {/* Botão de Edição e Seta - CORREÇÃO: Agora em linha e alinhados */}
+                          <div className="flex items-center justify-end gap-2 lg:gap-2">
                             {userRole === 'admin' && (
                               <Button
                                 size="sm"
@@ -1107,15 +1111,15 @@ export default function ListaJogadores() {
                                   e.stopPropagation()
                                   openEditPlayer(j)
                                 }}
-                                className="hover:bg-purple-600/20 p-2 h-8 w-8"
+                                className="hover:bg-purple-600/20 p-1.5 h-7 w-7 min-w-0"
                               >
-                                <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
+                                <Pencil className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
                               </Button>
                             )}
 
                             <ChevronDown
                               className={cn(
-                                "w-4 h-4 lg:w-5 lg:h-5 text-zinc-400 transition-transform duration-300 flex-shrink-0",
+                                "w-4 h-4 lg:w-4 lg:h-4 text-zinc-400 transition-transform duration-300 flex-shrink-0",
                                 isOpen && "rotate-180 text-purple-400"
                               )}
                             />
