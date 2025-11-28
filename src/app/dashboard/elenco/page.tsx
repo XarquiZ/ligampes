@@ -1587,257 +1587,274 @@ export default function ElencoPage() {
               </div>
             )}
 
-            {/* LIST VIEW - ATUALIZADO COM BOTÕES CORRIGIDOS E PROPORCIONAIS */}
-            {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
-              <div className="space-y-4 lg:space-y-6">
-                {filteredPlayers.map(j => {
-                  const isOpen = openedPlayers.includes(j.id)
-                  const stats = getPlayerStats(j)
+            {/* LIST VIEW - ATUALIZADA COM LAYOUT OTIMIZADO */}
+{viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
+  <div className="space-y-4 lg:space-y-6">
+    {filteredPlayers.map(j => {
+      const isOpen = openedPlayers.includes(j.id)
+      const stats = getPlayerStats(j)
 
-                  return (
-                    <div
-                      key={j.id}
-                      id={`player-${j.id}`}
-                      className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-lg lg:hover:shadow-xl hover:shadow-purple-600/20"
-                    >
-                      {/* Linha principal */}
-                      <div
-                        className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
-                        onClick={() => !isTransitioning && togglePlayer(j.id)}
-                      >
-                        <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
-                          {j.photo_url ? (
-                            <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                              <span className="text-xl lg:text-3xl font-black text-white">{j.position}</span>
-                            </div>
-                          )}
-                        </div>
+      return (
+        <div
+          key={j.id}
+          id={`player-${j.id}`}
+          className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-lg lg:hover:shadow-xl hover:shadow-purple-600/20"
+        >
+          {/* Linha principal - LAYOT OTIMIZADO */}
+          <div
+            className="p-4 lg:p-6 flex items-center gap-4 lg:gap-6 cursor-pointer select-none"
+            onClick={() => !isTransitioning && togglePlayer(j.id)}
+          >
+            <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full overflow-hidden ring-3 ring-purple-500/50 flex-shrink-0">
+              {j.photo_url ? (
+                <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                  <span className="text-lg lg:text-xl font-black text-white">{j.position}</span>
+                </div>
+              )}
+            </div>
 
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-7 gap-3 lg:gap-4 text-xs lg:text-sm">
-                          <div>
-                            <p className="font-bold text-base lg:text-lg">{j.name}</p>
-                            <p className="text-zinc-400 text-xs lg:text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
-                          </div>
-                          <div>
-                            <p className="text-zinc-500">Posição</p>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge className="bg-purple-600 text-xs">{j.position}</Badge>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-zinc-500">Clube</p>
-                            <div className="flex items-center gap-2">
-                              {renderClubLogo(j.logo_url, j.club)}
-                              <span className="text-xs lg:text-sm">{j.club}</span>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-zinc-500">Overall</p>
-                            <p className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
-                          </div>
-                          <div className="flex flex-col items-start min-w-[120px] lg:min-w-[140px]">
-                            <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
-                            <p className="text-emerald-400 font-bold text-base lg:text-xl whitespace-nowrap">
-                              R$ {Number(j.base_price).toLocaleString('pt-BR')}
-                            </p>
-                          </div>
-                          
-                          {/* COLUNA DOS BOTÕES - CORRIGIDA, PROPORCIONAL E ALINHADA À DIREITA */}
-                          <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-2 lg:gap-3">
-                            <div className="flex items-center gap-2 lg:gap-3">
-                              <Button
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleSellPlayer(j)
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
-                                title="Negociar"
-                              >
-                                <DollarSign className="w-4 h-4 lg:w-4 lg:h-4" />
-                              </Button>
-
-                              {/* Botão Dispensar - só aparece para overall <= 74 */}
-                              {j.overall <= 74 && (
-                                <Button
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleDismissPlayer(j)
-                                  }}
-                                  className="bg-red-600 hover:bg-red-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
-                                  title="Dispensar"
-                                >
-                                  <X className="w-4 h-4 lg:w-4 lg:h-4" />
-                                </Button>
-                              )}
-
-                              <ChevronDown
-                                className={cn(
-                                  "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300 flex-shrink-0",
-                                  isOpen && "rotate-180 text-purple-400"
-                                )}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Detalhes expandidos */}
-                      {isOpen && (
-                        <div className="border-t border-zinc-800 bg-zinc-900/50 px-4 lg:px-6 py-4 lg:py-6">
-                          <div className="space-y-4 lg:space-y-6">
-                            {/* Linha 1: básicos - Altura na mesma linha da idade */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm">
-                              <div>
-                                <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
-                              </div>
-                              <div>
-                                <span className="text-zinc-500 flex items-center gap-2">
-                                  <Ruler className="w-3 h-3 lg:w-4 lg:h-4" />
-                                  Altura: <strong className="ml-1 lg:ml-2">{formatHeight(j.height)}</strong>
-                                </span> 
-                              </div>
-                              <div>
-                                <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
-                              </div>
-                              <div>
-                                <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
-                              </div>
-                            </div>
-
-                            {/* Estatísticas da Temporada */}
-                            <div>
-                              <p className="text-zinc-500 font-medium mb-2 lg:mb-3 text-sm lg:text-base">Estatísticas da Temporada:</p>
-                              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 text-xs lg:text-sm">
-                                <div><span className="text-zinc-500">Gols:</span> <strong>{stats.goals}</strong></div>
-                                <div><span className="text-zinc-500">Assistências:</span> <strong>{stats.assists}</strong></div>
-                                <div><span className="text-zinc-500">Partidas:</span> <strong>{j.total_matches || 0}</strong></div>
-                                <div><span className="text-zinc-500">Cartões Amarelos:</span> <strong>{stats.yellowCards}</strong></div>
-                                <div><span className="text-zinc-500">Cartões Vermelhos:</span> <strong>{stats.redCards}</strong></div>
-                                <div><span className="text-zinc-500">Nota Média:</span> <strong>{stats.averageRating}</strong></div>
-                              </div>
-                            </div>
-
-                            {/* Posições alternativas (APENAS QUANDO EXPANDIDO) */}
-                            {j.alternative_positions && j.alternative_positions.length > 0 && (
-                              <div>
-                                <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
-                                <div className="flex gap-2 flex-wrap">
-                                  {j.alternative_positions.map(p => (
-                                    <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Atributos */}
-                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-4 lg:gap-x-6 gap-y-3 lg:gap-y-4 text-xs">
-                              {ATTR_ORDER.map(k => {
-                                const value = j[k as keyof Player] as number | null
-                                const display = (value ?? 40)
-                                const color = getAttrColorHex(display)
-                                return (
-                                  <div key={k} className="text-center">
-                                    <p className="text-zinc-500 font-medium text-xs">{ATTR_LABELS[k]}</p>
-                                    <p className="text-lg lg:text-xl font-black" style={{ color }}>{display}</p>
-                                  </div>
-                                )
-                              })}
-                            </div>
-
-                            {/* Pé fraco, Frequência, Forma física e Resistência a Lesão */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm items-center">
-                              <div>
-                                <p className="text-zinc-500">Pé Fraco (Uso)</p>
-                                <div className="flex items-center gap-2 lg:gap-3">
-                                  <LevelBars value={j.weak_foot_usage ?? 0} max={4} size="sm" />
-                                  <span className="font-bold">{j.weak_foot_usage ?? '-'}</span>
-                                </div>
-                              </div>
-
-                              <div>
-                                <p className="text-zinc-500">Pé Fraco (Precisão)</p>
-                                <div className="flex items-center gap-2 lg:gap-3">
-                                  <LevelBars value={j.weak_foot_accuracy ?? 0} max={4} size="sm" />
-                                  <span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span>
-                                </div>
-                              </div>
-
-                              <div>
-                                <p className="text-zinc-500">Forma Física</p>
-                                <div className="flex items-center gap-2 lg:gap-3">
-                                  <LevelBars value={j.form ?? 0} max={8} size="md" />
-                                  <span className="font-bold">{j.form ?? '-'}</span>
-                                </div>
-                              </div>
-
-                              <div>
-                                <p className="text-zinc-500">Resistência a Lesão</p>
-                                <div className="flex items-center gap-2 lg:gap-3">
-                                  <LevelBars value={j.injury_resistance ?? 0} max={3} size="sm" />
-                                  <span className="font-bold">{j.injury_resistance ?? '-'}</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Inspirador */}
-                            <div>
-                              <p className="text-zinc-500 font-medium mb-2">Inspirador</p>
-                              <div className="flex items-center gap-4 lg:gap-6">
-                                <div className="text-xs lg:text-sm">
-                                  <div className="text-zinc-400">Carregando</div>
-                                  <div className="flex gap-1 mt-1">
-                                    {Array.from({ length: 2 }).map((_, idx) => {
-                                      const filled = (j.inspiring_ball_carry ?? 0) > idx
-                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                                    })}
-                                  </div>
-                                </div>
-
-                                <div className="text-xs lg:text-sm">
-                                  <div className="text-zinc-400">Passe Rasteiro</div>
-                                  <div className="flex gap-1 mt-1">
-                                    {Array.from({ length: 2 }).map((_, idx) => {
-                                      const filled = (j.inspiring_low_pass ?? 0) > idx
-                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                                    })}
-                                  </div>
-                                </div>
-
-                                <div className="text-xs lg:text-sm">
-                                  <div className="text-zinc-400">Passe Alto</div>
-                                  <div className="flex gap-1 mt-1">
-                                    {Array.from({ length: 2 }).map((_, idx) => {
-                                      const filled = (j.inspiring_lofted_pass ?? 0) > idx
-                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Habilidades especiais */}
-                            {j.skills && j.skills.length > 0 && (
-                              <div>
-                                <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
-                                <div className="flex flex-wrap gap-2">
-                                  {j.skills.map(s => (
-                                    <Badge key={s} className="bg-purple-600/20 text-purple-300 border-purple-600/40 text-xs">{s}</Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+            {/* CONTEÚDO PRINCIPAL - DISTRIBUÍDO DE FORMA MAIS EQUILIBRADA */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 lg:gap-6 text-xs lg:text-sm items-center">
+              {/* Coluna 1: Nome e Estilo */}
+              <div className="min-w-[140px]">
+                <p className="font-bold text-base lg:text-lg leading-tight">{j.name}</p>
+                <p className="text-zinc-400 text-xs lg:text-sm mt-1 line-clamp-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
               </div>
-            )}
+
+              {/* Coluna 2: Posição e Idade */}
+              <div className="space-y-1">
+                <div>
+                  <p className="text-zinc-500 text-xs">Posição</p>
+                  <Badge className="bg-purple-600 text-xs">{j.position}</Badge>
+                </div>
+                <div>
+                  <p className="text-zinc-500 text-xs">Idade</p>
+                  <p className="text-white font-medium">{j.age ?? '-'}</p>
+                </div>
+              </div>
+
+              {/* Coluna 3: Clube */}
+              <div>
+                <p className="text-zinc-500 text-xs mb-2">Clube</p>
+                <div className="flex items-center gap-2">
+                  {renderClubLogo(j.logo_url, j.club)}
+                  <span className="text-xs lg:text-sm font-medium">{j.club}</span>
+                </div>
+              </div>
+
+              {/* Coluna 4: Overall e Valor - MAIS COMPACTO */}
+              <div className="space-y-2">
+                <div>
+                  <p className="text-zinc-500 text-xs">Overall</p>
+                  <p className="text-2xl lg:text-3xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">
+                    {j.overall}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-zinc-500 text-xs">Valor Base</p>
+                  <p className="text-emerald-400 font-bold text-sm lg:text-base whitespace-nowrap">
+                    R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Coluna 5: Botões e Seta - AGORA MAIS COMPACTA */}
+              <div className="flex items-center justify-end gap-2 lg:gap-3">
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSellPlayer(j)
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
+                    title="Negociar"
+                  >
+                    <DollarSign className="w-4 h-4" />
+                  </Button>
+
+                  {/* Botão Dispensar - só aparece para overall <= 74 */}
+                  {j.overall <= 74 && (
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDismissPlayer(j)
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
+                      title="Dispensar"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+
+                  <ChevronDown
+                    className={cn(
+                      "w-5 h-5 text-zinc-400 transition-transform duration-300 flex-shrink-0",
+                      isOpen && "rotate-180 text-purple-400"
+                    )}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Detalhes expandidos (mantido igual) */}
+          {isOpen && (
+            <div className="border-t border-zinc-800 bg-zinc-900/50 px-4 lg:px-6 py-4 lg:py-6">
+              <div className="space-y-4 lg:space-y-6">
+                {/* Linha 1: básicos - Altura na mesma linha da idade */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm">
+                  <div>
+                    <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 flex items-center gap-2">
+                      <Ruler className="w-3 h-3 lg:w-4 lg:h-4" />
+                      Altura: <strong className="ml-1 lg:ml-2">{formatHeight(j.height)}</strong>
+                    </span> 
+                  </div>
+                  <div>
+                    <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
+                  </div>
+                </div>
+
+                {/* Estatísticas da Temporada */}
+                <div>
+                  <p className="text-zinc-500 font-medium mb-2 lg:mb-3 text-sm lg:text-base">Estatísticas da Temporada:</p>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 text-xs lg:text-sm">
+                    <div><span className="text-zinc-500">Gols:</span> <strong>{stats.goals}</strong></div>
+                    <div><span className="text-zinc-500">Assistências:</span> <strong>{stats.assists}</strong></div>
+                    <div><span className="text-zinc-500">Partidas:</span> <strong>{j.total_matches || 0}</strong></div>
+                    <div><span className="text-zinc-500">Cartões Amarelos:</span> <strong>{stats.yellowCards}</strong></div>
+                    <div><span className="text-zinc-500">Cartões Vermelhos:</span> <strong>{stats.redCards}</strong></div>
+                    <div><span className="text-zinc-500">Nota Média:</span> <strong>{stats.averageRating}</strong></div>
+                  </div>
+                </div>
+
+                {/* Posições alternativas (APENAS QUANDO EXPANDIDO) */}
+                {j.alternative_positions && j.alternative_positions.length > 0 && (
+                  <div>
+                    <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {j.alternative_positions.map(p => (
+                        <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Atributos */}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-4 lg:gap-x-6 gap-y-3 lg:gap-y-4 text-xs">
+                  {ATTR_ORDER.map(k => {
+                    const value = j[k as keyof Player] as number | null
+                    const display = (value ?? 40)
+                    const color = getAttrColorHex(display)
+                    return (
+                      <div key={k} className="text-center">
+                        <p className="text-zinc-500 font-medium text-xs">{ATTR_LABELS[k]}</p>
+                        <p className="text-lg lg:text-xl font-black" style={{ color }}>{display}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Pé fraco, Frequência, Forma física e Resistência a Lesão */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm items-center">
+                  <div>
+                    <p className="text-zinc-500">Pé Fraco (Uso)</p>
+                    <div className="flex items-center gap-2 lg:gap-3">
+                      <LevelBars value={j.weak_foot_usage ?? 0} max={4} size="sm" />
+                      <span className="font-bold">{j.weak_foot_usage ?? '-'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-zinc-500">Pé Fraco (Precisão)</p>
+                    <div className="flex items-center gap-2 lg:gap-3">
+                      <LevelBars value={j.weak_foot_accuracy ?? 0} max={4} size="sm" />
+                      <span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-zinc-500">Forma Física</p>
+                    <div className="flex items-center gap-2 lg:gap-3">
+                      <LevelBars value={j.form ?? 0} max={8} size="md" />
+                      <span className="font-bold">{j.form ?? '-'}</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-zinc-500">Resistência a Lesão</p>
+                    <div className="flex items-center gap-2 lg:gap-3">
+                      <LevelBars value={j.injury_resistance ?? 0} max={3} size="sm" />
+                      <span className="font-bold">{j.injury_resistance ?? '-'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Inspirador */}
+                <div>
+                  <p className="text-zinc-500 font-medium mb-2">Inspirador</p>
+                  <div className="flex items-center gap-4 lg:gap-6">
+                    <div className="text-xs lg:text-sm">
+                      <div className="text-zinc-400">Carregando</div>
+                      <div className="flex gap-1 mt-1">
+                        {Array.from({ length: 2 }).map((_, idx) => {
+                          const filled = (j.inspiring_ball_carry ?? 0) > idx
+                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="text-xs lg:text-sm">
+                      <div className="text-zinc-400">Passe Rasteiro</div>
+                      <div className="flex gap-1 mt-1">
+                        {Array.from({ length: 2 }).map((_, idx) => {
+                          const filled = (j.inspiring_low_pass ?? 0) > idx
+                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="text-xs lg:text-sm">
+                      <div className="text-zinc-400">Passe Alto</div>
+                      <div className="flex gap-1 mt-1">
+                        {Array.from({ length: 2 }).map((_, idx) => {
+                          const filled = (j.inspiring_lofted_pass ?? 0) > idx
+                          return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Habilidades especiais */}
+                {j.skills && j.skills.length > 0 && (
+                  <div>
+                    <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
+                    <div className="flex flex-wrap gap-2">
+                      {j.skills.map(s => (
+                        <Badge key={s} className="bg-purple-600/20 text-purple-300 border-purple-600/40 text-xs">{s}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    })}
+  </div>
+)}
+
 
             {/* Modal de Transferência ATUALIZADO */}
             <TransferModal
