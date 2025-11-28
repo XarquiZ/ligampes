@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO ATUALIZADA
+// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -8,7 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp, Edit } from 'lucide-react'
+import { DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown, Building2, Target, Footprints, Clock } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
@@ -31,6 +31,14 @@ interface Team {
   balance?: number;
 }
 
+interface Player {
+  id: string;
+  name: string;
+  position: string;
+  overall: number;
+  team_id: string | null;
+}
+
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
   if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1).replace('.0', '')}M`
@@ -43,6 +51,7 @@ export default function Dashboard() {
   const { user, loading: authLoading } = useAuth()
   const [team, setTeam] = useState<Team | null>(null)
   const [profile, setProfile] = useState<any>(null)
+  const [players, setPlayers] = useState<Player[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -95,16 +104,41 @@ export default function Dashboard() {
             setProfile(newProfile)
             setTeam(newProfile?.teams || null)
             setNewCoachName(newProfile?.coach_name || defaultName)
+            
+            // Carregar jogadores do time
+            if (newProfile?.teams?.id) {
+              loadTeamPlayers(newProfile.teams.id)
+            }
           }
         } else {
           setProfile(profileData)
           setTeam(profileData?.teams || null)
           setNewCoachName(profileData?.coach_name || '')
+          
+          // Carregar jogadores do time
+          if (profileData?.teams?.id) {
+            loadTeamPlayers(profileData.teams.id)
+          }
         }
       } catch (error) {
         console.error('[Dashboard] Erro ao carregar dados:', error)
       } finally {
         setDataLoading(false)
+      }
+    }
+
+    const loadTeamPlayers = async (teamId: string) => {
+      try {
+        const { data: playersData, error: playersError } = await supabase
+          .from('players')
+          .select('id, name, position, overall, team_id')
+          .eq('team_id', teamId)
+
+        if (!playersError) {
+          setPlayers(playersData || [])
+        }
+      } catch (error) {
+        console.error('[Dashboard] Erro ao carregar jogadores:', error)
       }
     }
 
@@ -264,6 +298,21 @@ export default function Dashboard() {
     name: team?.name || 'Sem time'
   }
 
+  // Calcular estatísticas do time
+  const teamStats = {
+    totalPlayers: players.length,
+    averageOverall: players.length > 0 
+      ? Math.round(players.reduce((sum, player) => sum + player.overall, 0) / players.length)
+      : 0,
+    topPlayer: players.length > 0 
+      ? players.reduce((best, player) => player.overall > best.overall ? player : best)
+      : null,
+    positions: players.reduce((acc, player) => {
+      acc[player.position] = (acc[player.position] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+  }
+
   const tiles = [
     { 
       title: 'SALDO', 
@@ -272,16 +321,18 @@ export default function Dashboard() {
       value: formatBalance(team?.balance || 0), 
       subtitle: 'disponível para gastar', 
       link: '/dashboard/saldo',
-      buttonText: 'Ver saldo'
+      buttonText: 'Ver saldo',
+      preview: 'saldo'
     },
     { 
       title: 'MEU ELENCO', 
       icon: Shirt, 
       color: 'blue', 
-      value: '0/25', 
-      subtitle: 'meus jogadores', 
+      value: `${players.length}/25`, 
+      subtitle: 'jogadores no elenco', 
       link: '/dashboard/elenco',
-      buttonText: 'Ver elenco'
+      buttonText: 'Ver elenco',
+      preview: 'elenco'
     },
     { 
       title: 'JOGADORES', 
@@ -290,7 +341,8 @@ export default function Dashboard() {
       value: 'Pool', 
       subtitle: 'todos os atletas', 
       link: '/dashboard/jogadores',
-      buttonText: 'Ver jogadores'
+      buttonText: 'Ver jogadores',
+      preview: 'jogadores'
     },
     { 
       title: 'LEILÃO', 
@@ -299,7 +351,8 @@ export default function Dashboard() {
       value: 'EM BREVE', 
       subtitle: 'próximo evento', 
       link: '/dashboard/leilao',
-      buttonText: 'Ver leilão'
+      buttonText: 'Ver leilão',
+      preview: 'leilao'
     },
     { 
       title: 'TRANSFERÊNCIAS', 
@@ -308,9 +361,185 @@ export default function Dashboard() {
       value: 'Mercado', 
       subtitle: 'negociações ativas', 
       link: '/dashboard/transferencias',
-      buttonText: 'Ver mercado'
+      buttonText: 'Ver mercado',
+      preview: 'transferencias'
     },
   ]
+
+  // Função para renderizar o preview baseado no tile
+  const renderPreview = (tileTitle: string) => {
+    switch (tileTitle) {
+      case 'SALDO':
+        return (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+              <span className="text-emerald-400 text-sm font-semibold">Saldo Disponível</span>
+              <span className="text-emerald-400 font-bold text-lg">{formatBalance(team?.balance || 0)}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
+                <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
+                <div className="text-emerald-400 font-semibold">+ R$ 0</div>
+                <div className="text-zinc-400 text-xs">Entradas</div>
+              </div>
+              <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
+                <TrendingDown className="w-4 h-4 text-red-400 mx-auto mb-1" />
+                <div className="text-red-400 font-semibold">- R$ 0</div>
+                <div className="text-zinc-400 text-xs">Saídas</div>
+              </div>
+            </div>
+          </div>
+        )
+      
+      case 'MEU ELENCO':
+        return (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+              <span className="text-blue-400 text-sm font-semibold">Jogadores no Elenco</span>
+              <span className="text-blue-400 font-bold text-lg">{players.length}/25</span>
+            </div>
+            
+            {teamStats.topPlayer && (
+              <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-white font-semibold text-sm">Melhor Jogador</div>
+                    <div className="text-blue-400 text-xs">{teamStats.topPlayer.name}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-yellow-400 font-bold">{teamStats.topPlayer.overall} OVR</div>
+                    <div className="text-zinc-400 text-xs">{teamStats.topPlayer.position}</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              {Object.entries(teamStats.positions).slice(0, 6).map(([position, count]) => (
+                <div key={position} className="bg-zinc-800/50 p-2 rounded border border-zinc-700 text-center">
+                  <div className="text-white font-semibold">{count}</div>
+                  <div className="text-zinc-400 text-[10px]">{position}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      
+      case 'JOGADORES':
+        return (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-3 bg-pink-500/10 rounded-lg border border-pink-500/20">
+              <span className="text-pink-400 text-sm font-semibold">Database Completa</span>
+              <span className="text-pink-400 font-bold text-lg">150+</span>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">Jogadores Livres</span>
+                <span className="text-green-400 font-semibold">45</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-zinc-400">Contratados</span>
+                <span className="text-blue-400 font-semibold">105</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              {[
+                { rating: '75+', count: '25', color: 'text-yellow-400' },
+                { rating: '80+', count: '15', color: 'text-orange-400' },
+                { rating: '85+', count: '8', color: 'text-red-400' },
+                { rating: '90+', count: '2', color: 'text-purple-400' }
+              ].map((item) => (
+                <div key={item.rating} className="flex-1 bg-zinc-800/50 p-2 rounded border border-zinc-700 text-center">
+                  <div className={`font-bold text-xs ${item.color}`}>{item.rating}</div>
+                  <div className="text-zinc-400 text-[10px]">{item.count}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      
+      case 'LEILÃO':
+        return (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+              <span className="text-red-400 text-sm font-semibold">Próximo Leilão</span>
+              <span className="text-red-400 font-bold text-lg">EM BREVE</span>
+            </div>
+            
+            <div className="space-y-2 text-sm">
+              <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
+                <div className="text-orange-400 font-semibold">Aguardando Início</div>
+                <div className="text-zinc-400 text-xs mt-1">Jogadores premium disponíveis em breve</div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-zinc-800/30 p-2 rounded text-center">
+                  <Target className="w-3 h-3 text-yellow-400 mx-auto mb-1" />
+                  <div className="text-white font-semibold">5</div>
+                  <div className="text-zinc-400">Jogadores</div>
+                </div>
+                <div className="bg-zinc-800/30 p-2 rounded text-center">
+                  <DollarSign className="w-3 h-3 text-emerald-400 mx-auto mb-1" />
+                  <div className="text-white font-semibold">85+</div>
+                  <div className="text-zinc-400">OVR Mínimo</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      
+      case 'TRANSFERÊNCIAS':
+        return (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+              <span className="text-purple-400 text-sm font-semibold">Mercado de Transferências</span>
+              <span className="text-purple-400 font-bold text-lg">0</span>
+            </div>
+            
+            <div className="space-y-2 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
+                  <Clock className="w-4 h-4 text-blue-400 mx-auto mb-1" />
+                  <div className="text-blue-400 font-semibold">0</div>
+                  <div className="text-zinc-400 text-xs">Pendentes</div>
+                </div>
+                <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
+                  <TrendingUp className="w-4 h-4 text-green-400 mx-auto mb-1" />
+                  <div className="text-green-400 font-semibold">0</div>
+                  <div className="text-zinc-400 text-xs">Concluídas</div>
+                </div>
+              </div>
+              
+              <div className="bg-zinc-800/30 p-2 rounded text-center">
+                <div className="text-zinc-400 text-xs">Negocie jogadores com outros times</div>
+              </div>
+            </div>
+          </div>
+        )
+      
+      default:
+        return (
+          <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-center">
+            <p className="text-zinc-400 italic text-sm">Preview em desenvolvimento</p>
+          </div>
+        )
+    }
+  }
+
+  // Função para determinar a posição do tile expandido
+  const getTilePositionClass = (tileTitle: string, index: number) => {
+    if (expandedTile !== tileTitle) return ''
+    
+    // Tile na posição 3 (JOGADORES) - expande para a esquerda
+    if (index === 2) {
+      return 'lg:col-start-1 lg:col-span-2 row-start-1 scale-105 shadow-2xl z-10'
+    }
+    
+    // Demais tiles - comportamento padrão
+    return 'row-span-2 lg:col-span-2 scale-105 shadow-2xl z-10'
+  }
 
   return (
     <div className="flex min-h-screen bg-zinc-950">
@@ -401,14 +630,14 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Grid de Tiles */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-              {tiles.map((tile) => (
+            {/* Grid de Tiles - MODIFICADO */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 auto-rows-min">
+              {tiles.map((tile, index) => (
                 <Card
                   key={tile.title}
                   className={`group relative overflow-hidden rounded-xl lg:rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg lg:shadow-xl transition-all duration-700 cursor-pointer ${
                     expandedTile === tile.title
-                      ? 'row-span-2 lg:col-span-2 scale-105 shadow-2xl z-10'
+                      ? getTilePositionClass(tile.title, index)
                       : 'hover:scale-105 hover:shadow-purple-600/40'
                   }`}
                   onClick={() => setExpandedTile(expandedTile === tile.title ? null : tile.title)}
@@ -437,9 +666,7 @@ export default function Dashboard() {
 
                     {expandedTile === tile.title && (
                       <div className="mt-3 lg:mt-4 pt-3 lg:pt-4 border-t border-white/10 animate-in slide-in-from-top-4 duration-500">
-                        <div className="p-3 lg:p-4 bg-white/5 rounded-lg lg:rounded-xl border border-white/10 text-center">
-                          <p className="text-zinc-400 italic text-xs lg:text-sm">Em breve: dados reais aqui</p>
-                        </div>
+                        {renderPreview(tile.title)}
                       </div>
                     )}
 
@@ -453,6 +680,55 @@ export default function Dashboard() {
                 </Card>
               ))}
             </div>
+
+            {/* Estatísticas Rápidas do Time */}
+            {team && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 mt-8">
+                <Card className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/30 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-zinc-400 text-xs">Jogadores</p>
+                      <p className="text-white font-bold text-xl">{players.length}/25</p>
+                    </div>
+                    <Users className="w-8 h-8 text-purple-400" />
+                  </div>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-blue-600/20 to-cyan-600/20 border-blue-500/30 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-zinc-400 text-xs">OVR Médio</p>
+                      <p className="text-white font-bold text-xl">{teamStats.averageOverall}</p>
+                    </div>
+                    <Target className="w-8 h-8 text-blue-400" />
+                  </div>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-emerald-600/20 to-green-600/20 border-emerald-500/30 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-zinc-400 text-xs">Saldo</p>
+                      <p className="text-white font-bold text-xl">
+                        {formatBalance(team?.balance || 0).replace('R$ ', '')}
+                      </p>
+                    </div>
+                    <DollarSign className="w-8 h-8 text-emerald-400" />
+                  </div>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border-orange-500/30 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-zinc-400 text-xs">Melhor Jogador</p>
+                      <p className="text-white font-bold text-xl">
+                        {teamStats.topPlayer ? teamStats.topPlayer.overall : '0'}
+                      </p>
+                    </div>
+                    <Footprints className="w-8 h-8 text-orange-400" />
+                  </div>
+                </Card>
+              </div>
+            )}
           </div>
         </div>
 

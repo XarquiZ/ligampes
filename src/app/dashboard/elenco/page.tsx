@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler, Heart, GitCompare, MessageCircle  } from 'lucide-react'
+import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler, Heart, GitCompare, MessageCircle, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
@@ -1378,7 +1378,7 @@ export default function ElencoPage() {
     }
   }, [])
 
-  // Carregar jogadores favoritos - ATUALIZADO para incluir informações do time
+  // CORREÇÃO: Carregar jogadores favoritos - QUERY SIMPLIFICADA
   const loadFavoritePlayers = useCallback(async () => {
     if (!user) return
 
@@ -1401,7 +1401,7 @@ export default function ElencoPage() {
         return
       }
 
-      // Buscar dados completos dos jogadores favoritos com informações do time
+      // Buscar dados completos dos jogadores favoritos - QUERY SIMPLIFICADA
       const { data: playersData, error: playersError } = await supabase
         .from('players')
         .select(`
@@ -1418,7 +1418,6 @@ export default function ElencoPage() {
         const playersWithFavorites = (playersData || []).map(player => ({
           ...player,
           is_favorite: true,
-          // Garantir que o clube seja mostrado corretamente
           club: player.teams?.name || 'Sem time',
           logo_url: player.teams?.logo_url || null
         }))
@@ -1575,11 +1574,11 @@ export default function ElencoPage() {
       shouldExpand: true
     }))
     
-    // Navegar para a página de jogadores
-    router.push('/dashboard/jogadores')
+    // Navegar para a página de jogadores com hash
+    router.push(`/dashboard/jogadores#player-${player.id}`)
   }
 
-  // NOVA FUNÇÃO: Abrir chat com o técnico dono do time do jogador - CORRIGIDA
+  // CORREÇÃO: Função para buscar informações do time - QUERY SIMPLIFICADA
   const handleProposeToCoach = async (player: Player) => {
     if (!player.team_id) {
       alert('Este jogador não tem um time associado.')
@@ -1587,18 +1586,14 @@ export default function ElencoPage() {
     }
 
     try {
-      // Buscar informações do time CORRETAMENTE
+      // Buscar informações do time CORRETAMENTE - QUERY SIMPLIFICADA
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .select(`
           id,
           name,
           logo_url,
-          profiles!teams_user_id_fkey (
-            id,
-            coach_name,
-            user_id
-          )
+          user_id
         `)
         .eq('id', player.team_id)
         .single()
@@ -1609,8 +1604,14 @@ export default function ElencoPage() {
         return
       }
 
-      const coachProfile = teamData.profiles
-      if (!coachProfile) {
+      // Buscar perfil do técnico
+      const { data: coachProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, coach_name, user_id')
+        .eq('user_id', teamData.user_id)
+        .single()
+
+      if (profileError || !coachProfile) {
         alert('Não foi possível encontrar o técnico deste time.')
         return
       }
@@ -1681,7 +1682,6 @@ export default function ElencoPage() {
       
       // Recarregar conversas para garantir que a nova apareça
       setTimeout(() => {
-        // Disparar evento para forçar recarregamento das conversas no chat
         window.dispatchEvent(new CustomEvent('forceReloadConversations'))
       }, 500)
 
@@ -1702,6 +1702,29 @@ export default function ElencoPage() {
     } catch (error) {
       console.error('Erro ao compartilhar jogador:', error)
       alert('Erro ao abrir chat com o técnico.')
+    }
+  }
+
+  // NOVA FUNÇÃO: Remover jogador dos favoritos
+  const handleRemoveFromFavorites = async (player: Player) => {
+    if (!user) return
+
+    try {
+      const { error } = await supabase
+        .from('player_favorites')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('player_id', player.id)
+
+      if (error) throw error
+
+      // Atualizar lista local
+      setFavoritePlayers(prev => prev.filter(p => p.id !== player.id))
+      
+      alert('Jogador removido dos favoritos!')
+    } catch (error) {
+      console.error('Erro ao remover dos favoritos:', error)
+      alert('Erro ao remover jogador dos favoritos.')
     }
   }
 
@@ -2085,6 +2108,20 @@ export default function ElencoPage() {
         tabIndex={0}
         style={{ WebkitTapHighlightColor: 'transparent' }}
       >
+        {/* BOTÃO DE REMOVER DOS FAVORITOS - NOVO */}
+        {activeSection === 'favoritos' && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleRemoveFromFavorites(player)
+            }}
+            className="absolute top-2 lg:top-3 right-2 lg:right-3 z-20 bg-black/70 backdrop-blur p-1.5 rounded-full border border-zinc-700 hover:bg-red-600/20 transition-all"
+            title="Remover dos favoritos"
+          >
+            <Trash2 className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-red-400" />
+          </button>
+        )}
+
         {/* FOTO MENOR + OVR DESTACADO SEM NOME EM CIMA */}
         <div className="relative h-40 lg:h-52 bg-zinc-800">
           {player.photo_url ? (
@@ -2527,18 +2564,31 @@ export default function ElencoPage() {
                               <div className="flex items-center justify-end gap-2 lg:gap-3">
                                 <div className="flex items-center gap-2">
                                   {activeSection === 'favoritos' ? (
-                                    // Botão Proposta para favoritos
-                                    <Button
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        handleSharePlayer(j)
-                                      }}
-                                      className="bg-green-600 hover:bg-green-700 text-white h-8 lg:h-9 px-3 lg:px-4 flex items-center justify-center"
-                                    >
-                                      <MessageCircle className="w-4 h-4 mr-1 lg:mr-2" />
-                                      <span className="text-xs">Proposta</span>
-                                    </Button>
+                                    // Botões para favoritos
+                                    <>
+                                      <Button
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSharePlayer(j)
+                                        }}
+                                        className="bg-green-600 hover:bg-green-700 text-white h-8 lg:h-9 px-3 lg:px-4 flex items-center justify-center"
+                                      >
+                                        <MessageCircle className="w-4 h-4 mr-1 lg:mr-2" />
+                                        <span className="text-xs">Proposta</span>
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleRemoveFromFavorites(j)
+                                        }}
+                                        className="bg-red-600 hover:bg-red-700 text-white h-8 lg:h-9 w-8 lg:w-9 p-0 flex items-center justify-center"
+                                        title="Remover dos favoritos"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </>
                                   ) : (
                                     // Botões padrão para elenco
                                     <>
