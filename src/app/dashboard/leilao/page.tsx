@@ -22,6 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
+import FloatingChatButton from '@/components/FloatingChatButton'
+import ChatPopup from '@/components/Chatpopup'
 
 interface Player {
   id: string
@@ -248,6 +250,10 @@ export default function PaginaLeilao() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [profile, setProfile] = useState<any>(null)
   
+  // Estados para o chat
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+
   // Estados para o modal de criar leilão
   const [createAuctionModalOpen, setCreateAuctionModalOpen] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState('')
@@ -284,6 +290,60 @@ export default function PaginaLeilao() {
   useEffect(() => {
     loadInitialData()
   }, [])
+
+  // Carregar contagem de mensagens não lidas
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data: conversations } = await supabase
+          .from('conversations')
+          .select('id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+
+        if (!conversations?.length) {
+          setUnreadCount(0)
+          return
+        }
+
+        const conversationIds = conversations.map(conv => conv.id)
+        
+        const { count } = await supabase
+          .from('private_messages')
+          .select('*', { count: 'exact', head: true })
+          .in('conversation_id', conversationIds)
+          .eq('read', false)
+          .neq('sender_id', user.id)
+
+        setUnreadCount(count || 0)
+      } catch (error) {
+        console.error('Erro ao carregar contagem de mensagens:', error)
+      }
+    }
+
+    loadUnreadCount()
+
+    // Subscription para atualizar em tempo real
+    const subscription = supabase
+      .channel('unread_messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        () => {
+          loadUnreadCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [user])
 
   // CONTAGEM REGRESSIVA SEPARADA
   useEffect(() => {
@@ -1036,6 +1096,18 @@ export default function PaginaLeilao() {
     return filtered
   }
 
+  // Criar objetos compatíveis com os componentes de chat
+  const chatUser = {
+    id: user?.id || '',
+    name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
+    email: user?.email || ''
+  }
+
+  const chatTeam = {
+    id: team?.id || '',
+    name: team?.name || 'Sem time'
+  }
+
   const renderTabContent = () => {
     const tabAuctions = getAuctionsByTab()
 
@@ -1349,6 +1421,25 @@ export default function PaginaLeilao() {
             </div>
           </div>
         </div>
+
+        {/* Chat Components */}
+        {user && team && (
+          <>
+            <FloatingChatButton 
+              currentUser={chatUser}
+              currentTeam={chatTeam}
+              unreadCount={unreadCount}
+              onOpenChat={() => setIsChatOpen(true)}
+            />
+            
+            <ChatPopup
+              isOpen={isChatOpen}
+              onClose={() => setIsChatOpen(false)}
+              currentUser={chatUser}
+              currentTeam={chatTeam}
+            />
+          </>
+        )}
       </div>
     </div>
   )

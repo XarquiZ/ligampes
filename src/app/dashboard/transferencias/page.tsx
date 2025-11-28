@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
+import FloatingChatButton from '@/components/FloatingChatButton'
+import ChatPopup from '@/components/Chatpopup'
 
 // Função de formatar valor
 function formatBalance(value: number): string {
@@ -54,6 +56,10 @@ export default function PaginaTransferencias() {
   const [profile, setProfile] = useState<any>(null)
   const [team, setTeam] = useState<Team | null>(null)
 
+  // Estados para o chat
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+
   useEffect(() => {
     loadData()
     
@@ -72,6 +78,60 @@ export default function PaginaTransferencias() {
       subscription.unsubscribe()
     }
   }, [supabase])
+
+  // Carregar contagem de mensagens não lidas
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data: conversations } = await supabase
+          .from('conversations')
+          .select('id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+
+        if (!conversations?.length) {
+          setUnreadCount(0)
+          return
+        }
+
+        const conversationIds = conversations.map(conv => conv.id)
+        
+        const { count } = await supabase
+          .from('private_messages')
+          .select('*', { count: 'exact', head: true })
+          .in('conversation_id', conversationIds)
+          .eq('read', false)
+          .neq('sender_id', user.id)
+
+        setUnreadCount(count || 0)
+      } catch (error) {
+        console.error('Erro ao carregar contagem de mensagens:', error)
+      }
+    }
+
+    loadUnreadCount()
+
+    // Subscription para atualizar em tempo real
+    const subscription = supabase
+      .channel('unread_messages')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        () => {
+          loadUnreadCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [user])
 
   // Carregar detalhes dos jogadores de troca
   const loadExchangePlayersDetails = async (transfer: any) => {
@@ -325,6 +385,18 @@ export default function PaginaTransferencias() {
   // Contadores para as abas
   const pendingCount = allTransfers.filter(t => t.status === 'pending').length
   const completedCount = allTransfers.filter(t => t.status === 'approved').length
+
+  // Criar objetos compatíveis com os componentes de chat
+  const chatUser = {
+    id: user?.id || '',
+    name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
+    email: user?.email || ''
+  }
+
+  const chatTeam = {
+    id: team?.id || '',
+    name: team?.name || 'Sem time'
+  }
 
   if (loading) {
     return (
@@ -732,6 +804,25 @@ export default function PaginaTransferencias() {
             )}
           </div>
         </div>
+
+        {/* Chat Components */}
+        {user && team && (
+          <>
+            <FloatingChatButton 
+              currentUser={chatUser}
+              currentTeam={chatTeam}
+              unreadCount={unreadCount}
+              onOpenChat={() => setIsChatOpen(true)}
+            />
+            
+            <ChatPopup
+              isOpen={isChatOpen}
+              onClose={() => setIsChatOpen(false)}
+              currentUser={chatUser}
+              currentTeam={chatTeam}
+            />
+          </>
+        )}
       </div>
     </div>
   )
