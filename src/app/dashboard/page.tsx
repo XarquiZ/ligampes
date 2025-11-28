@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COM BOTÃO EDITAR
+// src/app/dashboard/page.tsx - VERSÃO ATUALIZADA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -171,27 +171,47 @@ export default function Dashboard() {
 
     setIsUpdating(true)
     try {
+      console.log('📝 Tentando atualizar coach_name para:', {
+        userId: user.id,
+        newName: newCoachName.trim()
+      })
+
       const { data, error } = await supabase
         .from('profiles')
         .update({ 
-          coach_name: newCoachName.trim(),
-          updated_at: new Date().toISOString()
+          coach_name: newCoachName.trim()
         })
         .eq('id', user.id)
         .select()
         .single()
 
+      console.log('🔍 Resposta completa do Supabase:', {
+        data,
+        error,
+        errorDetails: error ? {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        } : null
+      })
+
       if (error) {
-        console.error('Erro ao atualizar nome do técnico:', error)
-        alert('Erro ao atualizar nome. Tente novamente.')
-      } else {
-        setProfile(data)
-        setIsEditingName(false)
-        console.log('Nome do técnico atualizado com sucesso!')
+        throw error
       }
-    } catch (error) {
-      console.error('Erro ao atualizar nome do técnico:', error)
-      alert('Erro ao atualizar nome. Tente novamente.')
+
+      setProfile(data)
+      setIsEditingName(false)
+      console.log('✅ Nome do técnico atualizado com sucesso!')
+      
+    } catch (error: any) {
+      console.error('❌ Erro ao atualizar nome do técnico:', error)
+      
+      if (error.code === '42501') {
+        alert('Permissão negada. Verifique as políticas RLS da tabela profiles.')
+      } else {
+        alert(`Erro ao atualizar nome: ${error.message}`)
+      }
     } finally {
       setIsUpdating(false)
     }
@@ -329,9 +349,10 @@ export default function Dashboard() {
                           value={newCoachName}
                           onChange={(e) => setNewCoachName(e.target.value)}
                           onKeyDown={handleKeyPress}
-                          className="text-2xl lg:text-4xl font-black text-white bg-transparent border-b-2 border-purple-500 outline-none px-2 py-1"
+                          className="text-2xl lg:text-4xl font-black text-white bg-transparent border-b-2 border-purple-500 outline-none px-2 py-1 min-w-[200px]"
                           placeholder="Digite o nome..."
                           autoFocus
+                          disabled={isUpdating}
                         />
                       </div>
                       <div className="flex gap-2 justify-center md:justify-start">
@@ -339,7 +360,7 @@ export default function Dashboard() {
                           onClick={updateCoachName}
                           disabled={isUpdating || !newCoachName.trim()}
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white"
+                          className="bg-green-600 hover:bg-green-700 text-white px-4"
                         >
                           {isUpdating ? 'Salvando...' : 'OK'}
                         </Button>
@@ -348,7 +369,7 @@ export default function Dashboard() {
                           disabled={isUpdating}
                           size="sm"
                           variant="outline"
-                          className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white"
+                          className="border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4"
                         >
                           Cancelar
                         </Button>
@@ -361,10 +382,10 @@ export default function Dashboard() {
                         onClick={startEditing}
                         variant="ghost"
                         size="sm"
-                        className="p-1 h-auto text-white/70 hover:text-white hover:bg-white/10 rounded-full"
+                        className="p-1 h-auto text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all"
                         title="Editar nome do técnico"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-4 w-4 lg:h-5 lg:w-5" />
                       </Button>
                     </>
                   )}

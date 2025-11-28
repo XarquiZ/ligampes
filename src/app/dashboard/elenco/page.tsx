@@ -1378,7 +1378,7 @@ export default function ElencoPage() {
     }
   }, [])
 
-  // Carregar jogadores favoritos
+  // Carregar jogadores favoritos - ATUALIZADO para incluir informações do time
   const loadFavoritePlayers = useCallback(async () => {
     if (!user) return
 
@@ -1401,16 +1401,26 @@ export default function ElencoPage() {
         return
       }
 
-      // Buscar dados completos dos jogadores favoritos
+      // Buscar dados completos dos jogadores favoritos com informações do time
       const { data: playersData, error: playersError } = await supabase
         .from('players')
-        .select('*')
+        .select(`
+          *,
+          teams (
+            id,
+            name,
+            logo_url
+          )
+        `)
         .in('id', favoriteIds)
 
       if (!playersError) {
         const playersWithFavorites = (playersData || []).map(player => ({
           ...player,
-          is_favorite: true
+          is_favorite: true,
+          // Garantir que o clube seja mostrado corretamente
+          club: player.teams?.name || 'Sem time',
+          logo_url: player.teams?.logo_url || null
         }))
         setFavoritePlayers(playersWithFavorites)
       }
@@ -1556,13 +1566,96 @@ export default function ElencoPage() {
     setDismissModalOpen(true)
   }
 
+  // NOVA FUNÇÃO: Abrir chat com o técnico dono do time do jogador
+  const handleProposeToCoach = async (player: Player) => {
+    if (!player.team_id) {
+      alert('Este jogador não tem um time associado.')
+      return
+    }
+
+    try {
+      // Buscar informações do time e do técnico dono
+      const { data: teamData, error: teamError } = await supabase
+        .from('teams')
+        .select(`
+          id,
+          name,
+          profiles (
+            id,
+            coach_name,
+            user_id
+          )
+        `)
+        .eq('id', player.team_id)
+        .single()
+
+      if (teamError || !teamData) {
+        console.error('Erro ao buscar informações do time:', teamError)
+        alert('Erro ao buscar informações do técnico.')
+        return
+      }
+
+      const coachProfile = teamData.profiles
+      if (!coachProfile) {
+        alert('Não foi possível encontrar o técnico deste time.')
+        return
+      }
+
+      // Verificar se já existe uma conversa com este técnico
+      const { data: existingConversation, error: conversationError } = await supabase
+        .from('conversations')
+        .select('id')
+        .or(`user1_id.eq.${user?.id},user2_id.eq.${user?.id}`)
+        .or(`user1_id.eq.${coachProfile.user_id},user2_id.eq.${coachProfile.user_id}`)
+        .single()
+
+      let conversationId
+
+      if (existingConversation) {
+        // Usar conversa existente
+        conversationId = existingConversation.id
+      } else {
+        // Criar nova conversa
+        const { data: newConversation, error: newConversationError } = await supabase
+          .from('conversations')
+          .insert([
+            {
+              user1_id: user?.id,
+              user2_id: coachProfile.user_id,
+              team1_id: team?.id,
+              team2_id: teamData.id,
+              created_at: new Date().toISOString()
+            }
+          ])
+          .select()
+          .single()
+
+        if (newConversationError) {
+          console.error('Erro ao criar conversa:', newConversationError)
+          alert('Erro ao iniciar conversa com o técnico.')
+          return
+        }
+
+        conversationId = newConversation.id
+      }
+
+      // Abrir o chat popup com a conversa específica
+      setIsChatOpen(true)
+      
+      // Aqui você pode implementar lógica adicional para focar na conversa específica
+      // Isso dependerá da implementação do seu componente de chat
+      console.log('Abrindo conversa com o técnico:', coachProfile.coach_name, 'Conversa ID:', conversationId)
+
+    } catch (error) {
+      console.error('Erro ao processar proposta:', error)
+      alert('Erro ao processar a proposta.')
+    }
+  }
+
   // Função para compartilhar jogador no chat
   const handleSharePlayer = (player: Player) => {
-    // Abrir o chat popup
-    setIsChatOpen(true)
-    // Aqui você pode implementar a lógica para compartilhar o jogador diretamente no chat
-    // Isso dependerá da implementação do seu componente de chat
-    console.log('Compartilhar jogador no chat:', player)
+    // Usar a nova função de proposta para técnico
+    handleProposeToCoach(player)
   }
 
   // Função para confirmar dispensa - VERSÃO SIMPLIFICADA E ROBUSTA
@@ -1793,23 +1886,28 @@ export default function ElencoPage() {
     )
   }, [isTransitioning])
 
-  // NOVA FUNÇÃO: Handle click no card do grid para expandir na lista
+  // NOVA FUNÇÃO: Handle click no card do grid para expandir na lista (APENAS PARA ELENCO)
   const handleGridCardClick = useCallback((player: Player) => {
-    // Mudar para vista de lista
-    setViewMode('list')
-    
-    // Aguardar um pouco para a transição de vista e depois expandir o jogador
-    setTimeout(() => {
-      // Fechar todos os outros e abrir apenas este jogador
-      setOpenedPlayers([player.id])
+    if (activeSection === 'elenco') {
+      // Mudar para vista de lista
+      setViewMode('list')
       
-      // Scroll para o jogador
-      const element = document.getElementById(`player-${player.id}`)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      }
-    }, 100)
-  }, [])
+      // Aguardar um pouco para a transição de vista e depois expandir o jogador
+      setTimeout(() => {
+        // Fechar todos os outros e abrir apenas este jogador
+        setOpenedPlayers([player.id])
+        
+        // Scroll para o jogador
+        const element = document.getElementById(`player-${player.id}`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 100)
+    } else if (activeSection === 'favoritos') {
+      // Para favoritos, navegar para a página de jogadores com o card expandido
+      router.push(`/jogadores?playerId=${player.id}&expand=true`)
+    }
+  }, [activeSection, router])
 
   // Determinar quais jogadores mostrar baseado na seção ativa
   const playersToShow = useMemo(() => {
@@ -1910,7 +2008,7 @@ export default function ElencoPage() {
     </div>
   )
 
-  // Componente de Card de Jogador Reutilizável
+  // Componente de Card de Jogador Reutilizável - ATUALIZADO para favoritos
   const PlayerCard = ({ player, showProposeButton = false }: { player: Player; showProposeButton?: boolean }) => {
     const stats = getPlayerStats(player)
     
@@ -1935,6 +2033,20 @@ export default function ElencoPage() {
             <span className="text-2xl lg:text-3xl font-black text-yellow-400">{player.overall}</span>
             <span className="text-[8px] lg:text-[10px] text-zinc-300 -mt-1">OVR</span>
           </div>
+
+          {/* NOVO: Clube atual no card em grid (apenas para favoritos) */}
+          {activeSection === 'favoritos' && player.club && (
+            <div className="absolute bottom-2 lg:bottom-3 left-2 lg:left-3 bg-black/70 backdrop-blur px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg border border-zinc-700 flex items-center gap-2">
+              {player.logo_url && (
+                <img 
+                  src={player.logo_url} 
+                  alt={player.club}
+                  className="w-4 h-4 lg:w-5 lg:h-5 rounded-full object-contain"
+                />
+              )}
+              <span className="text-xs lg:text-sm text-white font-medium">{player.club}</span>
+            </div>
+          )}
         </div>
 
         {/* ÁREA DE INFORMAÇÕES FORA DA FOTO */}
@@ -2266,7 +2378,7 @@ export default function ElencoPage() {
                     {filteredPlayers.map(j => (
                       <div
                         key={j.id}
-                        onClick={() => activeSection === 'elenco' && handleGridCardClick(j)}
+                        onClick={() => handleGridCardClick(j)}
                         onMouseDown={(e) => e.preventDefault()}
                         tabIndex={0}
                         style={{ WebkitTapHighlightColor: 'transparent' }}
@@ -2323,7 +2435,10 @@ export default function ElencoPage() {
                                 <p className="text-zinc-500">Clube</p>
                                 <div className="flex items-center gap-2">
                                   {renderClubLogo(j.logo_url, j.club)}
-                                  <span className="text-xs lg:text-sm">{j.club}</span>
+                                  <span className="text-xs lg:text-sm">
+                                    {/* ATUALIZADO: Mostrar o clube correto para favoritos */}
+                                    {activeSection === 'favoritos' ? (j.club || 'Sem time') : j.club}
+                                  </span>
                                 </div>
                               </div>
                               <div>
@@ -2381,16 +2496,14 @@ export default function ElencoPage() {
                                           <X className="w-4 h-4" />
                                         </Button>
                                       )}
-                                    </>
-                                  )}
 
-                                  {activeSection === 'elenco' && (
-                                    <ChevronDown
-                                      className={cn(
-                                        "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300 flex-shrink-0",
-                                        isOpen && "rotate-180 text-purple-400"
-                                      )}
-                                    />
+                                      <ChevronDown
+                                        className={cn(
+                                          "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300 flex-shrink-0",
+                                          isOpen && "rotate-180 text-purple-400"
+                                        )}
+                                      />
+                                    </>
                                   )}
                                 </div>
                               </div>
