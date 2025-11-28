@@ -134,6 +134,11 @@ export default function ListaJogadores() {
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
 
+  // Estados para favoritos
+  const [favoritePlayers, setFavoritePlayers] = useState<string[]>([])
+  const [showFavoriteToast, setShowFavoriteToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState('')
+
   // Constantes movidas para dentro do componente para evitar hoisting
   const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
   const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
@@ -280,6 +285,67 @@ export default function ListaJogadores() {
     )
   }, [isTransitioning])
 
+  // Funções para favoritos
+  const loadFavoritePlayers = useCallback(async () => {
+    if (!user) return
+
+    try {
+      const { data: favoritesData, error } = await supabase
+        .from('player_favorites')
+        .select('player_id')
+        .eq('user_id', user.id)
+
+      if (!error) {
+        const favoriteIds = favoritesData.map(fav => fav.player_id)
+        setFavoritePlayers(favoriteIds)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar favoritos:', error)
+    }
+  }, [user])
+
+  const toggleFavorite = async (playerId: string) => {
+    if (!user) return
+
+    const isCurrentlyFavorite = favoritePlayers.includes(playerId)
+
+    try {
+      if (isCurrentlyFavorite) {
+        // Remover dos favoritos
+        const { error } = await supabase
+          .from('player_favorites')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('player_id', playerId)
+
+        if (error) throw error
+        
+        setFavoritePlayers(prev => prev.filter(id => id !== playerId))
+        setToastMessage('Jogador removido dos favoritos!')
+      } else {
+        // Adicionar aos favoritos
+        const { error } = await supabase
+          .from('player_favorites')
+          .insert([
+            { user_id: user.id, player_id: playerId }
+          ])
+
+        if (error) throw error
+        
+        setFavoritePlayers(prev => [...prev, playerId])
+        setToastMessage('Jogador adicionado aos favoritos!')
+      }
+
+      setShowFavoriteToast(true)
+      setTimeout(() => setShowFavoriteToast(false), 3000)
+    } catch (error) {
+      console.error('Erro ao atualizar favorito:', error)
+      setToastMessage('Erro ao atualizar favorito!')
+      setShowFavoriteToast(true)
+      setTimeout(() => setShowFavoriteToast(false), 3000)
+    }
+  }
+
   const [searchName, setSearchName] = useState('')
   const [filterPosition, setFilterPosition] = useState('Todas')
   const [filterFoot, setFilterFoot] = useState('Todos')
@@ -320,6 +386,11 @@ export default function ListaJogadores() {
 
     loadUserData()
   }, [authLoading, user])
+
+  // Carregar favoritos quando o usuário mudar
+  useEffect(() => {
+    loadFavoritePlayers()
+  }, [loadFavoritePlayers])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -846,6 +917,24 @@ export default function ListaJogadores() {
                     onClick={() => !isTransitioning && handleGridCardClick(j.id)}
                     className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer"
                   >
+                    {/* BOTÃO DE FAVORITO - NOVO */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleFavorite(j.id)
+                      }}
+                      className="absolute top-2 lg:top-3 left-2 lg:left-3 z-20 bg-black/70 backdrop-blur p-1.5 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all"
+                    >
+                      <Star 
+                        className={cn(
+                          "w-3 h-3 lg:w-4 lg:h-4 transition-all",
+                          favoritePlayers.includes(j.id) 
+                            ? "fill-yellow-400 text-yellow-400" 
+                            : "text-zinc-400 hover:text-yellow-400"
+                        )} 
+                      />
+                    </button>
+
                     {userRole === 'admin' && (
                       <button
                         onClick={(e) => {
@@ -927,7 +1016,25 @@ export default function ListaJogadores() {
                         className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
                         onClick={() => !isTransitioning && togglePlayer(j.id)}
                       >
-                        <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
+                        <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0 relative">
+                          {/* BOTÃO DE FAVORITO NA FOTO - NOVO */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleFavorite(j.id)
+                            }}
+                            className="absolute -top-1 -right-1 z-20 bg-black/80 backdrop-blur p-1.5 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all"
+                          >
+                            <Star 
+                              className={cn(
+                                "w-3 h-3 lg:w-4 lg:h-4 transition-all",
+                                favoritePlayers.includes(j.id) 
+                                  ? "fill-yellow-400 text-yellow-400" 
+                                  : "text-zinc-400 hover:text-yellow-400"
+                              )} 
+                            />
+                          </button>
+
                           {j.photo_url ? (
                             <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
                           ) : (
@@ -1186,6 +1293,27 @@ export default function ListaJogadores() {
               </div>
             )}
           </div>
+
+          {/* Toast de Feedback para Favoritos */}
+          {showFavoriteToast && (
+            <div className="fixed top-4 right-4 z-50 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-4 rounded-xl shadow-2xl border border-white/10 backdrop-blur-xl animate-in slide-in-from-right-8 duration-300">
+              <div className="flex items-center gap-3">
+                <Star className={cn(
+                  "w-5 h-5",
+                  toastMessage.includes('adicionado') ? "fill-yellow-400 text-yellow-400" : "text-white"
+                )} />
+                <div>
+                  <p className="font-bold text-sm">{toastMessage}</p>
+                  <p className="text-purple-200 text-xs mt-1">
+                    {toastMessage.includes('adicionado') 
+                      ? 'Agora ele aparece na aba "Favoritos" do seu elenco!' 
+                      : 'Ele foi removido da sua lista de favoritos.'
+                    }
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Chat Components */}
