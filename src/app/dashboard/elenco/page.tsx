@@ -1905,7 +1905,7 @@ export default function ElencoPage() {
       }, 100)
     } else if (activeSection === 'favoritos') {
       // Para favoritos, navegar para a página de jogadores com o card expandido
-      router.push(`/jogadores?playerId=${player.id}&expand=true`)
+      router.push(`/dashboard/jogadores?playerId=${player.id}&expand=true`)
     }
   }, [activeSection, router])
 
