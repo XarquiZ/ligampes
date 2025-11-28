@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA
+// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA COM DADOS REAIS
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -59,6 +59,22 @@ export default function Dashboard() {
   const [isEditingName, setIsEditingName] = useState(false)
   const [newCoachName, setNewCoachName] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+
+  // Novos estados para dados reais
+  const [balanceTransactions, setBalanceTransactions] = useState<any[]>([])
+  const [playersStats, setPlayersStats] = useState({
+    totalPlayers: 0,
+    freePlayers: 0,
+    contractedPlayers: 0,
+    ratingDistribution: {
+      '75+': 0,
+      '80+': 0, 
+      '85+': 0,
+      '90+': 0
+    }
+  })
+  const [activeAuctions, setActiveAuctions] = useState<any[]>([])
+  const [pendingTransfers, setPendingTransfers] = useState(0)
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -144,6 +160,133 @@ export default function Dashboard() {
 
     loadUserData()
   }, [authLoading, user])
+
+  // Carregar dados reais do banco
+  useEffect(() => {
+    if (team?.id) {
+      loadBalanceTransactions()
+      loadPlayersStats()
+      loadActiveAuctions()
+      loadPendingTransfers()
+    }
+  }, [team?.id])
+
+  // Função para carregar transações de saldo REAIS
+  const loadBalanceTransactions = async () => {
+    try {
+      const { data: transactions, error } = await supabase
+        .from('balance_transactions')
+        .select('*')
+        .eq('team_id', team?.id)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      if (!error) {
+        setBalanceTransactions(transactions || [])
+      } else {
+        console.error('Erro ao carregar transações:', error)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar transações:', error)
+    }
+  }
+
+  // Função para carregar estatísticas REAIS dos jogadores
+  const loadPlayersStats = async () => {
+    try {
+      // Total de jogadores
+      const { count: totalPlayers, error: totalError } = await supabase
+        .from('players')
+        .select('*', { count: 'exact', head: true })
+
+      if (totalError) console.error('Erro total players:', totalError)
+
+      // Jogadores livres (sem time)
+      const { count: freePlayers, error: freeError } = await supabase
+        .from('players')
+        .select('*', { count: 'exact', head: true })
+        .is('team_id', null)
+
+      if (freeError) console.error('Erro free players:', freeError)
+
+      // Jogadores contratados
+      const { count: contractedPlayers, error: contractedError } = await supabase
+        .from('players')
+        .select('*', { count: 'exact', head: true })
+        .not('team_id', 'is', null)
+
+      if (contractedError) console.error('Erro contracted players:', contractedError)
+
+      // Distribuição por rating (usando dados reais da coluna overall)
+      const { data: ratingData, error: ratingError } = await supabase
+        .from('players')
+        .select('overall')
+
+      const distribution = {
+        '75+': 0,
+        '80+': 0,
+        '85+': 0,
+        '90+': 0
+      }
+
+      if (ratingData && !ratingError) {
+        ratingData.forEach(player => {
+          const overall = player.overall || 0
+          if (overall >= 90) distribution['90+']++
+          else if (overall >= 85) distribution['85+']++
+          else if (overall >= 80) distribution['80+']++
+          else if (overall >= 75) distribution['75+']++
+        })
+      }
+
+      setPlayersStats({
+        totalPlayers: totalPlayers || 0,
+        freePlayers: freePlayers || 0,
+        contractedPlayers: contractedPlayers || 0,
+        ratingDistribution: distribution
+      })
+
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas:', error)
+    }
+  }
+
+  // Função para carregar leilões ativos REAIS
+  const loadActiveAuctions = async () => {
+    try {
+      const { data: auctions, error } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+
+      if (!error) {
+        setActiveAuctions(auctions || [])
+      } else {
+        console.error('Erro ao carregar leilões:', error)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar leilões:', error)
+    }
+  }
+
+  // Função para carregar transferências pendentes REAIS
+  const loadPendingTransfers = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('player_transfers')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+
+      if (!error) {
+        setPendingTransfers(count || 0)
+      } else {
+        console.error('Erro ao carregar transferências:', error)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar transferências:', error)
+    }
+  }
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -370,24 +513,60 @@ export default function Dashboard() {
   const renderPreview = (tileTitle: string) => {
     switch (tileTitle) {
       case 'SALDO':
+        const recentTransactions = balanceTransactions.slice(0, 3)
+        const totalCredits = balanceTransactions
+          .filter(t => t.type === 'credit')
+          .reduce((sum, t) => sum + (t.amount || 0), 0)
+        const totalDebits = balanceTransactions
+          .filter(t => t.type === 'debit')
+          .reduce((sum, t) => sum + (t.amount || 0), 0)
+
         return (
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
               <span className="text-emerald-400 text-sm font-semibold">Saldo Disponível</span>
               <span className="text-emerald-400 font-bold text-lg">{formatBalance(team?.balance || 0)}</span>
             </div>
+            
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
                 <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-                <div className="text-emerald-400 font-semibold">+ R$ 0</div>
-                <div className="text-zinc-400 text-xs">Entradas</div>
+                <div className="text-emerald-400 font-semibold text-sm">+ {formatBalance(totalCredits)}</div>
+                <div className="text-zinc-400 text-xs">Total Entradas</div>
               </div>
               <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
                 <TrendingDown className="w-4 h-4 text-red-400 mx-auto mb-1" />
-                <div className="text-red-400 font-semibold">- R$ 0</div>
-                <div className="text-zinc-400 text-xs">Saídas</div>
+                <div className="text-red-400 font-semibold text-sm">- {formatBalance(totalDebits)}</div>
+                <div className="text-zinc-400 text-xs">Total Saídas</div>
               </div>
             </div>
+
+            {/* ÚLTIMAS TRANSAÇÕES */}
+            {recentTransactions.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-zinc-400 text-sm font-semibold">Últimas Movimentações:</p>
+                {recentTransactions.map((transaction) => (
+                  <div 
+                    key={transaction.id}
+                    className="flex justify-between items-center p-2 bg-zinc-800/30 rounded text-xs"
+                  >
+                    <div className="flex-1 truncate">
+                      <p className="text-white truncate">{transaction.description}</p>
+                      {transaction.player_name && (
+                        <p className="text-zinc-400 text-[10px]">{transaction.player_name}</p>
+                      )}
+                    </div>
+                    <div className={`font-bold ${transaction.type === 'credit' ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {transaction.type === 'credit' ? '+' : '-'} {formatBalance(transaction.amount || 0)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-zinc-500 text-sm">Nenhuma transação recente</p>
+              </div>
+            )}
           </div>
         )
       
@@ -430,26 +609,26 @@ export default function Dashboard() {
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-pink-500/10 rounded-lg border border-pink-500/20">
               <span className="text-pink-400 text-sm font-semibold">Database Completa</span>
-              <span className="text-pink-400 font-bold text-lg">150+</span>
+              <span className="text-pink-400 font-bold text-lg">{playersStats.totalPlayers}</span>
             </div>
             
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Jogadores Livres</span>
-                <span className="text-green-400 font-semibold">45</span>
+                <span className="text-green-400 font-semibold">{playersStats.freePlayers}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Contratados</span>
-                <span className="text-blue-400 font-semibold">105</span>
+                <span className="text-blue-400 font-semibold">{playersStats.contractedPlayers}</span>
               </div>
             </div>
 
             <div className="flex gap-2">
               {[
-                { rating: '75+', count: '25', color: 'text-yellow-400' },
-                { rating: '80+', count: '15', color: 'text-orange-400' },
-                { rating: '85+', count: '8', color: 'text-red-400' },
-                { rating: '90+', count: '2', color: 'text-purple-400' }
+                { rating: '75+', count: playersStats.ratingDistribution['75+'], color: 'text-yellow-400' },
+                { rating: '80+', count: playersStats.ratingDistribution['80+'], color: 'text-orange-400' },
+                { rating: '85+', count: playersStats.ratingDistribution['85+'], color: 'text-red-400' },
+                { rating: '90+', count: playersStats.ratingDistribution['90+'], color: 'text-purple-400' }
               ].map((item) => (
                 <div key={item.rating} className="flex-1 bg-zinc-800/50 p-2 rounded border border-zinc-700 text-center">
                   <div className={`font-bold text-xs ${item.color}`}>{item.rating}</div>
@@ -461,31 +640,52 @@ export default function Dashboard() {
         )
       
       case 'LEILÃO':
+        const hasActiveAuctions = activeAuctions.length > 0
+        
         return (
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-              <span className="text-red-400 text-sm font-semibold">Próximo Leilão</span>
-              <span className="text-red-400 font-bold text-lg">EM BREVE</span>
+              <span className="text-red-400 text-sm font-semibold">
+                {hasActiveAuctions ? 'Leilões Ativos' : 'Próximo Leilão'}
+              </span>
+              <span className="text-red-400 font-bold text-lg">
+                {hasActiveAuctions ? activeAuctions.length : 'EM BREVE'}
+              </span>
             </div>
             
             <div className="space-y-2 text-sm">
-              <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
-                <div className="text-orange-400 font-semibold">Aguardando Início</div>
-                <div className="text-zinc-400 text-xs mt-1">Jogadores premium disponíveis em breve</div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-zinc-800/30 p-2 rounded text-center">
-                  <Target className="w-3 h-3 text-yellow-400 mx-auto mb-1" />
-                  <div className="text-white font-semibold">5</div>
-                  <div className="text-zinc-400">Jogadores</div>
+              {hasActiveAuctions ? (
+                <div className="space-y-2">
+                  <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700">
+                    <div className="text-orange-400 font-semibold text-center">
+                      {activeAuctions.length} Leilão{activeAuctions.length > 1 ? 's' : ''} Ativo{activeAuctions.length > 1 ? 's' : ''}
+                    </div>
+                    <div className="text-zinc-400 text-xs text-center mt-1">
+                      Participe agora dos leilões
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-zinc-800/30 p-2 rounded text-center">
+                      <Target className="w-3 h-3 text-yellow-400 mx-auto mb-1" />
+                      <div className="text-white font-semibold">{activeAuctions.length}</div>
+                      <div className="text-zinc-400">Ativos</div>
+                    </div>
+                    <div className="bg-zinc-800/30 p-2 rounded text-center">
+                      <DollarSign className="w-3 h-3 text-emerald-400 mx-auto mb-1" />
+                      <div className="text-white font-semibold">
+                        {activeAuctions.length > 0 ? formatBalance(activeAuctions[0].current_bid || 0) : 'R$ 0'}
+                      </div>
+                      <div className="text-zinc-400">Maior Lance</div>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-zinc-800/30 p-2 rounded text-center">
-                  <DollarSign className="w-3 h-3 text-emerald-400 mx-auto mb-1" />
-                  <div className="text-white font-semibold">85+</div>
-                  <div className="text-zinc-400">OVR Mínimo</div>
+              ) : (
+                <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
+                  <div className="text-orange-400 font-semibold">Aguardando Início</div>
+                  <div className="text-zinc-400 text-xs mt-1">Novos leilões em breve</div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )
@@ -495,14 +695,14 @@ export default function Dashboard() {
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
               <span className="text-purple-400 text-sm font-semibold">Mercado de Transferências</span>
-              <span className="text-purple-400 font-bold text-lg">0</span>
+              <span className="text-purple-400 font-bold text-lg">{pendingTransfers}</span>
             </div>
             
             <div className="space-y-2 text-sm">
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
                   <Clock className="w-4 h-4 text-blue-400 mx-auto mb-1" />
-                  <div className="text-blue-400 font-semibold">0</div>
+                  <div className="text-blue-400 font-semibold">{pendingTransfers}</div>
                   <div className="text-zinc-400 text-xs">Pendentes</div>
                 </div>
                 <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
@@ -513,7 +713,12 @@ export default function Dashboard() {
               </div>
               
               <div className="bg-zinc-800/30 p-2 rounded text-center">
-                <div className="text-zinc-400 text-xs">Negocie jogadores com outros times</div>
+                <div className="text-zinc-400 text-xs">
+                  {pendingTransfers > 0 
+                    ? `${pendingTransfers} negociação${pendingTransfers > 1 ? 'ões' : ''} aguardando aprovação`
+                    : 'Nenhuma negociação pendente'
+                  }
+                </div>
               </div>
             </div>
           </div>
