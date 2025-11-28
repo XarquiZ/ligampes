@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler, Heart, Compare } from 'lucide-react'
+import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler, Heart, GitCompare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
@@ -749,7 +749,7 @@ const SectionSwitch: React.FC<SectionSwitchProps> = ({ activeSection, onSectionC
           activeSection === 'comparacao' && 'bg-blue-600 shadow-lg shadow-blue-600/20'
         )}
       >
-        <Compare className="w-4 h-4 mr-2" />
+        <GitCompare className="w-4 h-4 mr-2" />
         Comparação
       </Button>
     </div>
@@ -1039,7 +1039,7 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
 
       {(!player1 || !player2) && (
         <div className="text-center py-12 bg-zinc-900/30 rounded-xl border border-zinc-700">
-          <Compare className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+          <GitCompare className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-zinc-400 mb-2">Selecione dois jogadores</h3>
           <p className="text-zinc-500">Escolha dois jogadores na database para comparar seus atributos</p>
         </div>
