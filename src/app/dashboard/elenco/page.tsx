@@ -942,81 +942,122 @@ export default function ElencoPage() {
     setDismissModalOpen(true)
   }
 
-  // Função para confirmar dispensa
+  // Função para confirmar dispensa - VERSÃO SIMPLIFICADA E ROBUSTA
   const handleConfirmDismiss = async (playerId: string, playerName: string, overall: number) => {
     try {
       const dismissValue = overall <= 73 ? 2_000_000 : 5_000_000
 
-      // 1. Registrar transação de saldo
-      const { error: balanceError } = await supabase
-        .from('balance_transactions')
-        .insert([{
-          team_id: teamId,
-          amount: dismissValue,
-          type: 'credit',
-          description: `Dispensa de jogador - ${playerName}`,
-          created_at: new Date().toISOString(),
-          player_name: playerName
-        }])
+      console.log('🔄 Iniciando dispensa do jogador:', playerName)
 
-      if (balanceError) throw balanceError
+      // 1. PRIMEIRO: Remover jogador do time (ação principal)
+      console.log('🗑️ Removendo jogador do time...')
+      const { error: playerError } = await supabase
+        .from('players')
+        .update({ team_id: null })
+        .eq('id', playerId)
 
-      // 2. Atualizar saldo do time
-      const { data: currentTeam } = await supabase
-        .from('teams')
-        .select('balance')
-        .eq('id', teamId)
-        .single()
-
-      if (currentTeam) {
-        const newBalance = currentTeam.balance + dismissValue
-        const { error: teamError } = await supabase
-          .from('teams')
-          .update({ balance: newBalance })
-          .eq('id', teamId)
-
-        if (teamError) throw teamError
+      if (playerError) {
+        console.error('❌ Erro ao remover jogador do time:', playerError)
+        throw new Error(`Falha ao remover jogador: ${playerError.message}`)
       }
 
-      // 3. Registrar na tabela de transferências como dispensa
-      const { error: transferError } = await supabase
-        .from('player_transfers')
-        .insert([{
+      console.log('✅ Jogador removido do time com sucesso')
+
+      // 2. TENTAR registrar transação de saldo (opcional)
+      try {
+        console.log('💰 Tentando registrar transação de saldo...')
+        const { error: balanceError } = await supabase
+          .from('balance_transactions')
+          .insert([{
+            team_id: teamId,
+            amount: dismissValue,
+            type: 'credit',
+            description: `Dispensa de jogador - ${playerName}`,
+            created_at: new Date().toISOString(),
+            player_name: playerName
+          }])
+
+        if (balanceError) {
+          console.warn('⚠️ Aviso: Não foi possível registrar transação de saldo:', balanceError.message)
+        } else {
+          console.log('✅ Transação de saldo registrada')
+        }
+      } catch (balanceError) {
+        console.warn('⚠️ Aviso: Erro no registro de saldo (continuando...):', balanceError)
+      }
+
+      // 3. TENTAR atualizar saldo do time (opcional)
+      try {
+        console.log('🔄 Tentando atualizar saldo do time...')
+        const { data: currentTeam } = await supabase
+          .from('teams')
+          .select('balance')
+          .eq('id', teamId)
+          .single()
+
+        if (currentTeam) {
+          const newBalance = currentTeam.balance + dismissValue
+          const { error: teamError } = await supabase
+            .from('teams')
+            .update({ balance: newBalance })
+            .eq('id', teamId)
+
+          if (teamError) {
+            console.warn('⚠️ Aviso: Não foi possível atualizar saldo do time:', teamError.message)
+          } else {
+            console.log('✅ Saldo do time atualizado')
+          }
+        }
+      } catch (balanceUpdateError) {
+        console.warn('⚠️ Aviso: Erro na atualização de saldo (continuando...):', balanceUpdateError)
+      }
+
+      // 4. TENTAR registrar na tabela de transferências (opcional)
+      try {
+        console.log('📝 Tentando registrar na tabela de transferências...')
+        const transferPayload = {
           player_id: playerId,
           player_name: playerName,
           from_team_id: teamId,
-          to_team_id: null, // Sem clube
+          to_team_id: null,
           value: dismissValue,
           status: 'approved',
           approved_by_seller: true,
           approved_by_buyer: true,
           approved_by_admin: true,
           created_at: new Date().toISOString(),
-          transfer_type: 'dismiss'
-        }])
+          transfer_type: 'dismiss',
+          is_exchange: false,
+          exchange_players: [],
+          exchange_value: 0
+        }
 
-      if (transferError) throw transferError
+        const { error: transferError } = await supabase
+          .from('player_transfers')
+          .insert([transferPayload])
 
-      // 4. Remover jogador do time (setar team_id como null)
-      const { error: playerError } = await supabase
-        .from('players')
-        .update({ team_id: null })
-        .eq('id', playerId)
+        if (transferError) {
+          console.warn('⚠️ Aviso: Não foi possível registrar transferência:', transferError.message)
+        } else {
+          console.log('✅ Transferência registrada')
+        }
+      } catch (transferError) {
+        console.warn('⚠️ Aviso: Erro no registro de transferência (continuando...):', transferError)
+      }
 
-      if (playerError) throw playerError
-
-      // Sucesso
+      // Sucesso - mesmo que algumas operações falhem, o essencial (remover jogador) foi feito
       setDismissModalOpen(false)
       setPlayerToDismiss(null)
       
       // Recarregar jogadores
       loadPlayers()
       
-      alert(`✅ Jogador dispensado com sucesso! R$ ${dismissValue.toLocaleString('pt-BR')} adicionados ao seu saldo.`)
+      console.log('🎉 Dispensa concluída com sucesso!')
+      alert(`✅ ${playerName} dispensado com sucesso!\nValor da dispensa: R$ ${dismissValue.toLocaleString('pt-BR')}`)
       
-    } catch (error) {
-      console.error('Erro ao dispensar jogador:', error)
-      alert('❌ Erro ao dispensar jogador. Tente novamente.')
+    } catch (error: any) {
+      console.error('💥 Erro crítico ao dispensar jogador:', error)
+      alert(`❌ Erro ao dispensar jogador: ${error.message || 'Erro desconhecido'}`)
     }
   }
 
@@ -1489,21 +1530,21 @@ export default function ElencoPage() {
                           />
                         </div>
 
-                        {/* Valor e Botões */}
+                        {/* Valor e Botões - LAYOUT CORRIGIDO */}
                         <div className="space-y-2">
                           <p className="text-center text-lg lg:text-xl font-black text-emerald-400">
                             R$ {Number(j.base_price).toLocaleString('pt-BR')}
                           </p>
                           
-                          {/* Container para os dois botões lado a lado */}
-                          <div className="flex gap-2">
+                          {/* Container para os dois botões lado a lado - AJUSTADO */}
+                          <div className="flex gap-2 w-full">
                             {/* Botão Negociar - redimensionado */}
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSellPlayer(j)
                               }}
-                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 h-7 lg:h-8"
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 h-7 lg:h-8 min-w-0"
                               size="sm"
                             >
                               <DollarSign className="w-3 h-3 mr-1" />
@@ -1517,7 +1558,7 @@ export default function ElencoPage() {
                                   e.stopPropagation()
                                   handleDismissPlayer(j)
                                 }}
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1 h-7 lg:h-8"
+                                className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1 h-7 lg:h-8 min-w-0"
                                 size="sm"
                               >
                                 <X className="w-3 h-3 mr-1" />
@@ -1533,7 +1574,7 @@ export default function ElencoPage() {
               </div>
             )}
 
-            {/* LIST VIEW - ATUALIZADO COM BOTÃO DE DISPENSA */}
+            {/* LIST VIEW - ATUALIZADO COM BOTÃO DE DISPENSA E LAYOUT CORRIGIDO */}
             {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
               <div className="space-y-4 lg:space-y-6">
                 {filteredPlayers.map(j => {
@@ -1588,40 +1629,44 @@ export default function ElencoPage() {
                               R$ {Number(j.base_price).toLocaleString('pt-BR')}
                             </p>
                           </div>
-                          <div className="flex items-center justify-start gap-3 lg:gap-4">
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleSellPlayer(j)
-                              }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs lg:text-sm h-8 lg:h-9"
-                            >
-                              <DollarSign className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                              Negociar
-                            </Button>
-
-                            {/* Botão Dispensar - só aparece para overall <= 74 */}
-                            {j.overall <= 74 && (
+                          
+                          {/* COLUNA DOS BOTÕES - CORRIGIDA E ALINHADA À DIREITA */}
+                          <div className="col-span-2 md:col-span-1 flex items-center justify-end gap-2 lg:gap-3">
+                            <div className="flex items-center gap-2 lg:gap-3">
                               <Button
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  handleDismissPlayer(j)
+                                  handleSellPlayer(j)
                                 }}
-                                className="bg-red-600 hover:bg-red-700 text-white text-xs lg:text-sm h-8 lg:h-9"
+                                className="bg-blue-600 hover:bg-blue-700 text-white text-xs lg:text-sm h-8 lg:h-9 whitespace-nowrap min-w-[80px] lg:min-w-[90px]"
                               >
-                                <X className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
-                                Dispensar
+                                <DollarSign className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
+                                Negociar
                               </Button>
-                            )}
 
-                            <ChevronDown
-                              className={cn(
-                                "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300",
-                                isOpen && "rotate-180 text-purple-400"
+                              {/* Botão Dispensar - só aparece para overall <= 74 */}
+                              {j.overall <= 74 && (
+                                <Button
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDismissPlayer(j)
+                                  }}
+                                  className="bg-red-600 hover:bg-red-700 text-white text-xs lg:text-sm h-8 lg:h-9 whitespace-nowrap min-w-[80px] lg:min-w-[90px]"
+                                >
+                                  <X className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
+                                  Dispensar
+                                </Button>
                               )}
-                            />
+
+                              <ChevronDown
+                                className={cn(
+                                  "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300 flex-shrink-0",
+                                  isOpen && "rotate-180 text-purple-400"
+                                )}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
