@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, Calendar, Users, ArrowRightLeft, X } from 'lucide-react'
+import { CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, Calendar, Users, ArrowRightLeft, X, Ban } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -176,7 +176,7 @@ export default function PaginaTransferencias() {
       }
     }
 
-    // 2. Carrega TODAS as negociações
+    // 2. Carrega TODAS as negociações (excluindo as rejeitadas)
     const { data: transferData } = await supabase
       .from('player_transfers')
       .select(`
@@ -200,7 +200,7 @@ export default function PaginaTransferencias() {
     }
     setExchangePlayersDetails(exchangeDetails)
     
-    // Filtra baseado na aba ativa
+    // Filtra baseado na aba ativa (excluindo rejeitadas)
     const filtered = activeTab === 'pending' 
       ? (transferData || []).filter(t => t.status === 'pending')
       : (transferData || []).filter(t => t.status === 'approved')
@@ -331,6 +331,38 @@ export default function PaginaTransferencias() {
     const updatedTransfer = updatedTransfers.find(t => t.id === transferId)
     if (updatedTransfer) {
       await checkAndExecuteTransfer(updatedTransfer)
+    }
+  }
+
+  // NOVA FUNÇÃO: Rejeitar transferência
+  const rejeitarTransferencia = async (transferId: string) => {
+    if (!confirm('Tem certeza que deseja cancelar esta transferência? Esta ação não pode ser desfeita.')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('player_transfers')
+        .update({ 
+          status: 'rejected',
+          approved_by_seller: false,
+          approved_by_buyer: false,
+          approved_by_admin: false
+        })
+        .eq('id', transferId)
+
+      if (error) {
+        alert('Erro ao cancelar transferência: ' + error.message)
+        return
+      }
+
+      // Remove a transferência da lista local imediatamente
+      setTransfers(prev => prev.filter(t => t.id !== transferId))
+      setAllTransfers(prev => prev.filter(t => t.id !== transferId))
+      
+      alert('✅ Transferência cancelada com sucesso!')
+    } catch (error) {
+      alert('Erro inesperado ao cancelar transferência')
     }
   }
 
@@ -669,33 +701,46 @@ export default function PaginaTransferencias() {
                             </div>
                           </div>
 
-                          {/* Botões de aprovação */}
+                          {/* Botões de aprovação E cancelamento */}
                           {(userTeamId === t.from_team_id || userTeamId === t.to_team_id || isAdmin) && (
-                            <div className="mt-6 flex flex-wrap gap-4 justify-center">
-                              {userTeamId === t.from_team_id && !t.approved_by_seller && (
-                                <Button
-                                  onClick={() => aprovar(t.id, 'seller')}
-                                  className="bg-green-600 hover:bg-green-700"
-                                >
-                                  Aprovar como Vendedor
-                                </Button>
-                              )}
-                              {userTeamId === t.to_team_id && !t.approved_by_buyer && (
-                                <Button
-                                  onClick={() => aprovar(t.id, 'buyer')}
-                                  className="bg-blue-600 hover:bg-blue-700"
-                                >
-                                  Aprovar como Comprador
-                                </Button>
-                              )}
-                              {isAdmin && !t.approved_by_admin && (
-                                <Button
-                                  onClick={() => aprovar(t.id, 'admin')}
-                                  className="bg-purple-600 hover:bg-purple-700"
-                                >
-                                  Aprovar como Admin
-                                </Button>
-                              )}
+                            <div className="mt-6 flex flex-wrap gap-4 justify-center items-center">
+                              <div className="flex flex-wrap gap-4">
+                                {userTeamId === t.from_team_id && !t.approved_by_seller && (
+                                  <Button
+                                    onClick={() => aprovar(t.id, 'seller')}
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    Aprovar como Vendedor
+                                  </Button>
+                                )}
+                                {userTeamId === t.to_team_id && !t.approved_by_buyer && (
+                                  <Button
+                                    onClick={() => aprovar(t.id, 'buyer')}
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                  >
+                                    Aprovar como Comprador
+                                  </Button>
+                                )}
+                                {isAdmin && !t.approved_by_admin && (
+                                  <Button
+                                    onClick={() => aprovar(t.id, 'admin')}
+                                    className="bg-purple-600 hover:bg-purple-700"
+                                  >
+                                    Aprovar como Admin
+                                  </Button>
+                                )}
+                              </div>
+
+                              {/* NOVO BOTÃO: Cancelar Transferência */}
+                              <Button
+                                onClick={() => rejeitarTransferencia(t.id)}
+                                variant="outline"
+                                className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                              >
+                                <Ban className="w-4 h-4 mr-2" />
+                                Cancelar Transferência
+                              </Button>
+
                               {/* Mensagem se já aprovou */}
                               {((userTeamId === t.from_team_id && t.approved_by_seller) ||
                                 (userTeamId === t.to_team_id && t.approved_by_buyer) ||
