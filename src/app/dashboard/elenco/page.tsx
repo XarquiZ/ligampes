@@ -688,16 +688,24 @@ const DismissModal: React.FC<DismissModalProps> = ({
 // Componente LevelBars atualizado
 function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null; max?: number; size?: 'sm' | 'md' }) {
   const v = Math.max(0, Math.min(max, value ?? 0))
-  const w = size === 'sm' ? 'w-4 h-2' : 'w-6 h-2.5'
+  
+  // Ajuste especial para forma física (8 barras)
+  const getBarWidth = () => {
+    if (max === 8) return 'w-2 h-2' // Barras menores para 8 itens
+    return size === 'sm' ? 'w-4 h-2' : 'w-6 h-2.5'
+  }
+  
+  const barWidth = getBarWidth()
+  
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-0.5">
       {Array.from({ length: max }).map((_, i) => {
         const active = i < v
         return (
           <div
             key={i}
             className={cn(
-              `${w} rounded-sm transition-all`,
+              `${barWidth} rounded-sm transition-all`,
               active ? 'bg-yellow-400 shadow-sm' : 'bg-zinc-700/80'
             )}
           />
@@ -945,6 +953,15 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
         const value1 = getAttributeValue(player1, key)
         const value2 = getAttributeValue(player2, key)
         
+        // Configurações específicas para cada tipo de atributo
+        const getBarConfig = (attrKey: string) => {
+          if (attrKey.includes('inspiring')) return { max: 2, size: 'sm' as const }
+          if (attrKey === 'form') return { max: 8, size: 'sm' as const } // Mantive 'sm' para forma física também
+          return { max: 4, size: 'sm' as const }
+        }
+        
+        const config = getBarConfig(key)
+        
         return (
           <div key={key} className="flex items-center justify-between gap-4">
             <div className="text-right w-20">
@@ -961,15 +978,15 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
                 <div className="flex-1 flex justify-center">
                   <LevelBars 
                     value={value1} 
-                    max={key.includes('inspiring') ? 2 : key === 'form' ? 8 : 4} 
-                    size={key === 'form' ? 'md' : 'sm'}
+                    max={config.max}
+                    size={config.size}
                   />
                 </div>
                 <div className="flex-1 flex justify-center">
                   <LevelBars 
                     value={value2} 
-                    max={key.includes('inspiring') ? 2 : key === 'form' ? 8 : 4} 
-                    size={key === 'form' ? 'md' : 'sm'}
+                    max={config.max}
+                    size={config.size}
                   />
                 </div>
               </div>
