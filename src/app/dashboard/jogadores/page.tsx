@@ -105,6 +105,16 @@ function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null;
   )
 }
 
+// Função para formatar o valor base (15.000.000 -> 15M)
+function formatBasePrice(price: number): string {
+  if (price >= 1000000) {
+    return `R$ ${(price / 1000000).toFixed(0)}M`
+  } else if (price >= 1000) {
+    return `R$ ${(price / 1000).toFixed(0)}K`
+  }
+  return `R$ ${price}`
+}
+
 export default function ListaJogadores() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -991,7 +1001,7 @@ export default function ListaJogadores() {
                       </div>
 
                       <p className="text-center text-lg lg:text-xl font-black text-emerald-400 mt-1 lg:mt-2">
-                        R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                        {formatBasePrice(j.base_price)}
                       </p>
                     </div>
                   </div>
@@ -1011,52 +1021,59 @@ export default function ListaJogadores() {
                       id={`player-${j.id}`}
                       className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-lg lg:hover:shadow-xl hover:shadow-purple-600/20"
                     >
-                      {/* Linha principal */}
+                      {/* Linha principal - CORREÇÃO: Estrutura flex para manter tudo na mesma linha */}
                       <div
-                        className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
+                        className="p-4 lg:p-6 flex items-center gap-4 lg:gap-6 cursor-pointer select-none"
                         onClick={() => !isTransitioning && togglePlayer(j.id)}
                       >
-                        <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
+                        {/* Foto do jogador */}
+                        <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
                           {j.photo_url ? (
                             <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                              <span className="text-xl lg:text-3xl font-black text-white">{j.position}</span>
+                              <span className="text-xl lg:text-2xl font-black text-white">{j.position}</span>
                             </div>
                           )}
                         </div>
 
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-3 lg:gap-4 text-xs lg:text-sm">
-                          <div>
+                        {/* Informações principais - CORREÇÃO: Grid responsivo para manter tudo na mesma linha */}
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-7 gap-3 lg:gap-4 text-xs lg:text-sm items-center">
+                          {/* Nome e Playstyle */}
+                          <div className="md:col-span-2">
                             <p className="font-bold text-base lg:text-lg">{j.name}</p>
                             <p className="text-zinc-400 text-xs lg:text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
                           </div>
+                          
+                          {/* Posição */}
                           <div>
                             <p className="text-zinc-500">Posição</p>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge className="bg-purple-600 text-xs">{j.position}</Badge>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-zinc-500">Clube</p>
-                            <div className="flex items-center gap-2">
-                              {renderClubLogo(j.logo_url, j.club)}
-                              <span className="text-xs lg:text-sm">{j.club}</span>
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-zinc-500">Overall</p>
-                            <p className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
+                            <Badge className="bg-purple-600 text-xs mt-1">{j.position}</Badge>
                           </div>
                           
-                          {/* BOTÃO DE FAVORITO - AGORA ENTRE OVERALL E VALOR BASE */}
+                          {/* Clube */}
+                          <div>
+                            <p className="text-zinc-500">Clube</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              {renderClubLogo(j.logo_url, j.club)}
+                              <span className="text-xs lg:text-sm truncate max-w-[80px]">{j.club}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Overall */}
+                          <div>
+                            <p className="text-zinc-500">Overall</p>
+                            <p className="text-2xl lg:text-4xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
+                          </div>
+                          
+                          {/* Botão de Favorito - CORREÇÃO: Agora em linha com os outros elementos */}
                           <div className="flex flex-col items-center justify-center">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 toggleFavorite(j.id)
                               }}
-                              className="bg-black/70 backdrop-blur p-2 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all mb-2"
+                              className="bg-black/70 backdrop-blur p-2 rounded-full border border-zinc-700 hover:bg-pink-600/20 transition-all mb-1"
                             >
                               <Star 
                                 className={cn(
@@ -1067,19 +1084,21 @@ export default function ListaJogadores() {
                                 )} 
                               />
                             </button>
-                            <span className="text-xs text-zinc-500 text-center">
+                            <span className="text-xs text-zinc-500 text-center hidden md:block">
                               {favoritePlayers.includes(j.id) ? 'Favorito' : 'Favoritar'}
                             </span>
                           </div>
 
-                          <div className="flex flex-col items-end min-w-[140px] lg:min-w-[180px]">
+                          {/* Valor Base - CORREÇÃO: Formatado com a nova função */}
+                          <div className="flex flex-col items-end">
                             <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
-                            <p className="text-emerald-400 font-bold text-base lg:text-xl whitespace-nowrap">
-                              R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                            <p className="text-emerald-400 font-bold text-base lg:text-lg whitespace-nowrap">
+                              {formatBasePrice(j.base_price)}
                             </p>
                           </div>
                           
-                          <div className="flex items-center justify-end gap-3 lg:gap-4">
+                          {/* Botão de Edição e Seta - CORREÇÃO: Agora em linha */}
+                          <div className="flex items-center justify-end gap-2 lg:gap-3">
                             {userRole === 'admin' && (
                               <Button
                                 size="sm"
@@ -1088,15 +1107,15 @@ export default function ListaJogadores() {
                                   e.stopPropagation()
                                   openEditPlayer(j)
                                 }}
-                                className="hover:bg-purple-600/20 p-2"
+                                className="hover:bg-purple-600/20 p-2 h-8 w-8"
                               >
-                                <Pencil className="w-4 h-4 lg:w-5 lg:h-5" />
+                                <Pencil className="w-3 h-3 lg:w-4 lg:h-4" />
                               </Button>
                             )}
 
                             <ChevronDown
                               className={cn(
-                                "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300",
+                                "w-4 h-4 lg:w-5 lg:h-5 text-zinc-400 transition-transform duration-300 flex-shrink-0",
                                 isOpen && "rotate-180 text-purple-400"
                               )}
                             />
