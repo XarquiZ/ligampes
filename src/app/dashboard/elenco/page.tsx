@@ -1376,7 +1376,7 @@ export default function ElencoPage() {
                               R$ {Number(j.base_price).toLocaleString('pt-BR')}
                             </p>
                           </div>
-                          <div className="flex items-center justify-end gap-3 lg:gap-4">
+                          <div className="flex items-center justify-start gap-3 lg:gap-4">
                             <Button
                               size="sm"
                               onClick={(e) => {
