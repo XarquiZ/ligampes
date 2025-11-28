@@ -1348,7 +1348,7 @@ export default function ElencoPage() {
                           )}
                         </div>
 
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-3 lg:gap-4 text-xs lg:text-sm">
+                        <div className="flex-1 grid grid-cols-2 md:grid-cols-7 gap-3 lg:gap-4 text-xs lg:text-sm">
                           <div>
                             <p className="font-bold text-base lg:text-lg">{j.name}</p>
                             <p className="text-zinc-400 text-xs lg:text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
@@ -1370,7 +1370,7 @@ export default function ElencoPage() {
                             <p className="text-zinc-500">Overall</p>
                             <p className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
                           </div>
-                          <div className="flex flex-col items-end min-w-[140px] lg:min-w-[180px]">
+                          <div className="flex flex-col items-start min-w-[120px] lg:min-w-[140px]">
                             <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
                             <p className="text-emerald-400 font-bold text-base lg:text-xl whitespace-nowrap">
                               R$ {Number(j.base_price).toLocaleString('pt-BR')}
