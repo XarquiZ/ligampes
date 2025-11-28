@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users } from 'lucide-react'
+import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
@@ -31,6 +31,9 @@ interface Player {
   playstyle?: string | null
   alternative_positions?: string[] | null
   age?: number | null
+  height?: number | null
+  is_penalty_specialist?: boolean | null
+  injury_resistance?: number | null
   
   // NOVAS ESTATÍSTICAS - adicione estas linhas
   total_goals?: number
@@ -575,6 +578,28 @@ const TransferModal: React.FC<TransferModalProps> = ({
   )
 }
 
+// Componente LevelBars atualizado
+function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null; max?: number; size?: 'sm' | 'md' }) {
+  const v = Math.max(0, Math.min(max, value ?? 0))
+  const w = size === 'sm' ? 'w-4 h-2' : 'w-6 h-2.5'
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: max }).map((_, i) => {
+        const active = i < v
+        return (
+          <div
+            key={i}
+            className={cn(
+              `${w} rounded-sm transition-all`,
+              active ? 'bg-yellow-400 shadow-sm' : 'bg-zinc-700/80'
+            )}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
 export default function ElencoPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -607,7 +632,7 @@ export default function ElencoPage() {
 
   // control opened in list view
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
-  const togglePlayer = (id: string) => setOpenedPlayers(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
   const POSITIONS = ['GO','ZC','LE','LD','VOL','MLG','MAT','SA','PTE','PTD','CA']
   const PLAYSTYLES = ['Artilheiro', 'Puxa marcação', 'Homem de área', 'Pivô', 'Armador criativo', 'Jog. de Lado de Campo', 'Lateral móvel', 'Especialista em cruz.', 'Clássica nº 10', 'Jog. de infiltração', 'Meia versátil', 'Volantão', 'Orquestrador', 'Primeiro volante', 'Zagueiro ofensivo', 'Ponta velocista', 'Zagueiro defensivo', 'Provocador', 'Atacante surpresa', 'Goleiro ofensivo', 'Goleiro defensivo']
@@ -620,16 +645,10 @@ export default function ElencoPage() {
     return '#E53935' // vermelho
   }
 
-  function LevelBars({ value=0, max=3, size='sm' }: { value?: number | null; max?: number; size?: 'sm'|'md' }) {
-    const v = Math.max(0, Math.min(max, value ?? 0))
-    const w = size === 'sm' ? 'w-4 h-2' : 'w-6 h-2.5'
-    return (
-      <div className="flex items-center gap-1">
-        {Array.from({ length: max }).map((_, i) => (
-          <div key={i} className={cn(w, 'rounded-sm transition-all', i < v ? 'bg-[#4FC3F7] shadow-sm' : 'bg-zinc-700/80')} />
-        ))}
-      </div>
-    )
+  // Funções auxiliares simplificadas
+  const formatHeight = (height: number | null | undefined) => {
+    if (height === null || height === undefined) return '-'
+    return `${height}cm`
   }
 
   // Componente de Checkbox personalizado com caixa branca
@@ -763,6 +782,9 @@ export default function ElencoPage() {
         preferred_foot: p.preferred_foot || 'Nenhum',
         playstyle: p.playstyle || null,
         nationality: p.nationality || 'Desconhecida',
+        height: p.height || null,
+        is_penalty_specialist: p.is_penalty_specialist || false,
+        injury_resistance: p.injury_resistance || null,
         // As estatísticas já virão automaticamente do SELECT *
         total_goals: p.total_goals || 0,
         total_assists: p.total_assists || 0,
@@ -905,6 +927,15 @@ export default function ElencoPage() {
 
   const clearPositionFilters = () => setSelectedPositions([])
   const clearPlaystyleFilters = () => setSelectedPlaystyles([])
+
+  const togglePlayer = useCallback((playerId: string) => {
+    if (isTransitioning) return;
+    setOpenedPlayers(prev =>
+      prev.includes(playerId)
+        ? prev.filter(id => id !== playerId)
+        : [...prev, playerId]
+    )
+  }, [isTransitioning])
 
   useEffect(() => {
     let f = [...players]
@@ -1290,88 +1321,108 @@ export default function ElencoPage() {
               </div>
             )}
 
-            {/* LIST VIEW - ATUALIZADO COM BOTÃO DE VENDA */}
+            {/* LIST VIEW - ATUALIZADO IGUAL À PÁGINA DE JOGADORES */}
             {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
               <div className="space-y-4 lg:space-y-6">
                 {filteredPlayers.map(j => {
                   const isOpen = openedPlayers.includes(j.id)
                   const stats = getPlayerStats(j)
+
                   return (
-                    <div 
-                      key={j.id} 
-                      className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden select-none"
-                      tabIndex={-1}
+                    <div
+                      key={j.id}
+                      className="bg-zinc-900/70 backdrop-blur border border-zinc-800 rounded-xl lg:rounded-2xl overflow-hidden transition-all hover:border-purple-500/70 hover:shadow-lg lg:hover:shadow-xl hover:shadow-purple-600/20"
                     >
-                      <div 
-                        className="p-4 lg:p-6 flex items-center gap-4 lg:gap-6 cursor-pointer"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          togglePlayer(j.id)
-                        }}
-                        onMouseDown={(e) => e.preventDefault()}
-                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                      {/* Linha principal */}
+                      <div
+                        className="p-4 lg:p-6 flex items-center gap-4 lg:gap-8 cursor-pointer select-none"
+                        onClick={() => !isTransitioning && togglePlayer(j.id)}
                       >
-                        <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
-                          {j.photo_url ? <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center"><span className="text-xl lg:text-2xl font-black text-white">{j.position}</span></div>}
+                        <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-full overflow-hidden ring-3 lg:ring-4 ring-purple-500/50 flex-shrink-0">
+                          {j.photo_url ? (
+                            <img src={j.photo_url} alt={j.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                              <span className="text-xl lg:text-3xl font-black text-white">{j.position}</span>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 lg:gap-4 text-xs lg:text-sm items-center">
+                        <div className="flex-1 grid grid-cols-2 md:grid-cols-6 gap-3 lg:gap-4 text-xs lg:text-sm">
                           <div>
-                            <p className="text-zinc-500 text-xs lg:text-sm">Nome</p>
-                            <p className="font-bold text-base lg:text-lg truncate">{j.name}</p>
+                            <p className="font-bold text-base lg:text-lg">{j.name}</p>
+                            <p className="text-zinc-400 text-xs lg:text-sm mt-1">{j.playstyle || 'Nenhum estilo de jogo'}</p>
                           </div>
-
                           <div>
-                            <p className="text-zinc-500 text-xs lg:text-sm">Posição</p>
-                            <div className="flex items-center gap-1 lg:gap-2 flex-wrap">
+                            <p className="text-zinc-500">Posição</p>
+                            <div className="flex items-center gap-2 flex-wrap">
                               <Badge className="bg-purple-600 text-xs">{j.position}</Badge>
-                              {j.alternative_positions?.map(p => <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>)}
                             </div>
                           </div>
-
                           <div>
-                            <p className="text-zinc-500 text-xs lg:text-sm">Clube</p>
-                            <div className="flex items-center gap-2">{renderClubLogo(j.logo_url, j.club)}<span className="text-xs lg:text-sm">{j.club}</span></div>
+                            <p className="text-zinc-500">Clube</p>
+                            <div className="flex items-center gap-2">
+                              {renderClubLogo(j.logo_url, j.club)}
+                              <span className="text-xs lg:text-sm">{j.club}</span>
+                            </div>
                           </div>
-
                           <div>
-                            <p className="text-zinc-500 text-xs lg:text-sm">Overall</p>
-                            <p className="text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-600">{j.overall}</p>
+                            <p className="text-zinc-500">Overall</p>
+                            <p className="text-3xl lg:text-5xl font-black bg-gradient-to-r from-yellow-400 to-red-600 bg-clip-text text-transparent">{j.overall}</p>
                           </div>
-
-                          <div>
-                            <p className="text-zinc-500 text-xs lg:text-sm">Valor</p>
-                            <p className="text-lg lg:text-2xl font-bold text-emerald-400">R$ {Number(j.base_price).toLocaleString('pt-BR')}</p>
+                          <div className="flex flex-col items-end min-w-[140px] lg:min-w-[180px]">
+                            <p className="text-zinc-500 text-right text-xs lg:text-sm">Valor Base</p>
+                            <p className="text-emerald-400 font-bold text-base lg:text-xl whitespace-nowrap">
+                              R$ {Number(j.base_price).toLocaleString('pt-BR')}
+                            </p>
                           </div>
-
-                          <div className="flex justify-end items-center gap-2">
+                          <div className="flex items-center justify-end gap-3 lg:gap-4">
                             <Button
+                              size="sm"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSellPlayer(j)
                               }}
                               className="bg-blue-600 hover:bg-blue-700 text-white text-xs lg:text-sm h-8 lg:h-9"
-                              size="sm"
                             >
-                              <DollarSign className="w-3 h-3 mr-1" />
+                              <DollarSign className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
                               Negociar
                             </Button>
-                            <ChevronDown className={cn('w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300', isOpen && 'rotate-180 text-purple-400')} />
+
+                            <ChevronDown
+                              className={cn(
+                                "w-5 h-5 lg:w-6 lg:h-6 text-zinc-400 transition-transform duration-300",
+                                isOpen && "rotate-180 text-purple-400"
+                              )}
+                            />
                           </div>
                         </div>
                       </div>
 
+                      {/* Detalhes expandidos */}
                       {isOpen && (
                         <div className="border-t border-zinc-800 bg-zinc-900/50 px-4 lg:px-6 py-4 lg:py-6">
                           <div className="space-y-4 lg:space-y-6">
+                            {/* Linha 1: básicos - Altura na mesma linha da idade */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm">
-                              <div><span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong></div>
-                              <div><span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong></div>
-                              <div><span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong></div>
-                              <div><span className="text-zinc-500">Estilo:</span> <strong>{j.playstyle || 'Nenhum'}</strong></div>
+                              <div>
+                                <span className="text-zinc-500">Idade:</span> <strong>{j.age ?? '-'}</strong>
+                              </div>
+                              <div>
+                                <span className="text-zinc-500 flex items-center gap-2">
+                                  <Ruler className="w-3 h-3 lg:w-4 lg:h-4" />
+                                  Altura: <strong className="ml-1 lg:ml-2">{formatHeight(j.height)}</strong>
+                                </span> 
+                              </div>
+                              <div>
+                                <span className="text-zinc-500">Nacionalidade:</span> <strong>{j.nationality}</strong>
+                              </div>
+                              <div>
+                                <span className="text-zinc-500">Pé:</span> <strong>{j.preferred_foot}</strong>
+                              </div>
                             </div>
 
-                            {/* NOVO: Estatísticas na visualização de lista */}
+                            {/* Estatísticas da Temporada */}
                             <div>
                               <p className="text-zinc-500 font-medium mb-2 lg:mb-3 text-sm lg:text-base">Estatísticas da Temporada:</p>
                               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 text-xs lg:text-sm">
@@ -1384,47 +1435,115 @@ export default function ElencoPage() {
                               </div>
                             </div>
 
-                            <div>
-                              <p className="text-zinc-500 font-medium mb-2 text-sm lg:text-base">Posições Alternativas:</p>
-                              <div className="flex gap-1 lg:gap-2 flex-wrap">{j.alternative_positions && j.alternative_positions.length ? j.alternative_positions.map(p => <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>) : <span className="text-zinc-500 text-sm">Nenhuma</span>}</div>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6 text-xs lg:text-sm items-center">
+                            {/* Posições alternativas (APENAS QUANDO EXPANDIDO) */}
+                            {j.alternative_positions && j.alternative_positions.length > 0 && (
                               <div>
-                                <p className="text-zinc-500">Pé Fraco (Uso)</p>
-                                <div className="flex items-center gap-2 lg:gap-3"><LevelBars value={j.weak_foot_usage ?? 0} max={3} size="sm" /><span className="font-bold">{j.weak_foot_usage ?? '-'}</span></div>
+                                <p className="text-zinc-500 font-medium mb-2">Posições Alternativas:</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {j.alternative_positions.map(p => (
+                                    <Badge key={p} className="bg-red-600/20 text-red-300 border-red-600/40 text-xs">{p}</Badge>
+                                  ))}
+                                </div>
                               </div>
+                            )}
 
-                              <div>
-                                <p className="text-zinc-500">Pé Fraco (Precisão)</p>
-                                <div className="flex items-center gap-2 lg:gap-3"><LevelBars value={j.weak_foot_accuracy ?? 0} max={3} size="sm" /><span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span></div>
-                              </div>
-
-                              <div>
-                                <p className="text-zinc-500">Forma Física</p>
-                                <div className="flex items-center gap-2 lg:gap-3"><LevelBars value={j.form ?? 0} max={8} size="md" /><span className="font-bold">{j.form ?? '-'}</span></div>
-                              </div>
-                            </div>
-
-                            <div>
-                              <p className="text-zinc-400 font-medium mb-2 text-sm lg:text-base">Habilidades Especiais</p>
-                              <div className="flex flex-wrap gap-1 lg:gap-2">{j.skills && j.skills.length ? j.skills.map(s => <Badge key={s} className="bg-purple-600/20 text-purple-300 border-purple-600/40 text-xs">{s}</Badge>) : <span className="text-zinc-500 text-sm">Nenhuma</span>}</div>
-                            </div>
-
-                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-3 lg:gap-x-6 gap-y-3 lg:gap-y-4 text-xs">
+                            {/* Atributos */}
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-x-4 lg:gap-x-6 gap-y-3 lg:gap-y-4 text-xs">
                               {ATTR_ORDER.map(k => {
-                                const val = (j as any)[k] as number | null
-                                const display = val ?? 40
+                                const value = j[k as keyof Player] as number | null
+                                const display = (value ?? 40)
                                 const color = getAttrColorHex(display)
                                 return (
                                   <div key={k} className="text-center">
-                                    <p className="text-zinc-500 font-medium text-xs">{ATTR_LABELS[k] ?? k}</p>
+                                    <p className="text-zinc-500 font-medium text-xs">{ATTR_LABELS[k]}</p>
                                     <p className="text-lg lg:text-xl font-black" style={{ color }}>{display}</p>
                                   </div>
                                 )
                               })}
                             </div>
 
+                            {/* Pé fraco, Frequência, Forma física e Resistência a Lesão */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6 text-xs lg:text-sm items-center">
+                              <div>
+                                <p className="text-zinc-500">Pé Fraco (Uso)</p>
+                                <div className="flex items-center gap-2 lg:gap-3">
+                                  <LevelBars value={j.weak_foot_usage ?? 0} max={4} size="sm" />
+                                  <span className="font-bold">{j.weak_foot_usage ?? '-'}</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="text-zinc-500">Pé Fraco (Precisão)</p>
+                                <div className="flex items-center gap-2 lg:gap-3">
+                                  <LevelBars value={j.weak_foot_accuracy ?? 0} max={4} size="sm" />
+                                  <span className="font-bold">{j.weak_foot_accuracy ?? '-'}</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="text-zinc-500">Forma Física</p>
+                                <div className="flex items-center gap-2 lg:gap-3">
+                                  <LevelBars value={j.form ?? 0} max={8} size="md" />
+                                  <span className="font-bold">{j.form ?? '-'}</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <p className="text-zinc-500">Resistência a Lesão</p>
+                                <div className="flex items-center gap-2 lg:gap-3">
+                                  <LevelBars value={j.injury_resistance ?? 0} max={3} size="sm" />
+                                  <span className="font-bold">{j.injury_resistance ?? '-'}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Inspirador */}
+                            <div>
+                              <p className="text-zinc-500 font-medium mb-2">Inspirador</p>
+                              <div className="flex items-center gap-4 lg:gap-6">
+                                <div className="text-xs lg:text-sm">
+                                  <div className="text-zinc-400">Carregando</div>
+                                  <div className="flex gap-1 mt-1">
+                                    {Array.from({ length: 2 }).map((_, idx) => {
+                                      const filled = (j.inspiring_ball_carry ?? 0) > idx
+                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div className="text-xs lg:text-sm">
+                                  <div className="text-zinc-400">Passe Rasteiro</div>
+                                  <div className="flex gap-1 mt-1">
+                                    {Array.from({ length: 2 }).map((_, idx) => {
+                                      const filled = (j.inspiring_low_pass ?? 0) > idx
+                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div className="text-xs lg:text-sm">
+                                  <div className="text-zinc-400">Passe Alto</div>
+                                  <div className="flex gap-1 mt-1">
+                                    {Array.from({ length: 2 }).map((_, idx) => {
+                                      const filled = (j.inspiring_lofted_pass ?? 0) > idx
+                                      return <Star key={idx} className={cn("w-3 h-3 lg:w-4 lg:h-4", filled ? "fill-yellow-400 text-yellow-400" : "text-zinc-600")} />
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Habilidades especiais */}
+                            {j.skills && j.skills.length > 0 && (
+                              <div>
+                                <p className="text-zinc-400 font-medium mb-2">Habilidades Especiais</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {j.skills.map(s => (
+                                    <Badge key={s} className="bg-purple-600/20 text-purple-300 border-purple-600/40 text-xs">{s}</Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
