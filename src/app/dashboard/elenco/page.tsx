@@ -578,6 +578,110 @@ const TransferModal: React.FC<TransferModalProps> = ({
   )
 }
 
+// Componente do Modal de Dispensa
+interface DismissModalProps {
+  player: Player | null
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: (playerId: string, playerName: string, overall: number) => void
+}
+
+const DismissModal: React.FC<DismissModalProps> = ({ 
+  player, 
+  isOpen, 
+  onClose, 
+  onConfirm 
+}) => {
+  if (!isOpen || !player) return null
+
+  const getDismissValue = () => {
+    if (player.overall <= 73) return 2_000_000
+    if (player.overall === 74) return 5_000_000
+    return 0
+  }
+
+  const dismissValue = getDismissValue()
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md">
+        <div className="p-6 border-b border-zinc-700">
+          <h2 className="text-2xl font-bold text-white">Dispensar Jogador</h2>
+          <p className="text-zinc-400 mt-1">Confirmar dispensa do jogador</p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Info do Jogador */}
+          <div className="flex items-center gap-4 p-4 bg-zinc-800/50 rounded-lg">
+            {player.photo_url ? (
+              <img 
+                src={player.photo_url} 
+                alt={player.name} 
+                className="w-16 h-16 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                <span className="text-lg font-black text-white">{player.position}</span>
+              </div>
+            )}
+            <div>
+              <h3 className="font-bold text-lg text-white">{player.name}</h3>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge className="bg-purple-600">{player.position}</Badge>
+                <span className="text-zinc-400 text-sm">OVR {player.overall}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Valor da Dispensa */}
+          <div className="bg-zinc-800/30 p-4 rounded-lg">
+            <p className="text-zinc-400 text-sm">Valor da Dispensa</p>
+            <p className="text-emerald-400 font-bold text-2xl">
+              R$ {dismissValue.toLocaleString('pt-BR')}
+            </p>
+            <p className="text-zinc-500 text-xs mt-1">
+              {player.overall <= 73 
+                ? "Jogadores até 73 de OVR: R$ 2.000.000" 
+                : "Jogadores com 74 de OVR: R$ 5.000.000"
+              }
+            </p>
+          </div>
+
+          {/* Aviso */}
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-yellow-400 font-semibold">Atenção</p>
+                <p className="text-yellow-300 text-sm mt-1">
+                  O jogador será desassociado do clube e ficará sem time. 
+                  Esta ação não pode ser desfeita.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-zinc-700 flex gap-3">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 bg-transparent border-zinc-600 hover:bg-zinc-800"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => onConfirm(player.id, player.name, player.overall)}
+            className="flex-1 bg-red-600 hover:bg-red-700"
+          >
+            Confirmar Dispensa
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Componente LevelBars atualizado
 function LevelBars({ value = 0, max = 3, size = 'sm' }: { value?: number | null; max?: number; size?: 'sm' | 'md' }) {
   const v = Math.max(0, Math.min(max, value ?? 0))
@@ -629,6 +733,10 @@ export default function ElencoPage() {
   const [transferModalOpen, setTransferModalOpen] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   const [allTeams, setAllTeams] = useState<Team[]>([])
+
+  // Estados para dispensa
+  const [dismissModalOpen, setDismissModalOpen] = useState(false)
+  const [playerToDismiss, setPlayerToDismiss] = useState<Player | null>(null)
 
   // control opened in list view
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
@@ -826,6 +934,90 @@ export default function ElencoPage() {
   const handleSellPlayer = (player: Player) => {
     setSelectedPlayer(player)
     setTransferModalOpen(true)
+  }
+
+  // Função para abrir modal de dispensa
+  const handleDismissPlayer = (player: Player) => {
+    setPlayerToDismiss(player)
+    setDismissModalOpen(true)
+  }
+
+  // Função para confirmar dispensa
+  const handleConfirmDismiss = async (playerId: string, playerName: string, overall: number) => {
+    try {
+      const dismissValue = overall <= 73 ? 2_000_000 : 5_000_000
+
+      // 1. Registrar transação de saldo
+      const { error: balanceError } = await supabase
+        .from('balance_transactions')
+        .insert([{
+          team_id: teamId,
+          amount: dismissValue,
+          type: 'credit',
+          description: `Dispensa de jogador - ${playerName}`,
+          created_at: new Date().toISOString(),
+          player_name: playerName
+        }])
+
+      if (balanceError) throw balanceError
+
+      // 2. Atualizar saldo do time
+      const { data: currentTeam } = await supabase
+        .from('teams')
+        .select('balance')
+        .eq('id', teamId)
+        .single()
+
+      if (currentTeam) {
+        const newBalance = currentTeam.balance + dismissValue
+        const { error: teamError } = await supabase
+          .from('teams')
+          .update({ balance: newBalance })
+          .eq('id', teamId)
+
+        if (teamError) throw teamError
+      }
+
+      // 3. Registrar na tabela de transferências como dispensa
+      const { error: transferError } = await supabase
+        .from('player_transfers')
+        .insert([{
+          player_id: playerId,
+          player_name: playerName,
+          from_team_id: teamId,
+          to_team_id: null, // Sem clube
+          value: dismissValue,
+          status: 'approved',
+          approved_by_seller: true,
+          approved_by_buyer: true,
+          approved_by_admin: true,
+          created_at: new Date().toISOString(),
+          transfer_type: 'dismiss'
+        }])
+
+      if (transferError) throw transferError
+
+      // 4. Remover jogador do time (setar team_id como null)
+      const { error: playerError } = await supabase
+        .from('players')
+        .update({ team_id: null })
+        .eq('id', playerId)
+
+      if (playerError) throw playerError
+
+      // Sucesso
+      setDismissModalOpen(false)
+      setPlayerToDismiss(null)
+      
+      // Recarregar jogadores
+      loadPlayers()
+      
+      alert(`✅ Jogador dispensado com sucesso! R$ ${dismissValue.toLocaleString('pt-BR')} adicionados ao seu saldo.`)
+      
+    } catch (error) {
+      console.error('Erro ao dispensar jogador:', error)
+      alert('❌ Erro ao dispensar jogador. Tente novamente.')
+    }
   }
 
   // Função para confirmar transferência - ATUALIZADA PARA SUPORTAR TROCA
@@ -1216,7 +1408,7 @@ export default function ElencoPage() {
               </div>
             )}
 
-            {/* GRID VIEW - ATUALIZADO COM BOTÃO DE VENDA */}
+            {/* GRID VIEW - ATUALIZADO COM BOTÃO DE DISPENSA */}
             {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 lg:gap-6">
                 {filteredPlayers.map(j => {
@@ -1297,22 +1489,42 @@ export default function ElencoPage() {
                           />
                         </div>
 
-                        {/* Valor e Botão de Venda */}
+                        {/* Valor e Botões */}
                         <div className="space-y-2">
                           <p className="text-center text-lg lg:text-xl font-black text-emerald-400">
                             R$ {Number(j.base_price).toLocaleString('pt-BR')}
                           </p>
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleSellPlayer(j)
-                            }}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs lg:text-sm py-1 h-7 lg:h-8"
-                            size="sm"
-                          >
-                            <DollarSign className="w-3 h-3 mr-1" />
-                            Negociar
-                          </Button>
+                          
+                          {/* Container para os dois botões lado a lado */}
+                          <div className="flex gap-2">
+                            {/* Botão Negociar - redimensionado */}
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSellPlayer(j)
+                              }}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 h-7 lg:h-8"
+                              size="sm"
+                            >
+                              <DollarSign className="w-3 h-3 mr-1" />
+                              Negociar
+                            </Button>
+                            
+                            {/* Botão Dispensar - só aparece para overall <= 74 */}
+                            {j.overall <= 74 && (
+                              <Button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDismissPlayer(j)
+                                }}
+                                className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-1 h-7 lg:h-8"
+                                size="sm"
+                              >
+                                <X className="w-3 h-3 mr-1" />
+                                Dispensar
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1321,7 +1533,7 @@ export default function ElencoPage() {
               </div>
             )}
 
-            {/* LIST VIEW - ATUALIZADO IGUAL À PÁGINA DE JOGADORES */}
+            {/* LIST VIEW - ATUALIZADO COM BOTÃO DE DISPENSA */}
             {viewMode === 'list' && !loading && filteredPlayers.length > 0 && (
               <div className="space-y-4 lg:space-y-6">
                 {filteredPlayers.map(j => {
@@ -1388,6 +1600,21 @@ export default function ElencoPage() {
                               <DollarSign className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
                               Negociar
                             </Button>
+
+                            {/* Botão Dispensar - só aparece para overall <= 74 */}
+                            {j.overall <= 74 && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDismissPlayer(j)
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white text-xs lg:text-sm h-8 lg:h-9"
+                              >
+                                <X className="w-3 h-3 lg:w-4 lg:h-4 mr-1" />
+                                Dispensar
+                              </Button>
+                            )}
 
                             <ChevronDown
                               className={cn(
@@ -1560,6 +1787,14 @@ export default function ElencoPage() {
               onClose={() => setTransferModalOpen(false)}
               onConfirm={handleConfirmTransfer}
               teams={allTeams}
+            />
+
+            {/* Modal de Dispensa */}
+            <DismissModal
+              player={playerToDismiss}
+              isOpen={dismissModalOpen}
+              onClose={() => setDismissModalOpen(false)}
+              onConfirm={handleConfirmDismiss}
             />
 
           </div>
