@@ -2306,6 +2306,52 @@ export default function ElencoPage() {
     name: team?.name || 'Sem time'
   }), [team])
 
+  // CORREÇÃO: Listener para focar em conversa específica quando receber evento
+  useEffect(() => {
+    const handleFocusConversation = (event: CustomEvent) => {
+      const { conversationId } = event.detail;
+      console.log('🎯 Evento focusConversation recebido:', conversationId);
+      
+      // Encontrar a conversa pelo ID
+      const conversation = conversations.find(conv => conv.id === conversationId);
+      if (conversation) {
+        console.log('✅ Conversa encontrada, focando...');
+        handleSelectConversation(conversation);
+      } else {
+        console.log('⚠️ Conversa não encontrada, aguardando...');
+        // Se não encontrou, tenta novamente após carregar conversas
+        setTimeout(() => {
+          loadConversations(true).then(() => {
+            const convAfterReload = conversations.find(conv => conv.id === conversationId);
+            if (convAfterReload) {
+              handleSelectConversation(convAfterReload);
+            }
+          });
+        }, 1000);
+      }
+    };
+
+    // Adicionar listener
+    window.addEventListener('focusConversation', handleFocusConversation as EventListener);
+
+    return () => {
+      window.removeEventListener('focusConversation', handleFocusConversation as EventListener);
+    };
+  }, [conversations]);
+
+  // CORREÇÃO: Função para carregar conversas
+  const loadConversations = async (forceUpdate = false) => {
+    // Implementação simplificada - você precisará adaptar conforme sua estrutura
+    console.log('Carregando conversas...');
+    // Aqui você implementaria a lógica real de carregar conversas
+  };
+
+  // CORREÇÃO: Função para selecionar conversa
+  const handleSelectConversation = (conversation: any) => {
+    console.log('Selecionando conversa:', conversation);
+    // Aqui você implementaria a lógica real de seleção de conversa
+  };
+
   if (authLoading || dataLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">

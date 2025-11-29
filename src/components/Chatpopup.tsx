@@ -812,6 +812,39 @@ export default function ChatPopup({
     }
   }, [isOpen, currentUser.id]);
 
+  // CORREÇÃO: Listener para focar em conversa específica quando receber evento
+  useEffect(() => {
+    const handleFocusConversation = (event: CustomEvent) => {
+      const { conversationId } = event.detail;
+      console.log('🎯 Evento focusConversation recebido:', conversationId);
+      
+      // Encontrar a conversa pelo ID
+      const conversation = conversations.find(conv => conv.id === conversationId);
+      if (conversation) {
+        console.log('✅ Conversa encontrada, focando...');
+        handleSelectConversation(conversation);
+      } else {
+        console.log('⚠️ Conversa não encontrada, aguardando...');
+        // Se não encontrou, tenta novamente após carregar conversas
+        setTimeout(() => {
+          loadConversations(true).then(() => {
+            const convAfterReload = conversations.find(conv => conv.id === conversationId);
+            if (convAfterReload) {
+              handleSelectConversation(convAfterReload);
+            }
+          });
+        }, 1000);
+      }
+    };
+
+    // Adicionar listener
+    window.addEventListener('focusConversation', handleFocusConversation as EventListener);
+
+    return () => {
+      window.removeEventListener('focusConversation', handleFocusConversation as EventListener);
+    };
+  }, [conversations]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -1183,7 +1216,7 @@ export default function ChatPopup({
           </>
         )}
       </div>
-
+        
       {/* Modal de seleção de jogadores */}
       {showPlayerSelector && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
