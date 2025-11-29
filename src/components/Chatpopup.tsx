@@ -1,7 +1,7 @@
 // src/components/Chatpopup.tsx
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Send, MessageCircle, Search, User, Crown, Paperclip, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -86,18 +86,17 @@ export default function ChatPopup({
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerData | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // CORREÇÃO: Estados para controlar o ciclo de atualização
+  // Estados para controle de performance
   const [isProcessingConversation, setIsProcessingConversation] = useState(false);
   const [lastProcessedConversation, setLastProcessedConversation] = useState<string | null>(null);
-  const [shouldSkipUnreadUpdate, setShouldSkipUnreadUpdate] = useState(false);
 
   // Calcular total de mensagens não lidas
-  const calculateTotalUnread = (conversations: Conversation[]) => {
+  const calculateTotalUnread = useCallback((conversations: Conversation[]) => {
     return conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0);
-  };
+  }, []);
 
   // Notificar mudança no contador
-  const notifyUnreadCountChange = (count: number) => {
+  const notifyUnreadCountChange = useCallback((count: number) => {
     console.log('Notificando mudança no contador:', count);
     if (onUnreadCountChange) {
       onUnreadCountChange(count);
@@ -108,63 +107,26 @@ export default function ChatPopup({
         detail: { totalUnread: count } 
       }));
     }
-  };
+  }, [onUnreadCountChange]);
 
-  // CORREÇÃO: Função para marcar mensagens como lidas - VERSÃO MELHORADA E VERIFICADA
+  // CORREÇÃO: Função para marcar mensagens como lidas - VERSÃO SIMPLIFICADA
   const markMessagesAsRead = async (conversationId: string) => {
     try {
       console.log('🎯 Marcando mensagens como lidas para conversa:', conversationId);
       
-      // PRIMEIRO: Verificar quantas mensagens não lidas existem
-      const { count: unreadCount, error: countError } = await supabase
-        .from('private_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('conversation_id', conversationId)
-        .eq('read', false)
-        .neq('sender_id', currentUser.id);
-
-      if (countError) {
-        console.error('❌ Erro ao contar mensagens não lidas:', countError);
-        return false;
-      }
-
-      console.log(`📊 Encontradas ${unreadCount} mensagens não lidas para marcar como lidas`);
-
-      if (unreadCount === 0) {
-        console.log('ℹ️ Nenhuma mensagem não lida encontrada');
-        return true;
-      }
-
-      // SEGUNDO: Marcar as mensagens como lidas
-      const { data, error, count } = await supabase
+      const { error } = await supabase
         .from('private_messages')
         .update({ read: true })
         .eq('conversation_id', conversationId)
         .eq('read', false)
-        .neq('sender_id', currentUser.id)
-        .select('*', { count: 'exact' });
+        .neq('sender_id', currentUser.id);
 
       if (error) {
         console.error('❌ Erro ao marcar mensagens como lidas:', error);
         return false;
       }
 
-      console.log(`✅ ${count || 0} mensagens marcadas como lidas com sucesso`);
-
-      // TERCEIRO: Verificar se realmente foram atualizadas
-      const { count: verifiedCount, error: verifyError } = await supabase
-        .from('private_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('conversation_id', conversationId)
-        .eq('read', false)
-        .neq('sender_id', currentUser.id);
-
-      if (verifyError) {
-        console.error('❌ Erro ao verificar atualização:', verifyError);
-      } else {
-        console.log(`🔍 Verificação: ${verifiedCount} mensagens ainda não lidas após atualização`);
-      }
-
+      console.log('✅ Mensagens marcadas como lidas com sucesso');
       return true;
     } catch (error) {
       console.error('❌ Erro ao processar marcação como lida:', error);
@@ -193,13 +155,8 @@ export default function ChatPopup({
     loadData();
   }, [isOpen, currentUser.id]);
 
-  // CORREÇÃO: Carregar conversas do usuário - VERSÃO OTIMIZADA
-  const loadConversations = async (forceUpdate = false) => {
-    if (isProcessingConversation && !forceUpdate) {
-      console.log('Ignorando loadConversations - já processando uma conversa');
-      return;
-    }
-
+  // CORREÇÃO: Carregar conversas do usuário - VERSÃO MAIS ROBUSTA
+  const loadConversations = async () => {
     try {
       console.log('Carregando conversas para usuário:', currentUser.id);
       
@@ -244,54 +201,27 @@ export default function ChatPopup({
         return;
       }
 
-      // CORREÇÃO: Buscar contagem de mensagens não lidas de forma mais eficiente
-      const conversationsWithUnread = await Promise.all(
+      // Buscar contagem de mensagens não lidas em lote
+      const unreadCounts = await Promise.all(
         conversationsData.map(async (conv) => {
-          // Se estamos processando esta conversa, usar o estado local
-          if (lastProcessedConversation === conv.id) {
-            console.log(`🔄 Usando estado local para conversa ${conv.id} (processando)`);
-            const localConv = conversations.find(c => c.id === conv.id);
-            return {
-              ...conv,
-              unread_count: localConv?.unread_count || 0
-            };
+          const { count, error: countError } = await supabase
+            .from('private_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', conv.id)
+            .eq('read', false)
+            .neq('sender_id', currentUser.id);
+
+          if (countError) {
+            console.error('Erro ao contar mensagens não lidas:', countError);
+            return 0;
           }
 
-          try {
-            // Buscar contagem de mensagens não lidas do OUTRO usuário
-            const { count, error: countError } = await supabase
-              .from('private_messages')
-              .select('*', { count: 'exact', head: true })
-              .eq('conversation_id', conv.id)
-              .eq('read', false)
-              .neq('sender_id', currentUser.id);
-
-            if (countError) {
-              console.error('Erro ao contar mensagens não lidas:', countError);
-              return {
-                ...conv,
-                unread_count: 0
-              };
-            }
-
-            console.log(`Conversa ${conv.id}: ${count} mensagens não lidas`);
-
-            return {
-              ...conv,
-              unread_count: count || 0
-            };
-          } catch (error) {
-            console.error('Erro ao processar conversa:', conv.id, error);
-            return {
-              ...conv,
-              unread_count: 0
-            };
-          }
+          return count || 0;
         })
       );
 
       // Formata as conversas
-      const formattedConversations: Conversation[] = conversationsWithUnread.map(conv => {
+      const formattedConversations: Conversation[] = conversationsData.map((conv, index) => {
         const user1Profile = profilesData.find(p => p.id === conv.user1_id);
         const user2Profile = profilesData.find(p => p.id === conv.user2_id);
 
@@ -317,20 +247,16 @@ export default function ChatPopup({
           },
           last_message: conv.last_message,
           last_message_at: conv.last_message_at,
-          unread_count: conv.unread_count
+          unread_count: unreadCounts[index]
         };
       });
 
       setConversations(formattedConversations);
       
       // Calcular e notificar o total de mensagens não lidas
-      if (!shouldSkipUnreadUpdate) {
-        const totalUnread = calculateTotalUnread(formattedConversations);
-        console.log('📊 Total de mensagens não lidas calculado:', totalUnread);
-        notifyUnreadCountChange(totalUnread);
-      } else {
-        console.log('⏸️  Pulando atualização do contador (shouldSkipUnreadUpdate = true)');
-      }
+      const totalUnread = calculateTotalUnread(formattedConversations);
+      console.log('📊 Total de mensagens não lidas calculado:', totalUnread);
+      notifyUnreadCountChange(totalUnread);
       
     } catch (error) {
       console.error('Erro ao processar conversas:', error);
@@ -376,7 +302,7 @@ export default function ChatPopup({
     }
   };
 
-  // CORREÇÃO: Carregar mensagens de uma conversa - SEM chamar loadConversations
+  // CORREÇÃO: Carregar mensagens de uma conversa
   const loadMessages = async (conversationId: string) => {
     try {
       console.log('💬 Carregando mensagens da conversa:', conversationId);
@@ -509,7 +435,7 @@ export default function ChatPopup({
     player.name.toLowerCase().includes(playerSearch.toLowerCase())
   );
 
-  // CORREÇÃO: Compartilhar jogador - versão otimizada
+  // Compartilhar jogador
   const sharePlayer = async () => {
     if (!selectedPlayer || !selectedConversation) return;
 
@@ -538,7 +464,7 @@ export default function ChatPopup({
         })
         .eq('id', selectedConversation.id);
 
-      // CORREÇÃO: Recarregar apenas as mensagens
+      // Recarregar apenas as mensagens
       await loadMessages(selectedConversation.id);
       
       // Atualizar localmente
@@ -630,7 +556,7 @@ export default function ChatPopup({
     }
   };
 
-  // CORREÇÃO: Enviar mensagem - versão otimizada
+  // Enviar mensagem
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -667,7 +593,7 @@ export default function ChatPopup({
         return;
       }
 
-      // CORREÇÃO: Recarregar apenas as mensagens, não as conversas
+      // Recarregar apenas as mensagens
       await loadMessages(selectedConversation.id);
       
       // Atualizar a última mensagem localmente
@@ -690,25 +616,20 @@ export default function ChatPopup({
 
   // Função para navegar para o jogador
   const navigateToPlayer = (playerId: string) => {
-    // Fechar o chat popup
     onClose();
     
-    // Navegar para a página de jogadores com o ID do jogador
     setTimeout(() => {
       const playerUrl = `/dashboard/jogadores#player-${playerId}`;
       
-      // Se já estamos na página de jogadores, apenas rolar para o elemento
       if (window.location.pathname.includes('/dashboard/jogadores')) {
-        // Forçar recarregamento para garantir que a view esteja em lista
         window.location.href = playerUrl;
       } else {
-        // Navegar para a página de jogadores
         window.location.href = playerUrl;
       }
     }, 300);
   };
 
-  // CORREÇÃO: Função handleSelectConversation completamente reescrita
+  // CORREÇÃO: Função handleSelectConversation simplificada
   const handleSelectConversation = async (conversation: Conversation) => {
     if (isProcessingConversation) {
       console.log('⏳ Já processando uma conversa, ignorando...');
@@ -720,7 +641,6 @@ export default function ChatPopup({
     
     setIsProcessingConversation(true);
     setLastProcessedConversation(conversation.id);
-    setShouldSkipUnreadUpdate(true);
     
     try {
       // 1. Atualizar UI imediatamente
@@ -735,7 +655,7 @@ export default function ChatPopup({
         if (success) {
           console.log('✅ Mensagens marcadas como lidas! Atualizando UI...');
           
-          // 3. Atualizar a conversa localmente SEM recarregar tudo
+          // 3. Atualizar a conversa localmente
           const updatedConversations = conversations.map(conv => 
             conv.id === conversation.id 
               ? { ...conv, unread_count: 0 }
@@ -744,42 +664,27 @@ export default function ChatPopup({
           
           setConversations(updatedConversations);
           
-          // 4. Atualizar o contador global baseado no estado local
+          // 4. Atualizar o contador global
           const totalUnread = calculateTotalUnread(updatedConversations);
           console.log('🔢 Total de não lidas após atualização:', totalUnread);
           notifyUnreadCountChange(totalUnread);
-          
-          // 5. Forçar uma sincronização com o banco após um delay
-          setTimeout(async () => {
-            console.log('🔄 Forçando sincronização com banco...');
-            await loadConversations(true); // forceUpdate = true
-          }, 1000);
-        } else {
-          console.error('❌ Falha ao marcar mensagens como lidas');
         }
       }
       
-      // 6. Carregar as mensagens da conversa
+      // 5. Carregar as mensagens da conversa
       await loadMessages(conversation.id);
-      
-      // 7. Aguardar um pouco e permitir atualizações futuras
-      setTimeout(() => {
-        setShouldSkipUnreadUpdate(false);
-        setLastProcessedConversation(null);
-      }, 3000);
       
     } catch (error) {
       console.error('💥 Erro ao selecionar conversa:', error);
-      setShouldSkipUnreadUpdate(false);
-      setLastProcessedConversation(null);
     } finally {
       setIsProcessingConversation(false);
+      setLastProcessedConversation(null);
     }
   };
 
-  // CORREÇÃO: Adicionar listener para atualizações em tempo real
+  // CORREÇÃO: Adicionar listener para atualizações em tempo real - VERSÃO MELHORADA
   useEffect(() => {
-    if (!isOpen || !currentUser.id || conversations.length === 0) return;
+    if (!isOpen || !currentUser.id) return;
 
     // Subscribe para atualizações em tempo real das mensagens
     const subscription = supabase
@@ -787,15 +692,32 @@ export default function ChatPopup({
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'private_messages',
-          filter: `conversation_id=in.(${conversations.map(c => `"${c.id}"`).join(',')})`
+          table: 'private_messages'
         },
-        (payload) => {
-          console.log('🔄 Mudança detectada nas mensagens:', payload);
-          // Recarregar conversas quando houver mudanças nas mensagens
-          loadConversations();
+        async (payload) => {
+          console.log('🔄 Nova mensagem detectada:', payload);
+          
+          // Verificar se a mensagem é para uma das conversas do usuário
+          const isRelevantMessage = conversations.some(
+            conv => conv.id === payload.new.conversation_id
+          );
+          
+          if (isRelevantMessage) {
+            // Se estamos na conversa onde a mensagem chegou, marcar como lida
+            if (selectedConversation?.id === payload.new.conversation_id) {
+              await markMessagesAsRead(payload.new.conversation_id);
+            }
+            
+            // Recarregar conversas
+            await loadConversations();
+            
+            // Se a mensagem é para a conversa atual, recarregar mensagens também
+            if (selectedConversation?.id === payload.new.conversation_id) {
+              await loadMessages(selectedConversation.id);
+            }
+          }
         }
       )
       .subscribe();
@@ -803,41 +725,28 @@ export default function ChatPopup({
     return () => {
       subscription.unsubscribe();
     };
-  }, [isOpen, currentUser.id, conversations]);
-
-  // CORREÇÃO: Adicionar listener para quando o componente for montado/desmontado
-  useEffect(() => {
-    if (isOpen && currentUser.id) {
-      loadConversations();
-    }
-  }, [isOpen, currentUser.id]);
+  }, [isOpen, currentUser.id, conversations, selectedConversation]);
 
   // CORREÇÃO: Listener para focar em conversa específica quando receber evento
   useEffect(() => {
-    const handleFocusConversation = (event: CustomEvent) => {
+    const handleFocusConversation = async (event: CustomEvent) => {
       const { conversationId } = event.detail;
       console.log('🎯 Evento focusConversation recebido:', conversationId);
+      
+      // Primeiro, recarregar as conversas para garantir que temos os dados mais recentes
+      await loadConversations();
       
       // Encontrar a conversa pelo ID
       const conversation = conversations.find(conv => conv.id === conversationId);
       if (conversation) {
         console.log('✅ Conversa encontrada, focando...');
         handleSelectConversation(conversation);
+        setActiveTab('conversations');
       } else {
-        console.log('⚠️ Conversa não encontrada, aguardando...');
-        // Se não encontrou, tenta novamente após carregar conversas
-        setTimeout(() => {
-          loadConversations(true).then(() => {
-            const convAfterReload = conversations.find(conv => conv.id === conversationId);
-            if (convAfterReload) {
-              handleSelectConversation(convAfterReload);
-            }
-          });
-        }, 1000);
+        console.log('⚠️ Conversa não encontrada após recarregar');
       }
     };
 
-    // Adicionar listener
     window.addEventListener('focusConversation', handleFocusConversation as EventListener);
 
     return () => {
@@ -1151,8 +1060,8 @@ export default function ChatPopup({
                             </div>
                           </div>
                           
-                          {/* Indicador de mensagens não lidas - ATUALIZADO */}
-                          {conversation.unread_count > 0 && (
+                          {/* Indicador de mensagens não lidas */}
+                          {conversation.unread_count && conversation.unread_count > 0 && (
                             <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
                               <span className="bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-bold shadow-lg">
                                 {conversation.unread_count}
