@@ -109,7 +109,7 @@ export default function ChatPopup({
     }
   }, [onUnreadCountChange]);
 
-  // CORREÇÃO: Função para marcar mensagens como lidas - VERSÃO SIMPLIFICADA
+  // Função para marcar mensagens como lidas
   const markMessagesAsRead = async (conversationId: string) => {
     try {
       console.log('🎯 Marcando mensagens como lidas para conversa:', conversationId);
@@ -155,7 +155,7 @@ export default function ChatPopup({
     loadData();
   }, [isOpen, currentUser.id]);
 
-  // CORREÇÃO: Carregar conversas do usuário - VERSÃO MAIS ROBUSTA
+  // Carregar conversas do usuário
   const loadConversations = async () => {
     try {
       console.log('Carregando conversas para usuário:', currentUser.id);
@@ -302,7 +302,7 @@ export default function ChatPopup({
     }
   };
 
-  // CORREÇÃO: Carregar mensagens de uma conversa
+  // Carregar mensagens de uma conversa
   const loadMessages = async (conversationId: string) => {
     try {
       console.log('💬 Carregando mensagens da conversa:', conversationId);
@@ -629,7 +629,7 @@ export default function ChatPopup({
     }, 300);
   };
 
-  // CORREÇÃO: Função handleSelectConversation simplificada
+  // Função handleSelectConversation simplificada
   const handleSelectConversation = async (conversation: Conversation) => {
     if (isProcessingConversation) {
       console.log('⏳ Já processando uma conversa, ignorando...');
@@ -682,7 +682,7 @@ export default function ChatPopup({
     }
   };
 
-  // CORREÇÃO: Adicionar listener para atualizações em tempo real - VERSÃO MELHORADA
+  // Listener para atualizações em tempo real
   useEffect(() => {
     if (!isOpen || !currentUser.id) return;
 
@@ -727,7 +727,7 @@ export default function ChatPopup({
     };
   }, [isOpen, currentUser.id, conversations, selectedConversation]);
 
-  // CORREÇÃO: Listener para focar em conversa específica quando receber evento
+  // Listener para focar em conversa específica quando receber evento
   useEffect(() => {
     const handleFocusConversation = async (event: CustomEvent) => {
       const { conversationId } = event.detail;
