@@ -45,6 +45,7 @@ interface Auction {
   start_time: string
   end_time: string | null
   created_by: string
+  auction_duration?: number // NOVO CAMPO: duração do leilão em minutos
   player?: Player
   current_bidder_team?: {
     name: string
@@ -296,7 +297,7 @@ export default function PaginaLeilao() {
     loadInitialData()
   }, [])
 
-  // NOVO: Polling em tempo real para atualizações
+  // CORREÇÃO: Polling a cada 1 segundo
   useEffect(() => {
     const pollingInterval = setInterval(async () => {
       // Verificar se há leilões ativos ou pendentes
@@ -306,7 +307,7 @@ export default function PaginaLeilao() {
         console.log('🔄 Polling: verificando atualizações...')
         await loadAuctions(true) // true indica que é uma atualização silenciosa
       }
-    }, 3000) // Verificar a cada 3 segundos
+    }, 1000) // CORREÇÃO: Alterado para 1 segundo
 
     return () => clearInterval(pollingInterval)
   }, [auctions])
@@ -617,11 +618,33 @@ export default function PaginaLeilao() {
     return Math.max(0, endTime - currentTime)
   }, [currentTime])
 
+  // CORREÇÃO: Função startPendingAuction respeitando a duração original
   const startPendingAuction = async (auctionId: string) => {
     try {
       console.log(`🎬 Iniciando leilão pendente: ${auctionId}`)
       
-      const durationMinutes = parseInt(auctionDuration)
+      // Buscar dados do leilão para obter a duração original
+      const { data: auctionData, error: fetchError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('id', auctionId)
+        .single()
+
+      if (fetchError) {
+        console.error('❌ Erro ao buscar dados do leilão:', fetchError)
+        return
+      }
+
+      // Calcular duração baseada no start_time e end_time originais
+      let durationMinutes = 5 // fallback
+      if (auctionData.start_time && auctionData.end_time) {
+        const startTime = new Date(auctionData.start_time).getTime()
+        const endTime = new Date(auctionData.end_time).getTime()
+        durationMinutes = Math.round((endTime - startTime) / 60000)
+      }
+
+      console.log(`⏰ Duração calculada do leilão: ${durationMinutes} minutos`)
+
       const { error } = await supabase
         .from('auctions')
         .update({ 
@@ -719,7 +742,7 @@ export default function PaginaLeilao() {
       const durationMinutes = parseInt(auctionDuration)
       const endTime = new Date(startDateTime.getTime() + durationMinutes * 60000)
 
-      // Criar leilão
+      // Criar leilão COM DURAÇÃO SALVA
       const { error } = await supabase
         .from('auctions')
         .insert([{
@@ -729,7 +752,8 @@ export default function PaginaLeilao() {
           status: 'pending',
           start_time: startDateTime.toISOString(),
           end_time: endTime.toISOString(),
-          created_by: user.id
+          created_by: user.id,
+          auction_duration: durationMinutes // CORREÇÃO: Salvar a duração
         }])
 
       if (error) throw error
@@ -754,10 +778,40 @@ export default function PaginaLeilao() {
     }
   }
 
+  // CORREÇÃO: Função handleStartAuction respeitando a duração salva
   const handleStartAuction = async (auctionId: string) => {
     try {
-      const durationMinutes = parseInt(auctionDuration)
-      await supabase
+      // Buscar dados do leilão para obter a duração salva
+      const { data: auctionData, error: fetchError } = await supabase
+        .from('auctions')
+        .select('auction_duration, start_time, end_time')
+        .eq('id', auctionId)
+        .single()
+
+      if (fetchError) {
+        console.error('❌ Erro ao buscar dados do leilão:', fetchError)
+        return
+      }
+
+      // Determinar a duração correta
+      let durationMinutes = 5 // fallback padrão
+      
+      // Prioridade 1: Usar auction_duration se existir
+      if (auctionData.auction_duration) {
+        durationMinutes = auctionData.auction_duration
+        console.log(`⏰ Usando duração salva: ${durationMinutes} minutos`)
+      } 
+      // Prioridade 2: Calcular a partir de start_time e end_time
+      else if (auctionData.start_time && auctionData.end_time) {
+        const startTime = new Date(auctionData.start_time).getTime()
+        const endTime = new Date(auctionData.end_time).getTime()
+        durationMinutes = Math.round((endTime - startTime) / 60000)
+        console.log(`⏰ Calculando duração: ${durationMinutes} minutos`)
+      }
+
+      console.log(`🎬 Iniciando leilão ${auctionId} com ${durationMinutes} minutos`)
+
+      const { error } = await supabase
         .from('auctions')
         .update({ 
           status: 'active',
@@ -765,6 +819,8 @@ export default function PaginaLeilao() {
           end_time: new Date(Date.now() + durationMinutes * 60000).toISOString()
         })
         .eq('id', auctionId)
+
+      if (error) throw error
 
       alert('🎉 Leilão iniciado!')
       await loadAuctions()
