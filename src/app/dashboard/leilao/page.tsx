@@ -45,7 +45,7 @@ interface Auction {
   start_time: string
   end_time: string | null
   created_by: string
-  auction_duration?: number // NOVO CAMPO: duração do leilão em minutos
+  auction_duration?: number
   player?: Player
   current_bidder_team?: {
     name: string
@@ -294,7 +294,7 @@ export default function PaginaLeilao() {
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [activeTab, setActiveTab] = useState<TabType>('active')
 
-  // Estados para lances - REMOVIDO bidAmount
+  // Estados para lances
   const [biddingAuctionId, setBiddingAuctionId] = useState<string | null>(null)
   const [selectedBidAmount, setSelectedBidAmount] = useState<number | null>(null)
   const [bidding, setBidding] = useState(false)
@@ -331,7 +331,7 @@ export default function PaginaLeilao() {
         console.log('🔄 Polling: verificando atualizações...')
         await loadAuctions(true) // true indica que é uma atualização silenciosa
       }
-    }, 1000) // CORREÇÃO: Alterado para 1 segundo
+    }, 1000)
 
     return () => clearInterval(pollingInterval)
   }, [auctions])
@@ -764,7 +764,7 @@ export default function PaginaLeilao() {
           start_time: startDateTime.toISOString(),
           end_time: endTime.toISOString(),
           created_by: user.id,
-          auction_duration: durationMinutes // CORREÇÃO: Salvar a duração
+          auction_duration: durationMinutes
         }])
 
       if (error) throw error
@@ -1179,7 +1179,6 @@ export default function PaginaLeilao() {
   }
 
   const handleStartPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // CORREÇÃO: Usar formatação livre para criação de leilão
     const formattedValue = formatCurrencyCreate(e.target.value)
     setStartPrice(formattedValue)
   }
@@ -1309,7 +1308,7 @@ export default function PaginaLeilao() {
                 </p>
               </div>
 
-              {/* CORREÇÃO: Exibir informações do time com saldo reservado PERSISTENTE E ESPECÍFICO */}
+              {/* Informações do time com saldo reservado */}
               {team && (
                 <div className="flex items-center gap-4 bg-zinc-800/50 rounded-lg p-4">
                   {team.logo_url && (
@@ -1390,7 +1389,6 @@ export default function PaginaLeilao() {
                         </Select>
                       </div>
 
-                      {/* NOVO: Campo para selecionar a data */}
                       <div>
                         <label className="text-zinc-400 text-sm font-medium mb-2 block">
                           Data de Início
@@ -1428,7 +1426,6 @@ export default function PaginaLeilao() {
                         </Select>
                       </div>
 
-                      {/* ATUALIZADO: Opções de duração com novos tempos */}
                       <div>
                         <label className="text-zinc-400 text-sm font-medium mb-2 block">
                           Duração
@@ -1576,7 +1573,7 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD ATUALIZADO - APENAS COM SELETOR
+// COMPONENTE AUCTIONCARD ATUALIZADO - CORREÇÃO DO PROBLEMA DE ATUALIZAÇÃO EM TEMPO REAL
 const AuctionCard = ({ 
   auction, 
   type, 
@@ -1598,30 +1595,70 @@ const AuctionCard = ({
 
   // NOVO ESTADO: Opções de lance dinâmicas
   const [bidOptions, setBidOptions] = useState<{ value: number; label: string }[]>([])
+  
+  // NOVO ESTADO: Controlar se o modal de lance está aberto
+  const [isBidModalOpen, setIsBidModalOpen] = useState(false)
 
-  // ATUALIZAR OPÇÕES QUANDO O LEILÃO MUDAR OU QUANDO ABRIR O SELETOR
+  // ATUALIZAR OPÇÕES QUANDO O LEILÃO MUDAR E O MODAL ESTIVER ABERTO
   useEffect(() => {
-    if (auction && biddingAuctionId === auction.id) {
+    if (auction && isBidModalOpen) {
       const options = generateBidOptions(auction.current_bid)
       setBidOptions(options)
-      // Resetar seleção quando abrir
+      console.log('🔄 Opções de lance atualizadas para leilão:', auction.id, 'lance atual:', auction.current_bid)
+    }
+  }, [auction, isBidModalOpen])
+
+  // NOVO: Sincronizar o estado do modal com biddingAuctionId
+  useEffect(() => {
+    setIsBidModalOpen(biddingAuctionId === auction.id)
+    
+    // Se o modal está sendo fechado, resetar a seleção
+    if (biddingAuctionId !== auction.id) {
       setSelectedBidAmount(null)
     }
-  }, [auction, biddingAuctionId])
+  }, [biddingAuctionId, auction.id])
+
+  // NOVA FUNÇÃO: Abrir modal de lance
+  const handleOpenBidModal = () => {
+    setBiddingAuctionId(auction.id)
+    setIsBidModalOpen(true)
+    
+    // Gerar opções imediatamente ao abrir
+    const options = generateBidOptions(auction.current_bid)
+    setBidOptions(options)
+    setSelectedBidAmount(null) // Resetar seleção ao abrir
+  }
+
+  // NOVA FUNÇÃO: Fechar modal de lance
+  const handleCloseBidModal = () => {
+    setBiddingAuctionId(null)
+    setIsBidModalOpen(false)
+    setSelectedBidAmount(null)
+  }
 
   // NOVA FUNÇÃO: Manipular seleção de lance
   const handleBidSelect = (value: string) => {
     const numericValue = parseInt(value)
     if (!isNaN(numericValue)) {
       setSelectedBidAmount(numericValue)
+      console.log('✅ Valor selecionado:', numericValue)
     }
   }
 
+  // NOVA FUNÇÃO: Dar lance com validações
   const handlePlaceBid = async () => {
     if (!selectedBidAmount) {
       alert('Selecione um valor de lance')
       return
     }
+
+    console.log('🎯 Tentando dar lance:', {
+      auctionId: auction.id,
+      selectedAmount: selectedBidAmount,
+      currentBid: auction.current_bid,
+      difference: selectedBidAmount - auction.current_bid
+    })
+
     await onBid(auction.id, selectedBidAmount)
   }
 
@@ -1771,66 +1808,105 @@ const AuctionCard = ({
 
         {/* CORREÇÃO: Permitir lances para usuários comuns com time - APENAS COM SELETOR */}
         {type === 'active' && timeRemaining > 0 && (
-          biddingAuctionId === auction.id ? (
-            <div className="space-y-3">
-              {/* SELETOR DE OPÇÕES DE LANCE */}
-              <Select onValueChange={handleBidSelect} value={selectedBidAmount?.toString() || ''}>
-                <SelectTrigger className="w-full bg-zinc-800/50 border-zinc-600 text-white">
-                  <SelectValue placeholder="Selecione um valor de lance" />
-                </SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-600 max-h-60">
-                  {bidOptions.map((option) => (
-                    <SelectItem 
-                      key={option.value} 
-                      value={option.value.toString()}
-                      className="text-white hover:bg-zinc-700"
-                    >
-                      <div className="flex justify-between items-center w-full">
-                        <span>R$ {option.label}</span>
-                        <span className="text-zinc-400 text-sm">
-                          {option.value.toLocaleString('pt-BR')}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              <div className="text-sm text-yellow-400 text-center">
-                💰 Lance mínimo: R$ {formatToMillions(auction.current_bid + 1000000)}
-                <br />
-                <span className="text-zinc-400">
-                  ({bidOptions.length} opções disponíveis)
-                </span>
+          isBidModalOpen ? (
+            <div className="space-y-3 p-4 bg-zinc-800/30 rounded-lg border border-zinc-600">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-lg font-bold text-white">Fazer Lance</h4>
+                <Badge variant="outline" className="bg-green-500/20 text-green-400">
+                  Ativo
+                </Badge>
               </div>
               
-              <div className="flex gap-2">
+              {/* SELETOR DE OPÇÕES DE LANCE */}
+              <div className="space-y-2">
+                <label className="text-zinc-400 text-sm font-medium">
+                  Selecione o valor do lance:
+                </label>
+                <Select 
+                  onValueChange={handleBidSelect} 
+                  value={selectedBidAmount?.toString() || ''}
+                  key={auction.current_bid} // Forçar recriação quando o lance atual mudar
+                >
+                  <SelectTrigger className="w-full bg-zinc-800/50 border-zinc-600 text-white">
+                    <SelectValue placeholder="Selecione um valor de lance" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-800 border-zinc-600 max-h-60">
+                    {bidOptions.map((option) => (
+                      <SelectItem 
+                        key={option.value} 
+                        value={option.value.toString()}
+                        className="text-white hover:bg-zinc-700 focus:bg-zinc-700"
+                      >
+                        <div className="flex justify-between items-center w-full">
+                          <span className="font-medium">R$ {option.label}</span>
+                          <span className="text-zinc-400 text-sm">
+                            {option.value.toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="text-sm text-yellow-400 text-center p-2 bg-yellow-500/10 rounded">
+                💰 <strong>Lance mínimo:</strong> R$ {formatToMillions(auction.current_bid + 1000000)}
+                <br />
+                <span className="text-zinc-300">
+                  {bidOptions.length} opções disponíveis (incrementos de 1M)
+                </span>
+              </div>
+
+              {/* INFO DO LANCE SELECIONADO */}
+              {selectedBidAmount && (
+                <div className="p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-blue-300">Seu lance:</span>
+                    <span className="font-bold text-white text-lg">
+                      R$ {formatToMillions(selectedBidAmount)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-xs mt-1">
+                    <span className="text-zinc-400">Diferença:</span>
+                    <span className="text-green-400">
+                      +R$ {formatToMillions(selectedBidAmount - auction.current_bid)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex gap-2 pt-2">
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    setBiddingAuctionId(null)
-                    setSelectedBidAmount(null)
-                  }}
-                  className="flex-1"
+                  onClick={handleCloseBidModal}
+                  className="flex-1 border-zinc-600 text-zinc-400 hover:bg-zinc-700/50"
+                  disabled={bidding}
                 >
                   Cancelar
                 </Button>
                 <Button
                   onClick={handlePlaceBid}
                   disabled={bidding || !selectedBidAmount}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold"
                 >
-                  {bidding ? 'Dando lance...' : 'Dar Lance'}
+                  {bidding ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Processando...
+                    </div>
+                  ) : (
+                    `Dar Lance - R$ ${selectedBidAmount ? formatToMillions(selectedBidAmount) : ''}`
+                  )}
                 </Button>
               </div>
             </div>
           ) : (
             <Button
-              onClick={() => setBiddingAuctionId(auction.id)}
-              className="w-full bg-green-600 hover:bg-green-700"
+              onClick={handleOpenBidModal}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3"
               disabled={!team}
             >
-              <DollarSign className="w-4 h-4 mr-2" />
+              <DollarSign className="w-5 h-5 mr-2" />
               {!team ? 'Sem Time' : 'Fazer Lance'}
             </Button>
           )
