@@ -755,17 +755,17 @@ export default function Dashboard() {
     }
   }
 
-  // Função para determinar a posição do tile expandido
+  // Função para determinar a posição do tile expandido - CORRIGIDA
   const getTilePositionClass = (tileTitle: string, index: number) => {
     if (expandedTile !== tileTitle) return ''
     
-    // Tile na posição 3 (JOGADORES) - expande para a esquerda
+    // Tile na posição 3 (JOGADORES) - expande para a esquerda mantendo a posição
     if (index === 2) {
-      return 'lg:col-start-1 lg:col-span-2 row-start-1 scale-105 shadow-2xl z-10'
+      return 'lg:col-start-2 lg:col-span-2 row-start-1 scale-105 shadow-2xl z-10'
     }
     
-    // Demais tiles - comportamento padrão
-    return 'row-span-2 lg:col-span-2 scale-105 shadow-2xl z-10'
+    // Demais tiles - comportamento padrão (expandem para a direita)
+    return 'lg:col-span-2 scale-105 shadow-2xl z-10'
   }
 
   return (
@@ -857,7 +857,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Grid de Tiles - MODIFICADO */}
+            {/* Grid de Tiles - CORRIGIDO */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 auto-rows-min">
               {tiles.map((tile, index) => (
                 <Card
