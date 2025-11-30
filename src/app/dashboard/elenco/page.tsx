@@ -2617,7 +2617,7 @@ export default function ElencoPage() {
                                         className="bg-green-600 hover:bg-green-700 text-white h-8 lg:h-9 px-3 lg:px-4 flex items-center justify-center"
                                       >
                                         <MessageCircle className="w-4 h-4 mr-1 lg:mr-2" />
-                                        <span className="text-xs"></span>
+                                        
                                       </Button>
                                       <Button
                                         size="sm"
