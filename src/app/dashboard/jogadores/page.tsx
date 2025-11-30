@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Sheet,
   SheetContent,
@@ -18,7 +19,7 @@ import {
 } from '@/components/ui/sheet'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { CadastrarJogadorForm } from '@/components/CadastrarJogadorForm'
-import { PlusCircle, Loader2, AlertCircle, Search, Filter, X, ChevronDown, Pencil, Grid3X3, List, Star, Ruler } from 'lucide-react'
+import { PlusCircle, Loader2, AlertCircle, Search, Filter, X, ChevronDown, Pencil, Grid3X3, List, Star, Ruler, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
@@ -115,6 +116,38 @@ function formatBasePrice(price: number): string {
   return `R$ ${price}`
 }
 
+// Componente de Checkbox personalizado com caixa branca
+const CustomCheckbox = ({ 
+  checked, 
+  onChange, 
+  id, 
+  label 
+}: { 
+  checked: boolean; 
+  onChange: () => void; 
+  id: string; 
+  label: string;
+}) => (
+  <div className="flex items-center space-x-3 cursor-pointer" onClick={onChange}>
+    <div className={cn(
+      "w-5 h-5 border-2 rounded-md flex items-center justify-center transition-all duration-200",
+      checked 
+        ? "bg-white border-white" 
+        : "bg-transparent border-white"
+    )}>
+      {checked && (
+        <Check className="w-3 h-3 text-black font-bold" />
+      )}
+    </div>
+    <label
+      htmlFor={id}
+      className="text-sm font-medium leading-none cursor-pointer flex-1"
+    >
+      {label}
+    </label>
+  </div>
+)
+
 export default function ListaJogadores() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -149,8 +182,12 @@ export default function ListaJogadores() {
   const [showFavoriteToast, setShowFavoriteToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
 
+  // Estados para filtros de posições (MULTIPLA SELEÇÃO)
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([])
+  const [positionFilterOpen, setPositionFilterOpen] = useState(false)
+
   // Constantes movidas para dentro do componente para evitar hoisting
-  const POSITIONS = ['Todas', 'GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
+  const POSITIONS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
   const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
 
   const ATTRIBUTE_GROUPS = [
@@ -242,6 +279,17 @@ export default function ListaJogadores() {
     'Toque duplo',
     'Volta para marcar'
   ].sort(), []);
+
+  // Funções para manipular checkboxes de posições
+  const togglePosition = (position: string) => {
+    setSelectedPositions(prev =>
+      prev.includes(position)
+        ? prev.filter(p => p !== position)
+        : [...prev, position]
+    )
+  }
+
+  const clearPositionFilters = () => setSelectedPositions([])
 
   // Funções auxiliares simplificadas
   const formatHeight = (height: number | null | undefined) => {
@@ -357,7 +405,6 @@ export default function ListaJogadores() {
   }
 
   const [searchName, setSearchName] = useState('')
-  const [filterPosition, setFilterPosition] = useState('Todas')
   const [filterFoot, setFilterFoot] = useState('Todos')
   const [filterTeam, setFilterTeam] = useState('Todos')
   const [selectedSkills, setSelectedSkills] = useState<string[]>([])
@@ -617,7 +664,8 @@ export default function ListaJogadores() {
   const filteredPlayers = useMemo(() => {
     return jogadores.filter(j => {
       const name = j.name.toLowerCase().includes(searchName.toLowerCase())
-      const pos = filterPosition === 'Todas' || j.position === filterPosition
+      // Filtro de posições (múltipla seleção)
+      const pos = selectedPositions.length === 0 || selectedPositions.includes(j.position)
       const foot = filterFoot === 'Todos' || j.preferred_foot === filterFoot
       const team = filterTeam === 'Todos' || (filterTeam === 'Sem Time' ? !j.team_id : j.team_id === filterTeam)
       const skills = selectedSkills.length === 0 || selectedSkills.every(s => j.skills?.includes(s))
@@ -628,9 +676,10 @@ export default function ListaJogadores() {
       
       return name && pos && foot && team && skills && attrs && height
     })
-  }, [jogadores, searchName, filterPosition, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight])
+  }, [jogadores, searchName, selectedPositions, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight])
 
   const activeAdvancedFilters = [
+    selectedPositions.length > 0,
     filterFoot !== 'Todos',
     filterTeam !== 'Todos',
     selectedSkills.length > 0,
@@ -640,7 +689,7 @@ export default function ListaJogadores() {
 
   const clearAllFilters = useCallback(() => {
     setSearchName('')
-    setFilterPosition('Todas')
+    setSelectedPositions([])
     setFilterFoot('Todos')
     setFilterTeam('Todos')
     setSelectedSkills([])
@@ -882,22 +931,67 @@ export default function ListaJogadores() {
                 />
               </div>
 
-              <Select value={filterPosition} onValueChange={setFilterPosition}>
-                <SelectTrigger className="w-full lg:w-64 h-12 lg:h-14 bg-zinc-900/70 border-zinc-700 text-white rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {POSITIONS.map(p => (
-                    <SelectItem key={p} value={p}>{p === 'Todas' ? 'Todas as posições' : p}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* FILTRO DE POSIÇÕES COM CHECKBOXES - ATUALIZADO */}
+              <div className="relative">
+                <Button 
+                  variant="outline" 
+                  className={cn(
+                    "h-12 lg:h-14 bg-zinc-900/70 border-zinc-700 flex items-center gap-2 text-sm lg:text-base w-full lg:w-64",
+                    selectedPositions.length > 0 && "border-purple-500 text-purple-400"
+                  )}
+                  onClick={() => setPositionFilterOpen(!positionFilterOpen)}
+                >
+                  <Filter className="w-4 h-4 lg:w-5 lg:h-5" />
+                  Posições
+                  {selectedPositions.length > 0 && (
+                    <Badge className="bg-purple-600 text-xs h-5 px-2 min-w-5">{selectedPositions.length}</Badge>
+                  )}
+                </Button>
+                
+                {positionFilterOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-base">Filtrar por Posição</h3>
+                      {selectedPositions.length > 0 && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={clearPositionFilters}
+                          className="text-xs text-red-400 hover:text-red-300 h-6"
+                        >
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {POSITIONS.map(position => (
+                        <CustomCheckbox
+                          key={position}
+                          id={`position-${position}`}
+                          checked={selectedPositions.includes(position)}
+                          onChange={() => togglePosition(position)}
+                          label={position}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               <Button variant="outline" size="lg" onClick={clearAllFilters} className="h-12 lg:h-14 px-4 lg:px-6 bg-zinc-900/70 border-zinc-700 hover:bg-zinc-800 hover:border-purple-500 text-white">
                 <X className="w-4 h-4 lg:w-5 lg:h-5 mr-2" />
                 Resetar Filtros
               </Button>
             </div>
+
+            {/* Fechar filtro de posições quando clicar fora */}
+            {positionFilterOpen && (
+              <div 
+                className="fixed inset-0 z-0 bg-transparent cursor-default"
+                onClick={() => setPositionFilterOpen(false)}
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              />
+            )}
 
             <div className="text-center mb-8 lg:mb-12">
               <p className="text-lg lg:text-xl text-zinc-400">
@@ -953,7 +1047,7 @@ export default function ListaJogadores() {
                         }}
                         className="absolute top-2 lg:top-3 left-2 lg:left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-1.5 rounded-full backdrop-blur"
                       >
-                        <Pencil className="w-3 h-3 lg:w-3 lg:h-3" />
+                        <Pencil className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
                       </button>
                     )}
 
