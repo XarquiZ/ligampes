@@ -2257,7 +2257,7 @@ export default function ElencoPage() {
                   size="sm"
                 >
                   <MessageCircle className="w-3 h-3 lg:w-3.5 lg:h-3.5 mr-1" />
-                  Proposta
+  
                 </Button>
               ) : (
                 // Botões padrão para elenco
