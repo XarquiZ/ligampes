@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COMPLETA CORRIGIDA
+// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -75,7 +75,7 @@ export default function Dashboard() {
   })
   const [activeAuctions, setActiveAuctions] = useState<any[]>([])
   const [pendingTransfers, setPendingTransfers] = useState(0)
-  const [completedTransfers, setCompletedTransfers] = useState(0) // NOVO ESTADO
+  const [completedTransfers, setCompletedTransfers] = useState(0)
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -169,7 +169,7 @@ export default function Dashboard() {
       loadPlayersStats()
       loadActiveAuctions()
       loadPendingTransfers()
-      loadCompletedTransfers() // NOVA FUNÇÃO
+      loadCompletedTransfers()
     }
   }, [team?.id])
 
@@ -290,7 +290,7 @@ export default function Dashboard() {
     }
   }
 
-  // NOVA FUNÇÃO: Carregar transferências completadas
+  // Função para carregar transferências completadas
   const loadCompletedTransfers = async () => {
     try {
       const { count, error } = await supabase
@@ -511,8 +511,8 @@ export default function Dashboard() {
       title: 'LEILÃO', 
       icon: Calendar, 
       color: 'red', 
-      value: 'EM BREVE', 
-      subtitle: 'próximo evento', 
+      value: activeAuctions.length > 0 ? 'AO VIVO' : 'EM BREVE', 
+      subtitle: activeAuctions.length > 0 ? 'leilão ativo' : 'próximo evento', 
       link: '/dashboard/leilao',
       buttonText: 'Ver leilão',
       preview: 'leilao'
@@ -661,47 +661,84 @@ export default function Dashboard() {
       
       case 'LEILÃO':
         const hasActiveAuctions = activeAuctions.length > 0
+        const activeAuction = hasActiveAuctions ? activeAuctions[0] : null
         
         return (
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-red-500/10 rounded-lg border border-red-500/20">
               <span className="text-red-400 text-sm font-semibold">
-                {hasActiveAuctions ? 'Leilões Ativos' : 'Próximo Leilão'}
+                {hasActiveAuctions ? 'Leilão Ativo' : 'Próximo Leilão'}
               </span>
               <span className="text-red-400 font-bold text-lg">
-                {hasActiveAuctions ? activeAuctions.length : 'EM BREVE'}
+                {hasActiveAuctions ? 'AO VIVO' : 'EM BREVE'}
               </span>
             </div>
             
             <div className="space-y-2 text-sm">
               {hasActiveAuctions ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
+                  {/* Preview do leilão ativo */}
                   <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700">
-                    <div className="text-orange-400 font-semibold text-center">
-                      {activeAuctions.length} Leilão{activeAuctions.length > 1 ? 's' : ''} Ativo{activeAuctions.length > 1 ? 's' : ''}
+                    <div className="flex justify-between items-start mb-2">
+                      <div>
+                        <div className="text-orange-400 font-semibold text-sm">Leilão Ativo</div>
+                        <div className="text-white text-xs mt-1">Participando agora</div>
+                      </div>
+                      <div className="bg-red-500/20 px-2 py-1 rounded-full">
+                        <span className="text-red-400 text-xs font-bold">AO VIVO</span>
+                      </div>
                     </div>
-                    <div className="text-zinc-400 text-xs text-center mt-1">
-                      Participe agora dos leilões
+                    
+                    {/* Informações do lance atual */}
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <div className="text-center">
+                        <DollarSign className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
+                        <div className="text-yellow-400 font-bold text-sm">
+                          {formatBalance(activeAuction.current_bid || activeAuction.start_price)}
+                        </div>
+                        <div className="text-zinc-400 text-xs">Lance Atual</div>
+                      </div>
+                      <div className="text-center">
+                        <Clock className="w-4 h-4 text-blue-400 mx-auto mb-1" />
+                        <div className="text-blue-400 font-bold text-sm">
+                          {activeAuction.end_time ? 
+                            new Date(activeAuction.end_time).toLocaleTimeString('pt-BR', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            }) : 'Indefinido'
+                          }
+                        </div>
+                        <div className="text-zinc-400 text-xs">Termina às</div>
+                      </div>
                     </div>
                   </div>
-                  
+
+                  {/* Estatísticas rápidas */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="bg-zinc-800/30 p-2 rounded text-center">
-                      <Target className="w-3 h-3 text-yellow-400 mx-auto mb-1" />
+                      <Target className="w-3 h-3 text-green-400 mx-auto mb-1" />
                       <div className="text-white font-semibold">{activeAuctions.length}</div>
                       <div className="text-zinc-400">Ativos</div>
                     </div>
                     <div className="bg-zinc-800/30 p-2 rounded text-center">
-                      <DollarSign className="w-3 h-3 text-emerald-400 mx-auto mb-1" />
+                      <TrendingUp className="w-3 h-3 text-emerald-400 mx-auto mb-1" />
                       <div className="text-white font-semibold">
-                        {activeAuctions.length > 0 ? formatBalance(activeAuctions[0].current_bid || 0) : 'R$ 0'}
+                        {activeAuction.current_bidder ? 'Sim' : 'Não'}
                       </div>
-                      <div className="text-zinc-400">Maior Lance</div>
+                      <div className="text-zinc-400">Com Lances</div>
+                    </div>
+                  </div>
+
+                  {/* Call to action */}
+                  <div className="bg-gradient-to-r from-red-500/20 to-orange-500/20 p-2 rounded-lg border border-red-500/30 text-center">
+                    <div className="text-white text-xs font-semibold">
+                      Participe agora do leilão!
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
+                <div className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-700 text-center">
+                  <Calendar className="w-8 h-8 text-orange-400 mx-auto mb-2" />
                   <div className="text-orange-400 font-semibold">Aguardando Início</div>
                   <div className="text-zinc-400 text-xs mt-1">Novos leilões em breve</div>
                 </div>
@@ -755,7 +792,7 @@ export default function Dashboard() {
     }
   }
 
-  // Função para determinar a posição do tile expandido - CORRIGIDA
+  // Função para determinar a posição do tile expandido
   const getTilePositionClass = (tileTitle: string, index: number) => {
     if (expandedTile !== tileTitle) return ''
     
@@ -857,7 +894,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Grid de Tiles - CORRIGIDO */}
+            {/* Grid de Tiles */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 auto-rows-min">
               {tiles.map((tile, index) => (
                 <Card
