@@ -1778,7 +1778,7 @@ const AuctionCard = ({
                   placeholder="0,00"
                   value={bidAmount}
                   onChange={handleBidAmountChange}
-                  className="pl-10 bg-zinc-800/50 border-zinc-600"
+                  className="pl-10 bg-zinc-800/50 border-zinc-600 text-white"
                 />
               </div>
               <div className="text-sm text-yellow-400 text-center">
