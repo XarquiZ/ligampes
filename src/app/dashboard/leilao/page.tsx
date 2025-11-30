@@ -12,7 +12,8 @@ import {
   Trophy,
   Timer,
   Minus,
-  Crown
+  Crown,
+  Calendar
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -259,6 +260,7 @@ export default function PaginaLeilao() {
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [startPrice, setStartPrice] = useState('')
   const [auctionDuration, setAuctionDuration] = useState('5')
+  const [startDate, setStartDate] = useState('')
   const [startTime, setStartTime] = useState('')
   const [freePlayers, setFreePlayers] = useState<Player[]>([])
   const [creatingAuction, setCreatingAuction] = useState(false)
@@ -286,10 +288,28 @@ export default function PaginaLeilao() {
   // Estado separado para contagem regressiva
   const [currentTime, setCurrentTime] = useState(Date.now())
 
+  // NOVO: Estado para polling em tempo real
+  const [lastUpdate, setLastUpdate] = useState(Date.now())
+
   // CARREGAMENTO INICIAL - APENAS UMA VEZ
   useEffect(() => {
     loadInitialData()
   }, [])
+
+  // NOVO: Polling em tempo real para atualizações
+  useEffect(() => {
+    const pollingInterval = setInterval(async () => {
+      // Verificar se há leilões ativos ou pendentes
+      const hasActiveOrPending = auctions.some(a => a.status === 'active' || a.status === 'pending')
+      
+      if (hasActiveOrPending) {
+        console.log('🔄 Polling: verificando atualizações...')
+        await loadAuctions(true) // true indica que é uma atualização silenciosa
+      }
+    }, 3000) // Verificar a cada 3 segundos
+
+    return () => clearInterval(pollingInterval)
+  }, [auctions])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -460,9 +480,12 @@ export default function PaginaLeilao() {
     }
   }
 
-  // FUNÇÃO PARA CARREGAR LEILÕES
-  const loadAuctions = async () => {
-    console.log('📥 Carregando leilões...')
+  // FUNÇÃO ATUALIZADA PARA CARREGAR LEILÕES (com polling silencioso)
+  const loadAuctions = async (silent = false) => {
+    if (!silent) {
+      console.log('📥 Carregando leilões...')
+    }
+    
     try {
       const { data: auctionsData, error } = await supabase
         .from('auctions')
@@ -474,11 +497,15 @@ export default function PaginaLeilao() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('❌ Erro ao carregar leilões:', error)
+        if (!silent) {
+          console.error('❌ Erro ao carregar leilões:', error)
+        }
         return
       }
 
-      console.log('🎯 Leilões encontrados no banco:', auctionsData?.length)
+      if (!silent) {
+        console.log('🎯 Leilões encontrados no banco:', auctionsData?.length)
+      }
       
       // Calcular tempo restante inicial
       const auctionsWithTime = (auctionsData || []).map(auction => {
@@ -490,17 +517,31 @@ export default function PaginaLeilao() {
         return { ...auction, time_remaining: timeRemaining }
       })
       
-      setAuctions(auctionsWithTime)
-      console.log('✅ Estado auctions atualizado:', auctionsWithTime.length)
+      // Atualizar estado de forma otimizada para evitar piscadas
+      setAuctions(prevAuctions => {
+        // Se não há mudanças significativas, não atualize
+        if (JSON.stringify(prevAuctions) === JSON.stringify(auctionsWithTime)) {
+          return prevAuctions
+        }
+        return auctionsWithTime
+      })
+
+      if (!silent) {
+        console.log('✅ Estado auctions atualizado:', auctionsWithTime.length)
+      }
 
       // Carregar lances para leilões ativos
       const activeAuctions = auctionsWithTime.filter(a => a.status === 'active')
       for (const auction of activeAuctions) {
-        await loadBids(auction.id)
+        await loadBids(auction.id, silent)
       }
 
+      setLastUpdate(Date.now())
+
     } catch (error) {
-      console.error('❌ Erro inesperado:', error)
+      if (!silent) {
+        console.error('❌ Erro inesperado:', error)
+      }
     }
   }
 
@@ -529,10 +570,12 @@ export default function PaginaLeilao() {
     }
   }
 
-  // FUNÇÃO PARA CARREGAR LANCES
-  const loadBids = async (auctionId: string) => {
+  // FUNÇÃO ATUALIZADA PARA CARREGAR LANCES (com polling silencioso)
+  const loadBids = async (auctionId: string, silent = false) => {
     try {
-      console.log(`📥 Carregando lances para leilão ${auctionId}`)
+      if (!silent) {
+        console.log(`📥 Carregando lances para leilão ${auctionId}`)
+      }
       
       const { data: bidsData, error } = await supabase
         .from('bids')
@@ -544,18 +587,24 @@ export default function PaginaLeilao() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        console.error('❌ Erro ao carregar lances:', error)
+        if (!silent) {
+          console.error('❌ Erro ao carregar lances:', error)
+        }
         return
       }
 
-      console.log(`✅ ${bidsData?.length || 0} lances carregados para leilão ${auctionId}`)
+      if (!silent) {
+        console.log(`✅ ${bidsData?.length || 0} lances carregados para leilão ${auctionId}`)
+      }
       
       setBids(prev => ({
         ...prev,
         [auctionId]: bidsData || []
       }))
     } catch (error) {
-      console.error('❌ Erro inesperado ao carregar lances:', error)
+      if (!silent) {
+        console.error('❌ Erro inesperado ao carregar lances:', error)
+      }
     }
   }
 
@@ -572,12 +621,13 @@ export default function PaginaLeilao() {
     try {
       console.log(`🎬 Iniciando leilão pendente: ${auctionId}`)
       
+      const durationMinutes = parseInt(auctionDuration)
       const { error } = await supabase
         .from('auctions')
         .update({ 
           status: 'active',
           start_time: new Date().toISOString(),
-          end_time: new Date(Date.now() + 5 * 60000).toISOString()
+          end_time: new Date(Date.now() + durationMinutes * 60000).toISOString()
         })
         .eq('id', auctionId)
 
@@ -622,9 +672,15 @@ export default function PaginaLeilao() {
     })
   }
 
-  // CRIAÇÃO DE LEILÃO
+  // NOVA FUNÇÃO: Obter data mínima para o date picker (hoje)
+  const getMinDate = () => {
+    const today = new Date()
+    return today.toISOString().split('T')[0]
+  }
+
+  // CRIAÇÃO DE LEILÃO ATUALIZADA COM DATA E HORA
   const handleCreateAuction = async () => {
-    if (!selectedPlayer || !startPrice || !startTime) {
+    if (!selectedPlayer || !startPrice || !startDate || !startTime) {
       alert('Preencha todos os campos')
       return
     }
@@ -641,19 +697,23 @@ export default function PaginaLeilao() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Usuário não autenticado')
 
-      // Preparar datas
-      const today = new Date()
+      // Combinar data e hora
+      const [year, month, day] = startDate.split('-')
       const [hours, minutes] = startTime.split(':')
+      
       const startDateTime = new Date(
-        today.getFullYear(),
-        today.getMonth(),
-        today.getDate(),
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
         parseInt(hours),
         parseInt(minutes)
       )
 
-      if (startDateTime < new Date()) {
-        startDateTime.setDate(startDateTime.getDate() + 1)
+      // Verificar se a data/hora é futura
+      if (startDateTime <= new Date()) {
+        alert('A data e hora de início devem ser futuras')
+        setCreatingAuction(false)
+        return
       }
 
       const durationMinutes = parseInt(auctionDuration)
@@ -696,12 +756,13 @@ export default function PaginaLeilao() {
 
   const handleStartAuction = async (auctionId: string) => {
     try {
+      const durationMinutes = parseInt(auctionDuration)
       await supabase
         .from('auctions')
         .update({ 
           status: 'active',
           start_time: new Date().toISOString(),
-          end_time: new Date(Date.now() + 5 * 60000).toISOString()
+          end_time: new Date(Date.now() + durationMinutes * 60000).toISOString()
         })
         .eq('id', auctionId)
 
@@ -1056,6 +1117,7 @@ export default function PaginaLeilao() {
     setSelectedPlayer('')
     setStartPrice('')
     setAuctionDuration('5')
+    setStartDate('')
     setStartTime('')
   }
 
@@ -1277,6 +1339,23 @@ export default function PaginaLeilao() {
                         </Select>
                       </div>
 
+                      {/* NOVO: Campo para selecionar a data */}
+                      <div>
+                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          Data de Início
+                        </label>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+                          <Input
+                            type="date"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            min={getMinDate()}
+                            className="pl-10 bg-zinc-800/50 border-zinc-600"
+                          />
+                        </div>
+                      </div>
+
                       <div>
                         <label className="text-zinc-400 text-sm font-medium mb-2 block">
                           Horário de Início
@@ -1298,20 +1377,21 @@ export default function PaginaLeilao() {
                         </Select>
                       </div>
 
+                      {/* ATUALIZADO: Opções de duração com novos tempos */}
                       <div>
                         <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                          Duração (minutos)
+                          Duração
                         </label>
                         <Select value={auctionDuration} onValueChange={setAuctionDuration}>
                           <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="1">1 minuto</SelectItem>
-                            <SelectItem value="3">3 minutos</SelectItem>
                             <SelectItem value="5">5 minutos</SelectItem>
                             <SelectItem value="10">10 minutos</SelectItem>
                             <SelectItem value="15">15 minutos</SelectItem>
+                            <SelectItem value="30">30 minutos</SelectItem>
+                            <SelectItem value="60">60 minutos</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
