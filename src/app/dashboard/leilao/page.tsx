@@ -83,6 +83,30 @@ interface UserProfile {
 
 type TabType = 'active' | 'pending' | 'finished'
 
+// NOVA FUNÇÃO: Formatar valores para exibição (ex: 50M)
+const formatToMillions = (value: number): string => {
+  if (value >= 1000000) {
+    return `${(value / 1000000).toFixed(0)}M`
+  }
+  return value.toLocaleString('pt-BR')
+}
+
+// NOVA FUNÇÃO: Gerar opções de lance
+const generateBidOptions = (currentBid: number): { value: number; label: string }[] => {
+  const options = []
+  const minBid = currentBid + 1000000 // Lance mínimo: 1 milhão acima
+  
+  for (let i = 0; i < 50; i++) {
+    const bidValue = minBid + (i * 1000000) // Incrementos de 1 milhão
+    options.push({
+      value: bidValue,
+      label: `${formatToMillions(bidValue)}`
+    })
+  }
+  
+  return options
+}
+
 // Hook para saldo reservado específico por time
 const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
@@ -270,9 +294,9 @@ export default function PaginaLeilao() {
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [activeTab, setActiveTab] = useState<TabType>('active')
 
-  // Estados para lances
+  // Estados para lances - REMOVIDO bidAmount
   const [biddingAuctionId, setBiddingAuctionId] = useState<string | null>(null)
-  const [bidAmount, setBidAmount] = useState('')
+  const [selectedBidAmount, setSelectedBidAmount] = useState<number | null>(null)
   const [bidding, setBidding] = useState(false)
   const [bids, setBids] = useState<{[key: string]: Bid[]}>({})
 
@@ -682,19 +706,6 @@ export default function PaginaLeilao() {
     })
   }
 
-  // CORREÇÃO: Função de formatação para lances (apenas formata, não arredonda)
-  const formatCurrencyBid = (value: string) => {
-    const onlyNumbers = value.replace(/\D/g, '')
-    if (onlyNumbers === '') return ''
-    
-    const number = parseInt(onlyNumbers) / 100
-    
-    return number.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
-  }
-
   // NOVA FUNÇÃO: Obter data mínima para o date picker (hoje)
   const getMinDate = () => {
     const today = new Date()
@@ -856,9 +867,9 @@ export default function PaginaLeilao() {
     }
   }
 
-  // CORREÇÃO DEFINITIVA: Função completamente revisada para dar lance
-  const handlePlaceBid = async (auctionId: string) => {
-    console.log(`💰 INICIANDO LANCE - Leilão: ${auctionId}`)
+  // FUNÇÃO ATUALIZADA: Dar lance apenas com valor do seletor
+  const handlePlaceBid = async (auctionId: string, amount: number) => {
+    console.log(`💰 INICIANDO LANCE - Leilão: ${auctionId}, Valor: ${amount}`)
     
     if (!team || !team.id) {
       alert('❌ Você precisa ter um time para dar lances.')
@@ -867,18 +878,8 @@ export default function PaginaLeilao() {
 
     console.log('🏆 Time do usuário:', { id: team.id, name: team.name })
 
-    let amount: number
-    try {
-      const cleanValue = bidAmount.replace(/\./g, '').replace(',', '.')
-      amount = parseFloat(cleanValue)
-      console.log('💰 Valor do lance convertido:', amount)
-    } catch (error) {
-      alert('Valor do lance inválido')
-      return
-    }
-
-    if (isNaN(amount) || amount <= 0) {
-      alert('Valor do lance inválido')
+    if (!amount || amount <= 0) {
+      alert('Selecione um valor de lance válido')
       return
     }
 
@@ -906,7 +907,7 @@ export default function PaginaLeilao() {
     
     // 1. Lance deve ser maior que o atual
     if (amount <= currentAuction.current_bid) {
-      alert(`❌ O lance deve ser maior que o atual: R$ ${currentAuction.current_bid.toLocaleString('pt-BR')}`)
+      alert(`❌ O lance deve ser maior que o atual: R$ ${formatToMillions(currentAuction.current_bid)}`)
       return
     }
 
@@ -915,14 +916,14 @@ export default function PaginaLeilao() {
     const diferencaAtual = amount - currentAuction.current_bid
     
     if (diferencaAtual < diferencaMinima) {
-      alert(`❌ O lance deve ser pelo menos R$ 1.000.000,00 maior que o atual\n\nLance atual: R$ ${currentAuction.current_bid.toLocaleString('pt-BR')}\nSeu lance: R$ ${amount.toLocaleString('pt-BR')}\nDiferença: R$ ${diferencaAtual.toLocaleString('pt-BR')}\n\nVocê precisa dar um lance de pelo menos: R$ ${(currentAuction.current_bid + diferencaMinima).toLocaleString('pt-BR')}`)
+      alert(`❌ O lance deve ser pelo menos R$ 1.000.000,00 maior que o atual\n\nLance atual: R$ ${formatToMillions(currentAuction.current_bid)}\nSeu lance: R$ ${formatToMillions(amount)}\nDiferença: R$ ${formatToMillions(diferencaAtual)}\n\nVocê precisa dar um lance de pelo menos: R$ ${formatToMillions(currentAuction.current_bid + diferencaMinima)}`)
       return
     }
 
     // 3. Validação de saldo (agora considerando saldo temporário)
     const saldoDisponivel = getSaldoDisponivel()
     if (amount > saldoDisponivel) {
-      alert(`❌ Saldo insuficiente para este lance.\n\nSeu saldo: R$ ${team.balance.toLocaleString('pt-BR')}\nSaldo reservado em outros lances: R$ ${getSaldoReservado().toLocaleString('pt-BR')}\nSaldo disponível: R$ ${saldoDisponivel.toLocaleString('pt-BR')}`)
+      alert(`❌ Saldo insuficiente para este lance.\n\nSeu saldo: R$ ${formatToMillions(team.balance)}\nSaldo reservado em outros lances: R$ ${formatToMillions(getSaldoReservado())}\nSaldo disponível: R$ ${formatToMillions(saldoDisponivel)}`)
       return
     }
 
@@ -1020,7 +1021,7 @@ export default function PaginaLeilao() {
       }
 
       // 6. ATUALIZAR INTERFACE
-      setBidAmount('')
+      setSelectedBidAmount(null)
       setBiddingAuctionId(null)
       
       // 7. RECARREGAR DADOS COMPLETAMENTE
@@ -1183,12 +1184,6 @@ export default function PaginaLeilao() {
     setStartPrice(formattedValue)
   }
 
-  const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // CORREÇÃO: Usar formatação sem arredondamento para lances
-    const formattedValue = formatCurrencyBid(e.target.value)
-    setBidAmount(formattedValue)
-  }
-
   const generateTimeOptions = () => {
     const times = []
     for (let hour = 0; hour <= 23; hour++) {
@@ -1270,8 +1265,8 @@ export default function PaginaLeilao() {
             team={team}
             biddingAuctionId={biddingAuctionId}
             setBiddingAuctionId={setBiddingAuctionId}
-            bidAmount={bidAmount}
-            setBidAmount={setBidAmount}
+            selectedBidAmount={selectedBidAmount}
+            setSelectedBidAmount={setSelectedBidAmount}
             bidding={bidding}
             calculateTimeRemaining={calculateTimeRemaining}
             formatTimeRemaining={formatTimeRemaining}
@@ -1327,15 +1322,15 @@ export default function PaginaLeilao() {
                   <div>
                     <p className="font-semibold text-white">{team.name}</p>
                     <p className="text-green-400">
-                      Saldo: R$ {team.balance.toLocaleString('pt-BR')}
+                      Saldo: R$ {formatToMillions(team.balance)}
                     </p>
                     {getSaldoReservado() > 0 && (
                       <div className="text-sm">
                         <p className="text-yellow-400">
-                          Disponível: R$ {getSaldoDisponivel().toLocaleString('pt-BR')}
+                          Disponível: R$ {formatToMillions(getSaldoDisponivel())}
                         </p>
                         <p className="text-zinc-400">
-                          Reserva: R$ {getSaldoReservado().toLocaleString('pt-BR')}
+                          Reserva: R$ {formatToMillions(getSaldoReservado())}
                         </p>
                       </div>
                     )}
@@ -1581,7 +1576,7 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD CORRIGIDO
+// COMPONENTE AUCTIONCARD ATUALIZADO - APENAS COM SELETOR
 const AuctionCard = ({ 
   auction, 
   type, 
@@ -1593,35 +1588,41 @@ const AuctionCard = ({
   team,
   biddingAuctionId,
   setBiddingAuctionId,
-  bidAmount,
-  setBidAmount,
+  selectedBidAmount,
+  setSelectedBidAmount,
   bidding,
   calculateTimeRemaining,
   formatTimeRemaining,
   saldoReservado
 }: any) => {
 
-  // CORREÇÃO: Função de formatação para lances (apenas formata, não arredonda)
-  const formatCurrencyDisplay = (value: string) => {
-    const onlyNumbers = value.replace(/\D/g, '')
-    if (onlyNumbers === '') return ''
-    
-    const number = parseInt(onlyNumbers) / 100
-    
-    return number.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
-  }
+  // NOVO ESTADO: Opções de lance dinâmicas
+  const [bidOptions, setBidOptions] = useState<{ value: number; label: string }[]>([])
 
-  const handleBidAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // CORREÇÃO: Permitir que o usuário digite qualquer valor
-    const formattedValue = formatCurrencyDisplay(e.target.value)
-    setBidAmount(formattedValue)
+  // ATUALIZAR OPÇÕES QUANDO O LEILÃO MUDAR OU QUANDO ABRIR O SELETOR
+  useEffect(() => {
+    if (auction && biddingAuctionId === auction.id) {
+      const options = generateBidOptions(auction.current_bid)
+      setBidOptions(options)
+      // Resetar seleção quando abrir
+      setSelectedBidAmount(null)
+    }
+  }, [auction, biddingAuctionId])
+
+  // NOVA FUNÇÃO: Manipular seleção de lance
+  const handleBidSelect = (value: string) => {
+    const numericValue = parseInt(value)
+    if (!isNaN(numericValue)) {
+      setSelectedBidAmount(numericValue)
+    }
   }
 
   const handlePlaceBid = async () => {
-    await onBid(auction.id)
+    if (!selectedBidAmount) {
+      alert('Selecione um valor de lance')
+      return
+    }
+    await onBid(auction.id, selectedBidAmount)
   }
 
   const getCardStyles = () => {
@@ -1714,7 +1715,7 @@ const AuctionCard = ({
           <div className="flex justify-between items-center p-3 bg-zinc-800/50 rounded-lg">
             <span className="text-zinc-400">Preço Inicial</span>
             <span className="text-2xl font-bold text-white">
-              R$ {auction.start_price.toLocaleString('pt-BR')}
+              R$ {formatToMillions(auction.start_price)}
             </span>
           </div>
         ) : (
@@ -1724,7 +1725,7 @@ const AuctionCard = ({
                 {type === 'active' ? 'Lance Atual' : 'Valor Atual'}
               </span>
               <span className="text-2xl font-bold text-white">
-                R$ {auction.current_bid.toLocaleString('pt-BR')}
+                R$ {formatToMillions(auction.current_bid)}
               </span>
             </div>
             
@@ -1768,33 +1769,55 @@ const AuctionCard = ({
           </>
         )}
 
-        {/* CORREÇÃO: Permitir lances para usuários comuns com time */}
+        {/* CORREÇÃO: Permitir lances para usuários comuns com time - APENAS COM SELETOR */}
         {type === 'active' && timeRemaining > 0 && (
           biddingAuctionId === auction.id ? (
             <div className="space-y-3">
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-                <Input
-                  placeholder="0,00"
-                  value={bidAmount}
-                  onChange={handleBidAmountChange}
-                  className="pl-10 bg-zinc-800/50 border-zinc-600 text-white"
-                />
-              </div>
+              {/* SELETOR DE OPÇÕES DE LANCE */}
+              <Select onValueChange={handleBidSelect} value={selectedBidAmount?.toString() || ''}>
+                <SelectTrigger className="w-full bg-zinc-800/50 border-zinc-600 text-white">
+                  <SelectValue placeholder="Selecione um valor de lance" />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-600 max-h-60">
+                  {bidOptions.map((option) => (
+                    <SelectItem 
+                      key={option.value} 
+                      value={option.value.toString()}
+                      className="text-white hover:bg-zinc-700"
+                    >
+                      <div className="flex justify-between items-center w-full">
+                        <span>R$ {option.label}</span>
+                        <span className="text-zinc-400 text-sm">
+                          {option.value.toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
               <div className="text-sm text-yellow-400 text-center">
-                💰 Lance mínimo: R$ {(auction.current_bid + 1000000).toLocaleString('pt-BR')}
+                💰 Lance mínimo: R$ {formatToMillions(auction.current_bid + 1000000)}
+                <br />
+                <span className="text-zinc-400">
+                  ({bidOptions.length} opções disponíveis)
+                </span>
               </div>
+              
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() => setBiddingAuctionId(null)}
+                  onClick={() => {
+                    setBiddingAuctionId(null)
+                    setSelectedBidAmount(null)
+                  }}
                   className="flex-1"
                 >
                   Cancelar
                 </Button>
                 <Button
                   onClick={handlePlaceBid}
-                  disabled={bidding}
+                  disabled={bidding || !selectedBidAmount}
                   className="flex-1 bg-green-600 hover:bg-green-700"
                 >
                   {bidding ? 'Dando lance...' : 'Dar Lance'}
@@ -1864,7 +1887,7 @@ const AuctionCard = ({
                     "font-bold",
                     index === 0 ? "text-yellow-400" : ""
                   )}>
-                    R$ {bid.amount.toLocaleString('pt-BR')}
+                    R$ {formatToMillions(bid.amount)}
                   </span>
                 </div>
               ))}

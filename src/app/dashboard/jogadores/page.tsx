@@ -949,7 +949,7 @@ export default function ListaJogadores() {
                 </Button>
                 
                 {positionFilterOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-full lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-4">
+                  <div className="absolute top-full left-0 mt-2 w-full lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-40 p-4">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-semibold text-base">Filtrar por Posição</h3>
                       {selectedPositions.length > 0 && (
