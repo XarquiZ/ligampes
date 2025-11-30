@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler, Heart, GitCompare, MessageCircle, Trash2 } from 'lucide-react'
+import { Loader2, Search, Grid3X3, List, ChevronDown, Star, AlertCircle, Filter, Check, Circle, Square, Pencil, Footprints, Target, DollarSign, ArrowRightLeft, X, Users, Ruler, Heart, GitCompare, MessageCircle, Trash2, ArrowUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
@@ -895,9 +895,17 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
         const color1 = getAttrColorHex(value1)
         const color2 = getAttrColorHex(value2)
         
+        // Determinar qual jogador tem o atributo maior
+        const player1Wins = value1 > value2
+        const player2Wins = value2 > value1
+        const isTie = value1 === value2
+        
         return (
           <div key={key} className="flex items-center justify-between gap-4">
-            <div className="text-right w-20">
+            <div className="text-right w-20 flex items-center justify-end gap-1">
+              {player1Wins && (
+                <ArrowUp className="w-3 h-3 text-green-400 flex-shrink-0" />
+              )}
               <span className="text-sm font-medium" style={{ color: color1 }}>
                 {value1}
               </span>
@@ -935,10 +943,13 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
               </div>
             </div>
             
-            <div className="text-left w-20">
+            <div className="text-left w-20 flex items-center gap-1">
               <span className="text-sm font-medium" style={{ color: color2 }}>
                 {value2}
               </span>
+              {player2Wins && (
+                <ArrowUp className="w-3 h-3 text-green-400 flex-shrink-0" />
+              )}
             </div>
           </div>
         )
@@ -946,7 +957,7 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
     </div>
   )
 
-  // Função para renderizar atributos extras
+  // Função para renderizar atributos extras - ATUALIZADA
   const renderExtraAttributes = () => (
     <div className="space-y-4">
       {extraAttributes.map(({ key, label }) => {
@@ -956,16 +967,23 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
         // Configurações específicas para cada tipo de atributo
         const getBarConfig = (attrKey: string) => {
           if (attrKey.includes('inspiring')) return { max: 2, size: 'sm' as const }
-          if (attrKey === 'form') return { max: 8, size: 'sm' as const } // Mantive 'sm' para forma física também
+          if (attrKey === 'form') return { max: 8, size: 'sm' as const }
           return { max: 4, size: 'sm' as const }
         }
         
         const config = getBarConfig(key)
         
+        // Determinar qual jogador tem o atributo maior
+        const player1Wins = value1 > value2
+        const player2Wins = value2 > value1
+        
         return (
           <div key={key} className="flex items-center justify-between gap-4">
-            <div className="text-right w-20">
-              <span className="text-sm font-medium text-white">
+            <div className="text-right w-20 flex items-center justify-end gap-1">
+              {player1Wins && (
+                <ArrowUp className="w-3 h-3 text-green-400 flex-shrink-0" />
+              )}
+              <span className="text-sm font-medium text-white min-w-[20px] text-right">
                 {value1}
               </span>
             </div>
@@ -992,10 +1010,13 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
               </div>
             </div>
             
-            <div className="text-left w-20">
-              <span className="text-sm font-medium text-white">
+            <div className="text-left w-20 flex items-center gap-1">
+              <span className="text-sm font-medium text-white min-w-[20px]">
                 {value2}
               </span>
+              {player2Wins && (
+                <ArrowUp className="w-3 h-3 text-green-400 flex-shrink-0" />
+              )}
             </div>
           </div>
         )
