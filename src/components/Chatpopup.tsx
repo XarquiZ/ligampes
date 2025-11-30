@@ -188,6 +188,7 @@ export default function ChatPopup({
           coach_name, 
           email, 
           role,
+          team_id,
           teams (
             id,
             name,
@@ -225,26 +226,35 @@ export default function ChatPopup({
         const user1Profile = profilesData.find(p => p.id === conv.user1_id);
         const user2Profile = profilesData.find(p => p.id === conv.user2_id);
 
+        // Função helper para formatar usuário
+        const formatUser = (profile: any, userId: string) => {
+          if (!profile) {
+            return {
+              id: userId,
+              name: 'Usuário',
+              email: '',
+              role: 'coach',
+              team_name: undefined,
+              team_logo: undefined
+            };
+          }
+
+          return {
+            id: userId,
+            name: profile.coach_name || profile.email || 'Usuário',
+            email: profile.email || '',
+            role: profile.role,
+            team_name: profile.teams?.name || undefined,
+            team_logo: profile.teams?.logo_url || undefined
+          };
+        };
+
         return {
           id: conv.id,
           user1_id: conv.user1_id,
           user2_id: conv.user2_id,
-          user1: {
-            id: conv.user1_id,
-            name: user1Profile?.coach_name || user1Profile?.email || 'Usuário',
-            email: user1Profile?.email || '',
-            role: user1Profile?.role,
-            team_name: user1Profile?.teams?.name,
-            team_logo: user1Profile?.teams?.logo_url
-          },
-          user2: {
-            id: conv.user2_id,
-            name: user2Profile?.coach_name || user2Profile?.email || 'Usuário',
-            email: user2Profile?.email || '',
-            role: user2Profile?.role,
-            team_name: user2Profile?.teams?.name,
-            team_logo: user2Profile?.teams?.logo_url
-          },
+          user1: formatUser(user1Profile, conv.user1_id),
+          user2: formatUser(user2Profile, conv.user2_id),
           last_message: conv.last_message,
           last_message_at: conv.last_message_at,
           unread_count: unreadCounts[index]
@@ -273,6 +283,7 @@ export default function ChatPopup({
           coach_name, 
           email, 
           role,
+          team_id,
           teams (
             id,
             name,
@@ -287,13 +298,14 @@ export default function ChatPopup({
         return;
       }
 
+      // Formatação com tratamento para dados nulos
       const formattedCoaches: User[] = coachesData.map(coach => ({
         id: coach.id,
-        name: coach.coach_name || coach.email,
+        name: coach.coach_name || coach.email || 'Treinador',
         email: coach.email,
         role: coach.role,
-        team_name: coach.teams?.name,
-        team_logo: coach.teams?.logo_url
+        team_name: coach.teams?.name || undefined,
+        team_logo: coach.teams?.logo_url || undefined
       }));
 
       setCoaches(formattedCoaches);
@@ -631,8 +643,8 @@ export default function ChatPopup({
 
   // Função handleSelectConversation simplificada
   const handleSelectConversation = async (conversation: Conversation) => {
-    if (isProcessingConversation) {
-      console.log('⏳ Já processando uma conversa, ignorando...');
+    if (isProcessingConversation && lastProcessedConversation === conversation.id) {
+      console.log('⏳ Já processando esta conversa, ignorando...');
       return;
     }
 
@@ -646,7 +658,10 @@ export default function ChatPopup({
       // 1. Atualizar UI imediatamente
       setSelectedConversation(conversation);
       
-      // 2. Se há mensagens não lidas, marcar como lidas no banco
+      // 2. Carregar mensagens primeiro para melhor UX
+      await loadMessages(conversation.id);
+      
+      // 3. Se há mensagens não lidas, marcar como lidas no banco
       if (conversation.unread_count && conversation.unread_count > 0) {
         console.log('🔴 Marcando mensagens como lidas...');
         
@@ -655,7 +670,7 @@ export default function ChatPopup({
         if (success) {
           console.log('✅ Mensagens marcadas como lidas! Atualizando UI...');
           
-          // 3. Atualizar a conversa localmente
+          // 4. Atualizar a conversa localmente
           const updatedConversations = conversations.map(conv => 
             conv.id === conversation.id 
               ? { ...conv, unread_count: 0 }
@@ -664,21 +679,20 @@ export default function ChatPopup({
           
           setConversations(updatedConversations);
           
-          // 4. Atualizar o contador global
+          // 5. Atualizar o contador global
           const totalUnread = calculateTotalUnread(updatedConversations);
           console.log('🔢 Total de não lidas após atualização:', totalUnread);
           notifyUnreadCountChange(totalUnread);
         }
       }
       
-      // 5. Carregar as mensagens da conversa
-      await loadMessages(conversation.id);
-      
     } catch (error) {
       console.error('💥 Erro ao selecionar conversa:', error);
     } finally {
       setIsProcessingConversation(false);
-      setLastProcessedConversation(null);
+      setTimeout(() => {
+        setLastProcessedConversation(null);
+      }, 500);
     }
   };
 
@@ -699,23 +713,16 @@ export default function ChatPopup({
         async (payload) => {
           console.log('🔄 Nova mensagem detectada:', payload);
           
-          // Verificar se a mensagem é para uma das conversas do usuário
-          const isRelevantMessage = conversations.some(
-            conv => conv.id === payload.new.conversation_id
-          );
+          // Recarregar conversas para atualizar contadores
+          await loadConversations();
           
-          if (isRelevantMessage) {
-            // Se estamos na conversa onde a mensagem chegou, marcar como lida
-            if (selectedConversation?.id === payload.new.conversation_id) {
-              await markMessagesAsRead(payload.new.conversation_id);
-            }
+          // Se a mensagem é para a conversa atual, recarregar mensagens também
+          if (selectedConversation?.id === payload.new.conversation_id) {
+            await loadMessages(selectedConversation.id);
             
-            // Recarregar conversas
-            await loadConversations();
-            
-            // Se a mensagem é para a conversa atual, recarregar mensagens também
-            if (selectedConversation?.id === payload.new.conversation_id) {
-              await loadMessages(selectedConversation.id);
+            // Marcar como lida se estamos na conversa
+            if (payload.new.sender_id !== currentUser.id) {
+              await markMessagesAsRead(selectedConversation.id);
             }
           }
         }
@@ -725,7 +732,7 @@ export default function ChatPopup({
     return () => {
       subscription.unsubscribe();
     };
-  }, [isOpen, currentUser.id, conversations, selectedConversation]);
+  }, [isOpen, currentUser.id, selectedConversation]);
 
   // Listener para focar em conversa específica quando receber evento
   useEffect(() => {

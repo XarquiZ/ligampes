@@ -33,49 +33,39 @@ export default function FloatingChatButton({
   const [internalUnreadCount, setInternalUnreadCount] = useState(unreadCount);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Sincronizar com a prop apenas uma vez após inicialização
+  // Sincronizar com a prop
   useEffect(() => {
-    if (!isInitialized && unreadCount >= 0) {
-      console.log('🔄 Inicializando FloatingChatButton com unreadCount:', unreadCount);
+    if (unreadCount >= 0) {
+      console.log('🔄 FloatingChatButton - Atualizando unreadCount:', unreadCount);
       setInternalUnreadCount(unreadCount);
-      setIsInitialized(true);
+      if (!isInitialized) setIsInitialized(true);
     }
   }, [unreadCount, isInitialized]);
 
-  // Atualizar apenas quando a prop mudar significativamente
-  useEffect(() => {
-    if (isInitialized && unreadCount !== internalUnreadCount) {
-      console.log('🔄 Atualizando unreadCount da prop:', unreadCount);
-      setInternalUnreadCount(unreadCount);
-    }
-  }, [unreadCount, internalUnreadCount, isInitialized]);
-
-  // Listener de eventos melhorado
+  // Listener de eventos para atualizações em tempo real
   useEffect(() => {
     const handleUnreadCountUpdated = (event: CustomEvent) => {
       const { totalUnread } = event.detail || {};
       if (typeof totalUnread === 'number' && totalUnread >= 0) {
-        console.log('📩 Evento recebido - totalUnread:', totalUnread);
+        console.log('📩 FloatingChatButton - Evento recebido:', totalUnread);
         
         // Atualizar estado interno
         setInternalUnreadCount(totalUnread);
         
-        // Notificar componente pai se a função existe
-        if (onUnreadCountChange && typeof onUnreadCountChange === 'function') {
-          console.log('📤 Notificando componente pai sobre mudança:', totalUnread);
+        // Notificar componente pai
+        if (onUnreadCountChange) {
+          console.log('📤 Notificando componente pai:', totalUnread);
           onUnreadCountChange(totalUnread);
         }
       }
     };
 
-    // Adicionar listener com opção passive para melhor performance
-    window.addEventListener('chatUnreadCountUpdated', handleUnreadCountUpdated as EventListener, { passive: true });
+    window.addEventListener('chatUnreadCountUpdated', handleUnreadCountUpdated as EventListener);
     
-    console.log('🎯 FloatingChatButton - Listener de eventos registrado');
+    console.log('🎯 FloatingChatButton - Listener registrado');
 
     return () => {
       window.removeEventListener('chatUnreadCountUpdated', handleUnreadCountUpdated as EventListener);
-      console.log('🧹 FloatingChatButton - Listener de eventos removido');
     };
   }, [onUnreadCountChange]);
 
@@ -87,14 +77,14 @@ export default function FloatingChatButton({
       onOpenChat();
     };
 
-    window.addEventListener('focusConversation', handleFocusConversation as EventListener, { passive: true });
+    window.addEventListener('focusConversation', handleFocusConversation as EventListener);
 
     return () => {
       window.removeEventListener('focusConversation', handleFocusConversation as EventListener);
     };
   }, [onOpenChat]);
 
-  // Função para abrir chat com melhor tratamento
+  // Função para abrir chat
   const handleOpenChat = useCallback(() => {
     console.log('💬 Abrindo chat - unreadCount atual:', internalUnreadCount);
     
@@ -108,16 +98,6 @@ export default function FloatingChatButton({
     // Chamar a função do componente pai
     onOpenChat();
   }, [internalUnreadCount, onOpenChat]);
-
-  // Efeito para debug - remover em produção
-  useEffect(() => {
-    console.log('🔔 FloatingChatButton - Estado atual:', {
-      internalUnreadCount,
-      propUnreadCount: unreadCount,
-      isInitialized,
-      currentUserId: currentUser?.id
-    });
-  }, [internalUnreadCount, unreadCount, isInitialized, currentUser]);
 
   return (
     <button
@@ -133,16 +113,11 @@ export default function FloatingChatButton({
         }`} 
       />
       
-      {/* Badge de notificação melhorada */}
+      {/* Badge de notificação */}
       {internalUnreadCount > 0 && (
-        <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full min-w-[20px] h-5 text-xs flex items-center justify-center font-bold shadow-lg border border-zinc-900 animate-bounce">
+        <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full min-w-[20px] h-5 text-xs flex items-center justify-center font-bold shadow-lg border border-zinc-900">
           {internalUnreadCount > 9 ? '9+' : internalUnreadCount}
         </span>
-      )}
-      
-      {/* Efeito de pulso suave quando há notificações */}
-      {internalUnreadCount > 0 && (
-        <span className="absolute inset-0 bg-red-500/20 rounded-xl animate-ping opacity-75" />
       )}
     </button>
   );
