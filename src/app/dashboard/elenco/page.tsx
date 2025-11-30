@@ -847,7 +847,7 @@ const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players, onShareP
 
   const getAttrColorHex = (value: number) => {
     if (value >= 95) return '#4FC3F7'
-    if (value >= 85) return '#8BC34A'
+    if (value >= 85) return '#00FF00'
     if (value >= 75) return '#FFFF00'
     return '#E53935'
   }
@@ -1294,7 +1294,7 @@ export default function ElencoPage() {
   // color map like PES mapping requested
   const getAttrColorHex = (value:number) => {
     if (value >= 95) return '#4FC3F7' // azul claro
-    if (value >= 85) return '#8BC34A' // verde claro
+    if (value >= 85) return '#00FF00' // verde claro
     if (value >= 75) return '#FFFF00' // laranja
     return '#E53935' // vermelho
   }

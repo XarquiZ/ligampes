@@ -251,7 +251,7 @@ export default function ListaJogadores() {
 
   const getAttrColorHex = (value: number) => {
     if (value >= 95) return '#4FC3F7'
-    if (value >= 85) return '#8BC34A'
+    if (value >= 85) return '#00FF00'
     if (value >= 75) return '#FFFF00'
     return '#E53935'
   }
