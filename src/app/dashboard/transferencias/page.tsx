@@ -1,7 +1,7 @@
 // src/app/dashboard/transferencias/page.tsx
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { 
   CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
@@ -36,10 +36,12 @@ function formatDateTime(dateString: string) {
 }
 
 // Função de formatação de moeda
-function formatCurrencyInput(value: string): string {
+const formatCurrencyInput = (value: string): string => {
+  // Remove tudo que não é número
   const onlyNumbers = value.replace(/\D/g, '')
   if (onlyNumbers === '') return ''
   
+  // Converte para número e formata
   const number = parseInt(onlyNumbers) / 100
   return number.toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
@@ -47,7 +49,8 @@ function formatCurrencyInput(value: string): string {
   })
 }
 
-function parseCurrencyToNumber(value: string): number {
+const parseCurrencyToNumber = (value: string): number => {
+  if (!value) return 0
   const cleaned = value.replace(/\./g, '').replace(',', '.')
   return parseFloat(cleaned) || 0
 }
@@ -87,6 +90,7 @@ interface MarketPlayer {
     overall: number
     photo_url: string | null
     base_price: number
+    club?: string
   }
 }
 
@@ -98,13 +102,14 @@ interface Player {
   photo_url: string | null
   base_price: number
   team_id: string | null
+  club?: string
 }
 
 export default function PaginaTransferencias() {
   // Switch principal entre Transferências e Mercado
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
   
-  // Estados para Transferências (mantidos da versão anterior)
+  // Estados para Transferências
   const [transfers, setTransfers] = useState<any[]>([])
   const [allTransfers, setAllTransfers] = useState<any[]>([])
   const [userTeamId, setUserTeamId] = useState<string | null>(null)
@@ -133,10 +138,6 @@ export default function PaginaTransferencias() {
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
   const [editDescriptionText, setEditDescriptionText] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
-
-  // Refs para evitar perda de foco
-  const descriptionRef = useRef<HTMLTextAreaElement>(null)
-  const priceRef = useRef<HTMLInputElement>(null)
 
   // Carregar dados do usuário e time
   useEffect(() => {
@@ -538,7 +539,8 @@ export default function PaginaTransferencias() {
             position,
             overall,
             photo_url,
-            base_price
+            base_price,
+            club
           ),
           team:teams!team_id (
             id,
@@ -553,7 +555,8 @@ export default function PaginaTransferencias() {
       const formattedData = (data || []).map(item => ({
         ...item,
         team_name: item.team?.name || 'Time desconhecido',
-        team_logo: item.team?.logo_url || null
+        team_logo: item.team?.logo_url || null,
+        player: item.player || undefined
       }))
 
       setMarketPlayers(formattedData)
@@ -564,7 +567,7 @@ export default function PaginaTransferencias() {
     }
   }
 
-  const loadMyPlayers = async () => {
+  const loadMyPlayers = useCallback(async () => {
     if (!team?.id) return
     
     try {
@@ -588,17 +591,23 @@ export default function PaginaTransferencias() {
             position,
             overall,
             photo_url,
-            base_price
+            base_price,
+            club
           )
         `)
         .eq('team_id', team.id)
         .order('created_at', { ascending: false })
 
-      setMyMarketPlayers(marketData || [])
+      const formattedMarketData = (marketData || []).map(item => ({
+        ...item,
+        player: item.player || undefined
+      }))
+
+      setMyMarketPlayers(formattedMarketData)
     } catch (error) {
       console.error('Erro ao carregar meus jogadores:', error)
     }
-  }
+  }, [team?.id])
 
   const handleAddToMarket = async () => {
     if (!selectedPlayer || !team?.id || !marketPrice) {
@@ -790,7 +799,7 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // Componente para exibir jogador do mercado
+  // Componente para exibir jogador do mercado - CORRIGIDO (substring error)
   const MarketPlayerCard = ({ listing, isMine = false }: { listing: MarketPlayer, isMine?: boolean }) => {
     const player = listing.player || {
       id: listing.player_id,
@@ -798,25 +807,32 @@ export default function PaginaTransferencias() {
       position: 'N/A',
       overall: 0,
       photo_url: null,
-      base_price: 0
+      base_price: 0,
+      club: 'Sem Clube'
     }
+
+    const teamName = listing.team_name || 'Time desconhecido'
+    const teamLogo = listing.team_logo
+    const safeTeamName = teamName || 'Time'
 
     return (
       <Card className="bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all p-4">
         {/* Header com time */}
         <div className="flex items-center gap-2 mb-3">
-          {listing.team_logo ? (
+          {teamLogo ? (
             <img 
-              src={listing.team_logo} 
-              alt={listing.team_name}
+              src={teamLogo} 
+              alt={teamName}
               className="w-6 h-6 rounded-full object-cover"
             />
           ) : (
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-              <span className="text-xs font-bold text-white">{listing.team_name.substring(0, 2)}</span>
+              <span className="text-xs font-bold text-white">
+                {safeTeamName.substring(0, 2)}
+              </span>
             </div>
           )}
-          <span className="text-sm text-zinc-300">{listing.team_name}</span>
+          <span className="text-sm text-zinc-300">{teamName}</span>
         </div>
 
         {/* Player info */}
@@ -907,31 +923,30 @@ export default function PaginaTransferencias() {
     )
   }
 
-  // Componente para editar descrição - CORRIGIDO
+  // Componente para editar descrição - CORRIGIDO (problema de foco)
   const EditDescriptionForm = ({ listing }: { listing: MarketPlayer }) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Permite submeter com Ctrl+Enter
+      if (e.key === 'Enter' && e.ctrlKey) {
+        e.preventDefault()
+        handleUpdateDescription(listing.id)
+      }
+      // Cancela com Escape
+      if (e.key === 'Escape') {
+        handleCancelEdit()
+      }
+    }
+
     return (
       <div className="mt-3 space-y-2">
         <Textarea
           id={`edit-desc-${listing.id}`}
           value={editDescriptionText}
-          onChange={(e) => {
-            setEditDescriptionText(e.target.value)
-          }}
-          onKeyDown={(e) => {
-            // Permite submeter com Ctrl+Enter
-            if (e.key === 'Enter' && e.ctrlKey) {
-              e.preventDefault()
-              handleUpdateDescription(listing.id)
-            }
-            // Cancela com Escape
-            if (e.key === 'Escape') {
-              handleCancelEdit()
-            }
-          }}
+          onChange={(e) => setEditDescriptionText(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Digite a descrição para este jogador..."
           className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
           rows={3}
-          autoFocus
         />
         <div className="flex gap-2">
           <Button
@@ -989,7 +1004,7 @@ export default function PaginaTransferencias() {
     </div>
   )
 
-  // Componente principal de Transferências (mantido da versão anterior)
+  // Componente TransferenciasView
   const TransferenciasView = () => (
     <>
       {/* Seletor de Abas */}
@@ -1413,265 +1428,280 @@ export default function PaginaTransferencias() {
     </>
   )
 
-  // Componente principal do Mercado
-  const MercadoView = () => (
-    <>
-      {/* Tabs do Mercado */}
-      <div className="flex gap-4 mb-6 justify-center md:justify-start">
-        <Button
-          onClick={() => setMarketTab('disponiveis')}
-          variant={marketTab === 'disponiveis' ? 'default' : 'outline'}
-          className={cn(
-            "flex items-center gap-2 text-white",
-            marketTab === 'disponiveis' ? "bg-blue-600 hover:bg-blue-700" : "bg-zinc-800/50 border-zinc-600"
-          )}
-        >
-          <ShoppingCart className="w-4 h-4" />
-          Disponíveis
-          <Badge variant="secondary" className="ml-2 bg-zinc-700">
-            {marketPlayers.length}
-          </Badge>
-        </Button>
-        
-        <Button
-          onClick={() => setMarketTab('meus')}
-          variant={marketTab === 'meus' ? 'default' : 'outline'}
-          className={cn(
-            "flex items-center gap-2 text-white",
-            marketTab === 'meus' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
-          )}
-        >
-          <Users className="w-4 h-4" />
-          Meus Jogadores
-          <Badge variant="secondary" className="ml-2 bg-zinc-700">
-            {myMarketPlayers.length}
-          </Badge>
-        </Button>
-      </div>
+  // Componente principal do Mercado - CORRIGIDO (problema de foco nos inputs)
+  const MercadoView = () => {
+    const [priceInputValue, setPriceInputValue] = useState(marketPrice)
+    const [descInputValue, setDescInputValue] = useState(marketDescription)
 
-      {marketTab === 'meus' && (
-        <Card className="p-6 mb-6 bg-white/5 border-white/10">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h3 className="text-xl font-bold text-white">Anunciar Jogador</h3>
-              <p className="text-zinc-400">Coloque jogadores do seu time disponíveis para negociação</p>
-            </div>
-            {!showAddForm && (
-              <Button
-                onClick={() => {
-                  setShowAddForm(true)
-                  // Resetar seleção quando abrir o formulário
-                  setSelectedPlayer(null)
-                  setMarketPrice('')
-                  setMarketDescription('')
-                }}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Jogador
-              </Button>
+    // Sincronizar estados quando props mudam
+    useEffect(() => {
+      setPriceInputValue(marketPrice)
+    }, [marketPrice])
+
+    useEffect(() => {
+      setDescInputValue(marketDescription)
+    }, [marketDescription])
+
+    const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const formattedValue = formatCurrencyInput(e.target.value)
+      setPriceInputValue(formattedValue)
+      setMarketPrice(formattedValue)
+    }
+
+    const handleDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setDescInputValue(e.target.value)
+      setMarketDescription(e.target.value)
+    }
+
+    return (
+      <>
+        {/* Tabs do Mercado */}
+        <div className="flex gap-4 mb-6 justify-center md:justify-start">
+          <Button
+            onClick={() => setMarketTab('disponiveis')}
+            variant={marketTab === 'disponiveis' ? 'default' : 'outline'}
+            className={cn(
+              "flex items-center gap-2 text-white",
+              marketTab === 'disponiveis' ? "bg-blue-600 hover:bg-blue-700" : "bg-zinc-800/50 border-zinc-600"
             )}
-          </div>
+          >
+            <ShoppingCart className="w-4 h-4" />
+            Disponíveis
+            <Badge variant="secondary" className="ml-2 bg-zinc-700">
+              {marketPlayers.length}
+            </Badge>
+          </Button>
+          
+          <Button
+            onClick={() => setMarketTab('meus')}
+            variant={marketTab === 'meus' ? 'default' : 'outline'}
+            className={cn(
+              "flex items-center gap-2 text-white",
+              marketTab === 'meus' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
+            )}
+          >
+            <Users className="w-4 h-4" />
+            Meus Jogadores
+            <Badge variant="secondary" className="ml-2 bg-zinc-700">
+              {myMarketPlayers.length}
+            </Badge>
+          </Button>
+        </div>
 
-          {showAddForm && (
-            <div className="space-y-4 p-4 bg-zinc-800/30 rounded-lg">
-              {/* Selecionar jogador */}
+        {marketTab === 'meus' && (
+          <Card className="p-6 mb-6 bg-white/5 border-white/10">
+            <div className="flex justify-between items-center mb-4">
               <div>
-                <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                  Selecione um jogador do seu time
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                  {availablePlayers.map(player => (
-                    <div
-                      key={player.id}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
-                        selectedPlayer?.id === player.id
-                          ? "bg-blue-500/20 border-blue-500/50"
-                          : "bg-zinc-800/30 border-zinc-600 hover:border-zinc-500"
-                      )}
-                      onClick={() => {
-                        setSelectedPlayer(player)
-                        // Focar no campo de preço quando selecionar jogador
-                        setTimeout(() => {
-                          const priceInput = document.getElementById('market-price-input')
-                          if (priceInput) priceInput.focus()
-                        }, 10)
-                      }}
-                    >
-                      {player.photo_url ? (
-                        <img 
-                          src={player.photo_url} 
-                          alt={player.name}
-                          className="w-10 h-10 rounded-full object-cover"
+                <h3 className="text-xl font-bold text-white">Anunciar Jogador</h3>
+                <p className="text-zinc-400">Coloque jogadores do seu time disponíveis para negociação</p>
+              </div>
+              {!showAddForm && (
+                <Button
+                  onClick={() => {
+                    setShowAddForm(true)
+                    // Resetar seleção quando abrir o formulário
+                    setSelectedPlayer(null)
+                    setMarketPrice('')
+                    setMarketDescription('')
+                    setPriceInputValue('')
+                    setDescInputValue('')
+                  }}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar Jogador
+                </Button>
+              )}
+            </div>
+
+            {showAddForm && (
+              <div className="space-y-4 p-4 bg-zinc-800/30 rounded-lg">
+                {/* Selecionar jogador */}
+                <div>
+                  <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                    Selecione um jogador do seu time
+                  </label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                    {availablePlayers.map(player => (
+                      <div
+                        key={player.id}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                          selectedPlayer?.id === player.id
+                            ? "bg-blue-500/20 border-blue-500/50"
+                            : "bg-zinc-800/30 border-zinc-600 hover:border-zinc-500"
+                        )}
+                        onClick={() => {
+                          setSelectedPlayer(player)
+                        }}
+                      >
+                        {player.photo_url ? (
+                          <img 
+                            src={player.photo_url} 
+                            alt={player.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-700 to-cyan-700 flex items-center justify-center">
+                            <span className="text-sm font-black text-white">{player.position}</span>
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <p className="font-medium text-white">{player.name}</p>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Badge className="bg-blue-600">{player.position}</Badge>
+                            <span className="text-zinc-400">OVR {player.overall}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-emerald-400 font-bold">
+                            R$ {player.base_price.toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {selectedPlayer && (
+                  <>
+                    {/* Preço - CORRIGIDO (problema de foco) */}
+                    <div>
+                      <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                        Preço de Venda
+                      </label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+                        <Input
+                          id="market-price-input"
+                          placeholder="0,00"
+                          value={priceInputValue}
+                          onChange={handlePriceChange}
+                          className="pl-10 bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          onKeyDown={(e) => {
+                            // Navegação com teclado
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              const descInput = document.getElementById('market-desc-input')
+                              if (descInput) descInput.focus()
+                            }
+                          }}
                         />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-700 to-cyan-700 flex items-center justify-center">
-                          <span className="text-sm font-black text-white">{player.position}</span>
-                        </div>
-                      )}
-                      <div className="flex-1">
-                        <p className="font-medium text-white">{player.name}</p>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Badge className="bg-blue-600">{player.position}</Badge>
-                          <span className="text-zinc-400">OVR {player.overall}</span>
-                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-emerald-400 font-bold">
-                          R$ {player.base_price.toLocaleString('pt-BR')}
-                        </p>
-                      </div>
+                      <p className="text-zinc-500 text-xs mt-1">
+                        Valor base do jogador: R$ {selectedPlayer.base_price.toLocaleString('pt-BR')}
+                      </p>
                     </div>
+
+                    {/* Descrição - CORRIGIDA (problema de foco) */}
+                    <div>
+                      <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                        Descrição (opcional)
+                        <span className="text-zinc-500 ml-1">- Por que está colocando à venda?</span>
+                      </label>
+                      <Textarea
+                        id="market-desc-input"
+                        placeholder="Ex: Preciso de grana para reforçar o time, jogador não se adaptou ao sistema..."
+                        value={descInputValue}
+                        onChange={handleDescChange}
+                        onKeyDown={(e) => {
+                          // Permite submeter com Ctrl+Enter
+                          if (e.key === 'Enter' && e.ctrlKey) {
+                            e.preventDefault()
+                            handleAddToMarket()
+                          }
+                        }}
+                        className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                        rows={3}
+                      />
+                    </div>
+
+                    {/* Botões */}
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={handleAddToMarket}
+                        disabled={addingPlayer || !marketPrice}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {addingPlayer ? 'Anunciando...' : 'Anunciar no Mercado'}
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setShowAddForm(false)
+                          setSelectedPlayer(null)
+                          setMarketPrice('')
+                          setMarketDescription('')
+                          setPriceInputValue('')
+                          setDescInputValue('')
+                        }}
+                        variant="outline"
+                        className="flex-1 text-white border-zinc-600 hover:bg-zinc-800"
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                    {marketPrice && (
+                      <p className="text-xs text-zinc-400">
+                        Dica: Use <kbd className="px-1 bg-zinc-700 rounded">Ctrl+Enter</kbd> no campo de descrição para salvar
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Meus jogadores no mercado */}
+            {myMarketPlayers.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-lg font-bold text-white mb-4">Meus jogadores anunciados</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {myMarketPlayers.map(listing => (
+                    <MarketPlayerCard 
+                      key={listing.id} 
+                      listing={listing} 
+                      isMine={true}
+                    />
                   ))}
                 </div>
               </div>
+            )}
+          </Card>
+        )}
 
-              {selectedPlayer && (
-                <>
-                  {/* Preço - CORRIGIDO */}
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Preço de Venda
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-                      <Input
-                        id="market-price-input"
-                        placeholder="0,00"
-                        value={marketPrice}
-                        onChange={(e) => {
-                          const formattedValue = formatCurrencyInput(e.target.value)
-                          setMarketPrice(formattedValue)
-                        }}
-                        className="pl-10 bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        onKeyDown={(e) => {
-                          // Navegação com teclado
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            const descInput = document.getElementById('market-desc-input')
-                            if (descInput) descInput.focus()
-                          }
-                          if (e.key === 'Escape') {
-                            e.preventDefault()
-                            setShowAddForm(false)
-                          }
-                        }}
-                      />
-                    </div>
-                    <p className="text-zinc-500 text-xs mt-1">
-                      Valor base do jogador: R$ {selectedPlayer.base_price.toLocaleString('pt-BR')}
-                    </p>
-                  </div>
-
-                  {/* Descrição - CORRIGIDA */}
-                  <div>
-                    <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                      Descrição (opcional)
-                      <span className="text-zinc-500 ml-1">- Por que está colocando à venda?</span>
-                    </label>
-                    <Textarea
-                      id="market-desc-input"
-                      placeholder="Ex: Preciso de grana para reforçar o time, jogador não se adaptou ao sistema..."
-                      value={marketDescription}
-                      onChange={(e) => {
-                        setMarketDescription(e.target.value)
-                      }}
-                      onKeyDown={(e) => {
-                        // Permite submeter com Ctrl+Enter
-                        if (e.key === 'Enter' && e.ctrlKey) {
-                          e.preventDefault()
-                          handleAddToMarket()
-                        }
-                      }}
-                      className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                      rows={3}
-                    />
-                  </div>
-
-                  {/* Botões */}
-                  <div className="flex gap-3">
-                    <Button
-                      onClick={handleAddToMarket}
-                      disabled={addingPlayer || !marketPrice}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {addingPlayer ? 'Anunciando...' : 'Anunciar no Mercado'}
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setShowAddForm(false)
-                        setSelectedPlayer(null)
-                        setMarketPrice('')
-                        setMarketDescription('')
-                      }}
-                      variant="outline"
-                      className="flex-1 text-white border-zinc-600 hover:bg-zinc-800"
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                  {marketPrice && (
-                    <p className="text-xs text-zinc-400">
-                      Dica: Use <kbd className="px-1 bg-zinc-700 rounded">Ctrl+Enter</kbd> no campo de descrição para salvar
-                    </p>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Meus jogadores no mercado */}
-          {myMarketPlayers.length > 0 && (
-            <div className="mt-6">
-              <h4 className="text-lg font-bold text-white mb-4">Meus jogadores anunciados</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {myMarketPlayers.map(listing => (
-                  <MarketPlayerCard 
-                    key={listing.id} 
-                    listing={listing} 
-                    isMine={true}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Lista de jogadores disponíveis */}
-      {loadingMarket ? (
-        <div className="text-center py-16">
-          <p className="text-xl text-zinc-400 animate-pulse">Carregando mercado...</p>
-        </div>
-      ) : marketTab === 'disponiveis' && marketPlayers.length === 0 ? (
-        <Card className="p-16 text-center bg-white/5 border-white/10">
-          <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-          <p className="text-xl text-zinc-400">Nenhum jogador disponível no mercado</p>
-          <p className="text-zinc-500 mt-2">Os times ainda não anunciaram jogadores para venda</p>
-        </Card>
-      ) : marketTab === 'meus' && myMarketPlayers.length === 0 && !showAddForm ? (
-        <Card className="p-16 text-center bg-white/5 border-white/10">
-          <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-          <p className="text-xl text-zinc-400">Você ainda não anunciou jogadores</p>
-          <p className="text-zinc-500 mt-2">Clique em "Adicionar Jogador" para começar</p>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(marketTab === 'disponiveis' ? marketPlayers : myMarketPlayers)
-            .filter(listing => marketTab === 'disponiveis' ? listing.is_active : true)
-            .map(listing => (
-              <MarketPlayerCard 
-                key={listing.id} 
-                listing={listing} 
-                isMine={marketTab === 'meus'}
-              />
-            ))
-          }
-        </div>
-      )}
-    </>
-  )
+        {/* Lista de jogadores disponíveis */}
+        {loadingMarket ? (
+          <div className="text-center py-16">
+            <p className="text-xl text-zinc-400 animate-pulse">Carregando mercado...</p>
+          </div>
+        ) : marketTab === 'disponiveis' && marketPlayers.length === 0 ? (
+          <Card className="p-16 text-center bg-white/5 border-white/10">
+            <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
+            <p className="text-xl text-zinc-400">Nenhum jogador disponível no mercado</p>
+            <p className="text-zinc-500 mt-2">Os times ainda não anunciaram jogadores para venda</p>
+          </Card>
+        ) : marketTab === 'meus' && myMarketPlayers.length === 0 && !showAddForm ? (
+          <Card className="p-16 text-center bg-white/5 border-white/10">
+            <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
+            <p className="text-xl text-zinc-400">Você ainda não anunciou jogadores</p>
+            <p className="text-zinc-500 mt-2">Clique em "Adicionar Jogador" para começar</p>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(marketTab === 'disponiveis' ? marketPlayers : myMarketPlayers)
+              .filter(listing => marketTab === 'disponiveis' ? listing.is_active : true)
+              .map(listing => (
+                <MarketPlayerCard 
+                  key={listing.id} 
+                  listing={listing} 
+                  isMine={marketTab === 'meus'}
+                />
+              ))
+            }
+          </div>
+        )}
+      </>
+    )
+  }
 
   // Criar objetos compatíveis com os componentes de chat
   const chatUser = {
