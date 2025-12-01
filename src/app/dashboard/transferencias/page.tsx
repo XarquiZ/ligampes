@@ -1,7 +1,7 @@
 // src/app/dashboard/transferencias/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { 
   CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
@@ -35,6 +35,23 @@ function formatDateTime(dateString: string) {
   }
 }
 
+// Função de formatação de moeda
+function formatCurrencyInput(value: string): string {
+  const onlyNumbers = value.replace(/\D/g, '')
+  if (onlyNumbers === '') return ''
+  
+  const number = parseInt(onlyNumbers) / 100
+  return number.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+function parseCurrencyToNumber(value: string): number {
+  const cleaned = value.replace(/\./g, '').replace(',', '.')
+  return parseFloat(cleaned) || 0
+}
+
 interface UserProfile {
   id: string
   email?: string
@@ -56,7 +73,7 @@ interface MarketPlayer {
   player_name: string
   team_id: string
   team_name: string
-  team_logo: string
+  team_logo: string | null
   price: number
   description: string | null
   is_active: boolean
@@ -117,6 +134,10 @@ export default function PaginaTransferencias() {
   const [editDescriptionText, setEditDescriptionText] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
 
+  // Refs para evitar perda de foco
+  const descriptionRef = useRef<HTMLTextAreaElement>(null)
+  const priceRef = useRef<HTMLInputElement>(null)
+
   // Carregar dados do usuário e time
   useEffect(() => {
     loadUserData()
@@ -137,6 +158,7 @@ export default function PaginaTransferencias() {
         () => {
           if (activeView === 'mercado') {
             loadMarketData()
+            loadMyPlayers()
           }
         }
       )
@@ -584,7 +606,7 @@ export default function PaginaTransferencias() {
       return
     }
 
-    const price = parseFloat(marketPrice.replace(/\./g, '').replace(',', '.'))
+    const price = parseCurrencyToNumber(marketPrice)
     if (isNaN(price) || price <= 0) {
       alert('Preço inválido')
       return
@@ -604,7 +626,7 @@ export default function PaginaTransferencias() {
           player_name: selectedPlayer.name,
           team_id: team.id,
           price: price,
-          description: marketDescription || null,
+          description: marketDescription.trim() || null,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -650,13 +672,16 @@ export default function PaginaTransferencias() {
   }
 
   const handleUpdateDescription = async (listingId: string) => {
-    if (!editDescriptionText.trim()) return
+    if (!editDescriptionText.trim()) {
+      alert('A descrição não pode estar vazia')
+      return
+    }
 
     try {
       const { error } = await supabase
         .from('market_listings')
         .update({ 
-          description: editDescriptionText,
+          description: editDescriptionText.trim(),
           updated_at: new Date().toISOString()
         })
         .eq('id', listingId)
@@ -677,6 +702,15 @@ export default function PaginaTransferencias() {
   const handleStartEditDescription = (listing: MarketPlayer) => {
     setEditingDescription(listing.id)
     setEditDescriptionText(listing.description || '')
+    
+    // Foco no textarea após um pequeno delay para garantir renderização
+    setTimeout(() => {
+      const textarea = document.getElementById(`edit-desc-${listing.id}`) as HTMLTextAreaElement
+      if (textarea) {
+        textarea.focus()
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
+      }
+    }, 10)
   }
 
   const handleCancelEdit = () => {
@@ -839,7 +873,7 @@ export default function PaginaTransferencias() {
                 onClick={() => handleStartEditDescription(listing)}
                 variant="outline"
                 size="sm"
-                className="flex-1"
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700"
               >
                 <Edit className="w-4 h-4 mr-1" />
                 Editar
@@ -848,7 +882,7 @@ export default function PaginaTransferencias() {
                 onClick={() => handleRemoveFromMarket(listing.id)}
                 variant="outline"
                 size="sm"
-                className="flex-1 bg-red-600/20 border-red-600 hover:bg-red-600/30"
+                className="flex-1 bg-red-600/20 border-red-600 hover:bg-red-600/30 text-white"
               >
                 <Trash2 className="w-4 h-4 mr-1" />
                 Remover
@@ -857,33 +891,53 @@ export default function PaginaTransferencias() {
           ) : (
             <Button
               onClick={() => handleBuyPlayer(listing)}
-              className="flex-1 bg-green-600 hover:bg-green-700"
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
             >
               <ShoppingCart className="w-4 h-4 mr-1" />
               Fazer Proposta
             </Button>
           )}
         </div>
+
+        {/* Formulário de edição de descrição */}
+        {isMine && editingDescription === listing.id && (
+          <EditDescriptionForm listing={listing} />
+        )}
       </Card>
     )
   }
 
-  // Componente para editar descrição
+  // Componente para editar descrição - CORRIGIDO
   const EditDescriptionForm = ({ listing }: { listing: MarketPlayer }) => {
     return (
       <div className="mt-3 space-y-2">
         <Textarea
+          id={`edit-desc-${listing.id}`}
           value={editDescriptionText}
-          onChange={(e) => setEditDescriptionText(e.target.value)}
+          onChange={(e) => {
+            setEditDescriptionText(e.target.value)
+          }}
+          onKeyDown={(e) => {
+            // Permite submeter com Ctrl+Enter
+            if (e.key === 'Enter' && e.ctrlKey) {
+              e.preventDefault()
+              handleUpdateDescription(listing.id)
+            }
+            // Cancela com Escape
+            if (e.key === 'Escape') {
+              handleCancelEdit()
+            }
+          }}
           placeholder="Digite a descrição para este jogador..."
-          className="bg-zinc-800/50 border-zinc-600 text-sm"
+          className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
           rows={3}
+          autoFocus
         />
         <div className="flex gap-2">
           <Button
             onClick={() => handleUpdateDescription(listing.id)}
             size="sm"
-            className="flex-1 bg-green-600 hover:bg-green-700"
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
           >
             <Save className="w-4 h-4 mr-1" />
             Salvar
@@ -892,12 +946,15 @@ export default function PaginaTransferencias() {
             onClick={handleCancelEdit}
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700"
           >
             <XCircle className="w-4 h-4 mr-1" />
             Cancelar
           </Button>
         </div>
+        <p className="text-xs text-zinc-400">
+          Dica: Use <kbd className="px-1 bg-zinc-700 rounded">Ctrl+Enter</kbd> para salvar
+        </p>
       </div>
     )
   }
@@ -911,7 +968,7 @@ export default function PaginaTransferencias() {
         onClick={() => setActiveView('transferencias')}
         className={cn(
           'rounded-lg text-sm font-bold px-6 py-2 transition-all',
-          activeView === 'transferencias' && 'bg-purple-600 shadow-lg shadow-purple-600/20'
+          activeView === 'transferencias' && 'bg-purple-600 shadow-lg shadow-purple-600/20 text-white'
         )}
       >
         <ArrowRightLeft className="w-4 h-4 mr-2" />
@@ -923,7 +980,7 @@ export default function PaginaTransferencias() {
         onClick={() => setActiveView('mercado')}
         className={cn(
           'rounded-lg text-sm font-bold px-6 py-2 transition-all',
-          activeView === 'mercado' && 'bg-green-600 shadow-lg shadow-green-600/20'
+          activeView === 'mercado' && 'bg-green-600 shadow-lg shadow-green-600/20 text-white'
         )}
       >
         <Tag className="w-4 h-4 mr-2" />
@@ -941,7 +998,7 @@ export default function PaginaTransferencias() {
           onClick={() => setActiveTab('pending')}
           variant={activeTab === 'pending' ? 'default' : 'outline'}
           className={cn(
-            "flex items-center gap-2",
+            "flex items-center gap-2 text-white",
             activeTab === 'pending' ? "bg-purple-600 hover:bg-purple-700" : "bg-zinc-800/50 border-zinc-600"
           )}
         >
@@ -956,7 +1013,7 @@ export default function PaginaTransferencias() {
           onClick={() => setActiveTab('completed')}
           variant={activeTab === 'completed' ? 'default' : 'outline'}
           className={cn(
-            "flex items-center gap-2",
+            "flex items-center gap-2 text-white",
             activeTab === 'completed' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
           )}
         >
@@ -1187,7 +1244,7 @@ export default function PaginaTransferencias() {
                           {userTeamId === t.from_team_id && !t.approved_by_seller && (
                             <Button
                               onClick={() => aprovar(t.id, 'seller')}
-                              className="bg-green-600 hover:bg-green-700"
+                              className="bg-green-600 hover:bg-green-700 text-white"
                             >
                               Aprovar como Vendedor
                             </Button>
@@ -1195,7 +1252,7 @@ export default function PaginaTransferencias() {
                           {userTeamId === t.to_team_id && !t.approved_by_buyer && (
                             <Button
                               onClick={() => aprovar(t.id, 'buyer')}
-                              className="bg-blue-600 hover:bg-blue-700"
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
                             >
                               Aprovar como Comprador
                             </Button>
@@ -1203,7 +1260,7 @@ export default function PaginaTransferencias() {
                           {isAdmin && !t.approved_by_admin && (
                             <Button
                               onClick={() => aprovar(t.id, 'admin')}
-                              className="bg-purple-600 hover:bg-purple-700"
+                              className="bg-purple-600 hover:bg-purple-700 text-white"
                             >
                               Aprovar como Admin
                             </Button>
@@ -1365,7 +1422,7 @@ export default function PaginaTransferencias() {
           onClick={() => setMarketTab('disponiveis')}
           variant={marketTab === 'disponiveis' ? 'default' : 'outline'}
           className={cn(
-            "flex items-center gap-2",
+            "flex items-center gap-2 text-white",
             marketTab === 'disponiveis' ? "bg-blue-600 hover:bg-blue-700" : "bg-zinc-800/50 border-zinc-600"
           )}
         >
@@ -1380,7 +1437,7 @@ export default function PaginaTransferencias() {
           onClick={() => setMarketTab('meus')}
           variant={marketTab === 'meus' ? 'default' : 'outline'}
           className={cn(
-            "flex items-center gap-2",
+            "flex items-center gap-2 text-white",
             marketTab === 'meus' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
           )}
         >
@@ -1401,8 +1458,14 @@ export default function PaginaTransferencias() {
             </div>
             {!showAddForm && (
               <Button
-                onClick={() => setShowAddForm(true)}
-                className="bg-green-600 hover:bg-green-700"
+                onClick={() => {
+                  setShowAddForm(true)
+                  // Resetar seleção quando abrir o formulário
+                  setSelectedPlayer(null)
+                  setMarketPrice('')
+                  setMarketDescription('')
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Adicionar Jogador
@@ -1427,7 +1490,14 @@ export default function PaginaTransferencias() {
                           ? "bg-blue-500/20 border-blue-500/50"
                           : "bg-zinc-800/30 border-zinc-600 hover:border-zinc-500"
                       )}
-                      onClick={() => setSelectedPlayer(player)}
+                      onClick={() => {
+                        setSelectedPlayer(player)
+                        // Focar no campo de preço quando selecionar jogador
+                        setTimeout(() => {
+                          const priceInput = document.getElementById('market-price-input')
+                          if (priceInput) priceInput.focus()
+                        }, 10)
+                      }}
                     >
                       {player.photo_url ? (
                         <img 
@@ -1459,7 +1529,7 @@ export default function PaginaTransferencias() {
 
               {selectedPlayer && (
                 <>
-                  {/* Preço */}
+                  {/* Preço - CORRIGIDO */}
                   <div>
                     <label className="text-zinc-400 text-sm font-medium mb-2 block">
                       Preço de Venda
@@ -1467,10 +1537,26 @@ export default function PaginaTransferencias() {
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
                       <Input
+                        id="market-price-input"
                         placeholder="0,00"
                         value={marketPrice}
-                        onChange={(e) => setMarketPrice(e.target.value)}
-                        className="pl-10 bg-zinc-800/50 border-zinc-600"
+                        onChange={(e) => {
+                          const formattedValue = formatCurrencyInput(e.target.value)
+                          setMarketPrice(formattedValue)
+                        }}
+                        className="pl-10 bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        onKeyDown={(e) => {
+                          // Navegação com teclado
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            const descInput = document.getElementById('market-desc-input')
+                            if (descInput) descInput.focus()
+                          }
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            setShowAddForm(false)
+                          }
+                        }}
                       />
                     </div>
                     <p className="text-zinc-500 text-xs mt-1">
@@ -1478,17 +1564,27 @@ export default function PaginaTransferencias() {
                     </p>
                   </div>
 
-                  {/* Descrição */}
+                  {/* Descrição - CORRIGIDA */}
                   <div>
                     <label className="text-zinc-400 text-sm font-medium mb-2 block">
                       Descrição (opcional)
                       <span className="text-zinc-500 ml-1">- Por que está colocando à venda?</span>
                     </label>
                     <Textarea
+                      id="market-desc-input"
                       placeholder="Ex: Preciso de grana para reforçar o time, jogador não se adaptou ao sistema..."
                       value={marketDescription}
-                      onChange={(e) => setMarketDescription(e.target.value)}
-                      className="bg-zinc-800/50 border-zinc-600 text-sm"
+                      onChange={(e) => {
+                        setMarketDescription(e.target.value)
+                      }}
+                      onKeyDown={(e) => {
+                        // Permite submeter com Ctrl+Enter
+                        if (e.key === 'Enter' && e.ctrlKey) {
+                          e.preventDefault()
+                          handleAddToMarket()
+                        }
+                      }}
+                      className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                       rows={3}
                     />
                   </div>
@@ -1497,8 +1593,8 @@ export default function PaginaTransferencias() {
                   <div className="flex gap-3">
                     <Button
                       onClick={handleAddToMarket}
-                      disabled={addingPlayer}
-                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      disabled={addingPlayer || !marketPrice}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {addingPlayer ? 'Anunciando...' : 'Anunciar no Mercado'}
                     </Button>
@@ -1510,11 +1606,16 @@ export default function PaginaTransferencias() {
                         setMarketDescription('')
                       }}
                       variant="outline"
-                      className="flex-1"
+                      className="flex-1 text-white border-zinc-600 hover:bg-zinc-800"
                     >
                       Cancelar
                     </Button>
                   </div>
+                  {marketPrice && (
+                    <p className="text-xs text-zinc-400">
+                      Dica: Use <kbd className="px-1 bg-zinc-700 rounded">Ctrl+Enter</kbd> no campo de descrição para salvar
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -1526,12 +1627,11 @@ export default function PaginaTransferencias() {
               <h4 className="text-lg font-bold text-white mb-4">Meus jogadores anunciados</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {myMarketPlayers.map(listing => (
-                  <div key={listing.id}>
-                    <MarketPlayerCard listing={listing} isMine={true} />
-                    {editingDescription === listing.id && (
-                      <EditDescriptionForm listing={listing} />
-                    )}
-                  </div>
+                  <MarketPlayerCard 
+                    key={listing.id} 
+                    listing={listing} 
+                    isMine={true}
+                  />
                 ))}
               </div>
             </div>
