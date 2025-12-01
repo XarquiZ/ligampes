@@ -1,7 +1,7 @@
 // src/app/dashboard/leilao/page.tsx
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { 
   Gavel, 
@@ -13,7 +13,9 @@ import {
   Timer,
   Minus,
   Crown,
-  Calendar
+  Calendar,
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -25,6 +27,7 @@ import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import FloatingChatButton from '@/components/FloatingChatButton'
 import ChatPopup from '@/components/Chatpopup'
+import { toast } from 'sonner'
 
 interface Player {
   id: string
@@ -107,156 +110,30 @@ const generateBidOptions = (currentBid: number): { value: number; label: string 
   return options
 }
 
-// Hook para saldo reservado específico por time
+// Hook para saldo reservado específico por time (SIMPLIFICADO)
 const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
-  const [isLoaded, setIsLoaded] = useState(false)
-
-  // Carregar do localStorage na inicialização - ESPECÍFICO POR TIME
-  useEffect(() => {
-    const loadSaldoReservado = () => {
-      if (!teamId) {
-        setIsLoaded(true)
-        return
-      }
-
-      try {
-        const key = `saldoReservadoLeilao_${teamId}`
-        const saved = localStorage.getItem(key)
-        console.log('📥 Tentando carregar saldo reservado do localStorage para time:', teamId, saved)
-        
-        if (saved) {
-          const parsed = JSON.parse(saved)
-          
-          // Verificação mais robusta dos dados
-          if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-            // Filtrar apenas valores numéricos válidos
-            const filtered: {[key: string]: number} = {}
-            Object.keys(parsed).forEach(key => {
-              const value = parsed[key]
-              if (typeof value === 'number' && value > 0) {
-                filtered[key] = value
-              }
-            })
-            
-            setSaldoReservado(filtered)
-            console.log('💰 Saldo reservado carregado com sucesso para time', teamId, ':', filtered)
-          } else {
-            console.warn('⚠️ Dados de saldo reservado inválidos, limpando...')
-            localStorage.removeItem(key)
-          }
-        } else {
-          console.log('ℹ️ Nenhum saldo reservado encontrado no localStorage para time:', teamId)
-        }
-      } catch (error) {
-        console.error('❌ Erro ao carregar saldo reservado:', error)
-        if (teamId) {
-          localStorage.removeItem(`saldoReservadoLeilao_${teamId}`)
-        }
-      } finally {
-        setIsLoaded(true)
-      }
-    }
-
-    loadSaldoReservado()
-  }, [teamId])
-
-  // Salvar no localStorage sempre que mudar - ESPECÍFICO POR TIME
-  useEffect(() => {
-    if (!isLoaded || !teamId) return
-
-    try {
-      const key = `saldoReservadoLeilao_${teamId}`
-      console.log('💾 Salvando saldo reservado no localStorage para time:', teamId, saldoReservado)
-      localStorage.setItem(key, JSON.stringify(saldoReservado))
-    } catch (error) {
-      console.error('❌ Erro ao salvar saldo reservado:', error)
-    }
-  }, [saldoReservado, isLoaded, teamId])
 
   const reservarSaldo = (auctionId: string, amount: number) => {
-    if (!auctionId || amount <= 0 || !teamId) {
-      console.error('❌ Parâmetros inválidos para reservarSaldo:', { auctionId, amount, teamId })
-      return
-    }
-
-    setSaldoReservado(prev => {
-      const novo = { ...prev, [auctionId]: amount }
-      console.log(`💰 Saldo reservado para leilão ${auctionId} do time ${teamId}: R$ ${amount.toLocaleString('pt-BR')}`)
-      console.log('📊 Estado atualizado do saldo reservado:', novo)
-      return novo
-    })
+    if (!auctionId || amount <= 0 || !teamId) return
+    setSaldoReservado(prev => ({ ...prev, [auctionId]: amount }))
   }
 
   const liberarSaldo = (auctionId: string) => {
-    if (!auctionId || !teamId) {
-      console.error('❌ Parâmetros inválidos para liberarSaldo')
-      return
-    }
-
+    if (!auctionId || !teamId) return
     setSaldoReservado(prev => {
       const novo = { ...prev }
-      if (novo[auctionId]) {
-        console.log(`💰 Saldo liberado do leilão ${auctionId} do time ${teamId}: R$ ${novo[auctionId].toLocaleString('pt-BR')}`)
-        delete novo[auctionId]
-        console.log('📊 Estado após liberação:', novo)
-      }
+      delete novo[auctionId]
       return novo
     })
   }
 
   const getSaldoReservado = () => {
-    const total = Object.values(saldoReservado).reduce((total, valor) => total + valor, 0)
-    console.log('📈 Total do saldo reservado calculado para time', teamId, ':', total)
-    return total
+    return Object.values(saldoReservado).reduce((total, valor) => total + valor, 0)
   }
 
-  // NOVA FUNÇÃO: Sincronizar com estado atual dos leilões
-  const sincronizarComLeiloes = (auctions: Auction[]) => {
-    if (!isLoaded || !teamId) return false
-    
-    let atualizado = false
-    const agora = Date.now()
-    
-    setSaldoReservado(prev => {
-      const novo = { ...prev }
-      
-      Object.keys(novo).forEach(auctionId => {
-        const auction = auctions.find(a => a.id === auctionId)
-        const valorReservado = novo[auctionId]
-        
-        // Condições para liberar saldo automaticamente
-        if (!auction) {
-          console.log(`🔄 Liberando saldo reservado - leilão ${auctionId} não existe mais`)
-          delete novo[auctionId]
-          atualizado = true
-        } else if (auction.status === 'finished') {
-          console.log(`🔄 Liberando saldo reservado - leilão ${auctionId} finalizado`)
-          delete novo[auctionId]
-          atualizado = true
-        } else if (auction.current_bidder !== teamId) {
-          console.log(`🔄 Liberando saldo reservado - não é mais o líder no leilão ${auctionId}`)
-          delete novo[auctionId]
-          atualizado = true
-        } else if (auction.end_time && new Date(auction.end_time).getTime() < agora) {
-          console.log(`🔄 Liberando saldo reservado - leilão ${auctionId} expirado`)
-          delete novo[auctionId]
-          atualizado = true
-        } else if (auction.current_bid !== valorReservado) {
-          console.log(`🔄 Liberando saldo reservado - lance atual diferente do reservado no leilão ${auctionId}`)
-          delete novo[auctionId]
-          atualizado = true
-        }
-      })
-      
-      if (atualizado) {
-        console.log('🔄 Estado do saldo reservado sincronizado para time', teamId, ':', novo)
-      }
-      
-      return novo
-    })
-    
-    return atualizado
+  const limparTodos = () => {
+    setSaldoReservado({})
   }
 
   return {
@@ -264,8 +141,7 @@ const useSaldoReservado = (teamId: string | null) => {
     reservarSaldo,
     liberarSaldo,
     getSaldoReservado,
-    sincronizarComLeiloes,
-    isLoaded
+    limparTodos
   }
 }
 
@@ -300,41 +176,162 @@ export default function PaginaLeilao() {
   const [bidding, setBidding] = useState(false)
   const [bids, setBids] = useState<{[key: string]: Bid[]}>({})
 
-  // Hook melhorado com sincronização e específico por time
+  // Hook simplificado
   const {
     saldoReservado,
     reservarSaldo,
     liberarSaldo,
     getSaldoReservado,
-    sincronizarComLeiloes,
-    isLoaded
+    limparTodos
   } = useSaldoReservado(team?.id || null)
 
-  // Estado separado para contagem regressiva
+  // Estado para contagem regressiva
   const [currentTime, setCurrentTime] = useState(Date.now())
 
-  // NOVO: Estado para polling em tempo real
-  const [lastUpdate, setLastUpdate] = useState(Date.now())
+  // REF para evitar múltiplas execuções
+  const isProcessingRef = useRef(false)
+  const subscriptionsRef = useRef<any[]>([])
 
-  // CARREGAMENTO INICIAL - APENAS UMA VEZ
+  // CARREGAMENTO INICIAL
   useEffect(() => {
     loadInitialData()
+    
+    return () => {
+      // Limpar todas as subscriptions ao desmontar
+      subscriptionsRef.current.forEach(sub => {
+        supabase.removeChannel(sub)
+      })
+    }
   }, [])
 
-  // CORREÇÃO: Polling a cada 1 segundo
+  // CONTAGEM REGRESSIVA SEPARADA (apenas para UI)
   useEffect(() => {
-    const pollingInterval = setInterval(async () => {
-      // Verificar se há leilões ativos ou pendentes
-      const hasActiveOrPending = auctions.some(a => a.status === 'active' || a.status === 'pending')
-      
-      if (hasActiveOrPending) {
-        console.log('🔄 Polling: verificando atualizações...')
-        await loadAuctions(true) // true indica que é uma atualização silenciosa
-      }
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now())
     }, 1000)
+    
+    return () => clearInterval(interval)
+  }, [])
 
-    return () => clearInterval(pollingInterval)
-  }, [auctions])
+  // CONFIGURAR REALTIME SUPABASE
+  useEffect(() => {
+    if (!user || !team) return
+
+    // Canal para atualizações de leilões
+    const auctionsChannel = supabase
+      .channel('auctions_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auctions',
+          filter: 'status=eq.active'
+        },
+        async (payload) => {
+          console.log('🔄 Atualização de leilão em tempo real:', payload)
+          
+          // Se for um UPDATE e o leilão está na lista atual
+          if (payload.eventType === 'UPDATE') {
+            const updatedAuction = payload.new as Auction
+            
+            // Buscar dados completos do leilão atualizado
+            const { data: fullAuction } = await supabase
+              .from('auctions')
+              .select(`
+                *,
+                player:players(*),
+                current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+              `)
+              .eq('id', updatedAuction.id)
+              .single()
+            
+            if (fullAuction) {
+              setAuctions(prev => {
+                const index = prev.findIndex(a => a.id === fullAuction.id)
+                if (index >= 0) {
+                  const newAuctions = [...prev]
+                  newAuctions[index] = {
+                    ...fullAuction,
+                    time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
+                      ? Math.max(0, new Date(fullAuction.end_time).getTime() - currentTime)
+                      : 0
+                  }
+                  return newAuctions
+                }
+                return prev
+              })
+
+              // Se o usuário atual perdeu o leilão, liberar saldo
+              if (team && updatedAuction.current_bidder !== team.id) {
+                liberarSaldo(updatedAuction.id)
+              }
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    // Canal para novos lances
+    const bidsChannel = supabase
+      .channel('bids_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bids'
+        },
+        async (payload) => {
+          const newBid = payload.new as Bid
+          console.log('💰 Novo lance em tempo real:', newBid)
+          
+          // Carregar lances atualizados para este leilão
+          const { data: updatedBids } = await supabase
+            .from('bids')
+            .select(`
+              *,
+              team:teams(name, logo_url)
+            `)
+            .eq('auction_id', newBid.auction_id)
+            .order('created_at', { ascending: false })
+          
+          if (updatedBids) {
+            setBids(prev => ({
+              ...prev,
+              [newBid.auction_id]: updatedBids
+            }))
+          }
+        }
+      )
+      .subscribe()
+
+    // Canal para atualizações de saldo
+    const balanceChannel = supabase
+      .channel('balance_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'teams',
+          filter: `id=eq.${team.id}`
+        },
+        (payload) => {
+          console.log('💰 Saldo atualizado em tempo real:', payload.new.balance)
+          setTeam(prev => prev ? { ...prev, balance: payload.new.balance } : null)
+        }
+      )
+      .subscribe()
+
+    subscriptionsRef.current = [auctionsChannel, bidsChannel, balanceChannel]
+
+    return () => {
+      supabase.removeChannel(auctionsChannel)
+      supabase.removeChannel(bidsChannel)
+      supabase.removeChannel(balanceChannel)
+    }
+  }, [user, team, currentTime])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -369,7 +366,6 @@ export default function PaginaLeilao() {
 
     loadUnreadCount()
 
-    // Subscription para atualizar em tempo real
     const subscription = supabase
       .channel('unread_messages')
       .on(
@@ -389,60 +385,6 @@ export default function PaginaLeilao() {
       subscription.unsubscribe()
     }
   }, [user])
-
-  // CONTAGEM REGRESSIVA SEPARADA
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(Date.now())
-    }, 1000)
-    
-    return () => clearInterval(interval)
-  }, [])
-
-  // SINCRONIZAR SALDO RESERVADO COM ESTADO ATUAL DOS LEILÕES
-  useEffect(() => {
-    if (isLoaded && auctions.length > 0 && team) {
-      console.log('🔄 Sincronizando saldo reservado com estado atual dos leilões para time:', team.id)
-      const atualizado = sincronizarComLeiloes(auctions)
-      
-      if (atualizado) {
-        console.log('🔄 Recarregando dados após sincronização...')
-        // Recarregar dados se houve mudanças no saldo reservado
-        setTimeout(() => loadInitialData(), 100)
-      }
-    }
-  }, [isLoaded, auctions, team])
-
-  // VERIFICAR LEILÕES QUE DEVEM SER FINALIZADOS OU INICIADOS
-  useEffect(() => {
-    const checkAuctions = async () => {
-      const now = Date.now()
-      
-      // Verificar leilões ativos que devem finalizar
-      const activeAuctions = auctions.filter(a => a.status === 'active')
-      for (const auction of activeAuctions) {
-        if (auction.end_time) {
-          const endTime = new Date(auction.end_time).getTime()
-          if (now >= endTime) {
-            console.log(`⏰ Finalizando leilão ${auction.id} - tempo esgotado`)
-            await finishAuction(auction.id)
-          }
-        }
-      }
-      
-      // Verificar leilões pendentes que devem iniciar
-      const pendingAuctions = auctions.filter(a => a.status === 'pending')
-      for (const auction of pendingAuctions) {
-        const startTime = new Date(auction.start_time).getTime()
-        if (now >= startTime) {
-          console.log(`🎬 Iniciando leilão pendente ${auction.id}`)
-          await startPendingAuction(auction.id)
-        }
-      }
-    }
-    
-    checkAuctions()
-  }, [currentTime, auctions])
 
   const getSaldoDisponivel = () => {
     if (!team) return 0
@@ -482,7 +424,6 @@ export default function PaginaLeilao() {
         setProfile(profile)
         setIsAdmin(profile?.role === 'admin')
 
-        // Definir time diretamente do perfil
         if (profile.teams) {
           setTeam(profile.teams)
           console.log('🏆 Time carregado:', profile.teams)
@@ -498,18 +439,19 @@ export default function PaginaLeilao() {
         await loadFreePlayers()
       }
 
+      toast.success('Dados carregados com sucesso!')
+
     } catch (error) {
       console.error('❌ Erro ao carregar dados:', error)
+      toast.error('Erro ao carregar dados do leilão')
     } finally {
       setLoading(false)
     }
   }
 
-  // FUNÇÃO ATUALIZADA PARA CARREGAR LEILÕES (com polling silencioso)
-  const loadAuctions = async (silent = false) => {
-    if (!silent) {
-      console.log('📥 Carregando leilões...')
-    }
+  // FUNÇÃO PARA CARREGAR LEILÕES
+  const loadAuctions = async () => {
+    console.log('📥 Carregando leilões...')
     
     try {
       const { data: auctionsData, error } = await supabase
@@ -522,17 +464,14 @@ export default function PaginaLeilao() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        if (!silent) {
-          console.error('❌ Erro ao carregar leilões:', error)
-        }
+        console.error('❌ Erro ao carregar leilões:', error)
+        toast.error('Erro ao carregar leilões')
         return
       }
 
-      if (!silent) {
-        console.log('🎯 Leilões encontrados no banco:', auctionsData?.length)
-      }
+      console.log('🎯 Leilões encontrados:', auctionsData?.length)
       
-      // Calcular tempo restante inicial
+      // Calcular tempo restante
       const auctionsWithTime = (auctionsData || []).map(auction => {
         if (auction.status !== 'active' || !auction.end_time) {
           return { ...auction, time_remaining: 0 }
@@ -542,31 +481,16 @@ export default function PaginaLeilao() {
         return { ...auction, time_remaining: timeRemaining }
       })
       
-      // Atualizar estado de forma otimizada para evitar piscadas
-      setAuctions(prevAuctions => {
-        // Se não há mudanças significativas, não atualize
-        if (JSON.stringify(prevAuctions) === JSON.stringify(auctionsWithTime)) {
-          return prevAuctions
-        }
-        return auctionsWithTime
-      })
-
-      if (!silent) {
-        console.log('✅ Estado auctions atualizado:', auctionsWithTime.length)
-      }
+      setAuctions(auctionsWithTime)
 
       // Carregar lances para leilões ativos
       const activeAuctions = auctionsWithTime.filter(a => a.status === 'active')
       for (const auction of activeAuctions) {
-        await loadBids(auction.id, silent)
+        await loadBids(auction.id)
       }
-
-      setLastUpdate(Date.now())
 
     } catch (error) {
-      if (!silent) {
-        console.error('❌ Erro inesperado:', error)
-      }
+      console.error('❌ Erro inesperado:', error)
     }
   }
 
@@ -595,13 +519,8 @@ export default function PaginaLeilao() {
     }
   }
 
-  // FUNÇÃO ATUALIZADA PARA CARREGAR LANCES (com polling silencioso)
-  const loadBids = async (auctionId: string, silent = false) => {
+  const loadBids = async (auctionId: string) => {
     try {
-      if (!silent) {
-        console.log(`📥 Carregando lances para leilão ${auctionId}`)
-      }
-      
       const { data: bidsData, error } = await supabase
         .from('bids')
         .select(`
@@ -612,14 +531,8 @@ export default function PaginaLeilao() {
         .order('created_at', { ascending: false })
 
       if (error) {
-        if (!silent) {
-          console.error('❌ Erro ao carregar lances:', error)
-        }
+        console.error('❌ Erro ao carregar lances:', error)
         return
-      }
-
-      if (!silent) {
-        console.log(`✅ ${bidsData?.length || 0} lances carregados para leilão ${auctionId}`)
       }
       
       setBids(prev => ({
@@ -627,13 +540,11 @@ export default function PaginaLeilao() {
         [auctionId]: bidsData || []
       }))
     } catch (error) {
-      if (!silent) {
-        console.error('❌ Erro inesperado ao carregar lances:', error)
-      }
+      console.error('❌ Erro inesperado ao carregar lances:', error)
     }
   }
 
-  // FUNÇÃO PARA CALCULAR TEMPO RESTANTE (APENAS PARA EXIBIÇÃO)
+  // FUNÇÃO PARA CALCULAR TEMPO RESTANTE
   const calculateTimeRemaining = useCallback((auction: Auction) => {
     if (auction.status !== 'active' || !auction.end_time) {
       return 0
@@ -642,32 +553,23 @@ export default function PaginaLeilao() {
     return Math.max(0, endTime - currentTime)
   }, [currentTime])
 
-  // CORREÇÃO: Função startPendingAuction respeitando a duração original
+  // Função startPendingAuction
   const startPendingAuction = async (auctionId: string) => {
     try {
       console.log(`🎬 Iniciando leilão pendente: ${auctionId}`)
       
-      // Buscar dados do leilão para obter a duração original
-      const { data: auctionData, error: fetchError } = await supabase
+      const { data: auctionData } = await supabase
         .from('auctions')
         .select('*')
         .eq('id', auctionId)
         .single()
 
-      if (fetchError) {
-        console.error('❌ Erro ao buscar dados do leilão:', fetchError)
+      if (!auctionData) {
+        toast.error('Leilão não encontrado')
         return
       }
 
-      // Calcular duração baseada no start_time e end_time originais
-      let durationMinutes = 5 // fallback
-      if (auctionData.start_time && auctionData.end_time) {
-        const startTime = new Date(auctionData.start_time).getTime()
-        const endTime = new Date(auctionData.end_time).getTime()
-        durationMinutes = Math.round((endTime - startTime) / 60000)
-      }
-
-      console.log(`⏰ Duração calculada do leilão: ${durationMinutes} minutos`)
+      let durationMinutes = auctionData.auction_duration || 5
 
       const { error } = await supabase
         .from('auctions')
@@ -680,11 +582,12 @@ export default function PaginaLeilao() {
 
       if (error) throw error
 
+      toast.success('Leilão iniciado com sucesso!')
       await loadAuctions()
-      console.log('✅ Leilão iniciado com sucesso')
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Erro ao iniciar leilão:', error)
+      toast.error(`Erro: ${error.message}`)
     }
   }
 
@@ -694,7 +597,7 @@ export default function PaginaLeilao() {
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
 
-  // CORREÇÃO: Função de formatação para criação de leilão (permite qualquer valor)
+  // Função de formatação para criação de leilão
   const formatCurrencyCreate = (value: string) => {
     const onlyNumbers = value.replace(/\D/g, '')
     if (onlyNumbers === '') return ''
@@ -706,22 +609,22 @@ export default function PaginaLeilao() {
     })
   }
 
-  // NOVA FUNÇÃO: Obter data mínima para o date picker (hoje)
+  // Obter data mínima para o date picker
   const getMinDate = () => {
     const today = new Date()
     return today.toISOString().split('T')[0]
   }
 
-  // CRIAÇÃO DE LEILÃO ATUALIZADA COM DATA E HORA
+  // CRIAÇÃO DE LEILÃO
   const handleCreateAuction = async () => {
     if (!selectedPlayer || !startPrice || !startDate || !startTime) {
-      alert('Preencha todos os campos')
+      toast.error('Preencha todos os campos')
       return
     }
 
     const price = parseFloat(startPrice.replace(/\./g, '').replace(',', '.'))
     if (isNaN(price) || price <= 0) {
-      alert('Valor inicial inválido')
+      toast.error('Valor inicial inválido')
       return
     }
 
@@ -743,9 +646,8 @@ export default function PaginaLeilao() {
         parseInt(minutes)
       )
 
-      // Verificar se a data/hora é futura
       if (startDateTime <= new Date()) {
-        alert('A data e hora de início devem ser futuras')
+        toast.error('A data e hora de início devem ser futuras')
         setCreatingAuction(false)
         return
       }
@@ -753,7 +655,6 @@ export default function PaginaLeilao() {
       const durationMinutes = parseInt(auctionDuration)
       const endTime = new Date(startDateTime.getTime() + durationMinutes * 60000)
 
-      // Criar leilão COM DURAÇÃO SALVA
       const { error } = await supabase
         .from('auctions')
         .insert([{
@@ -769,8 +670,7 @@ export default function PaginaLeilao() {
 
       if (error) throw error
 
-      console.log('✅ Leilão criado no banco')
-
+      toast.success('Leilão agendado com sucesso!')
       setCreateAuctionModalOpen(false)
       resetCreateAuctionForm()
       
@@ -779,48 +679,29 @@ export default function PaginaLeilao() {
       
       setActiveTab('pending')
 
-      alert('✅ Leilão agendado com sucesso!')
-
     } catch (error: any) {
       console.error('❌ Erro ao criar leilão:', error)
-      alert(`Erro: ${error.message}`)
+      toast.error(`Erro: ${error.message}`)
     } finally {
       setCreatingAuction(false)
     }
   }
 
-  // CORREÇÃO: Função handleStartAuction respeitando a duração salva
+  // Função handleStartAuction
   const handleStartAuction = async (auctionId: string) => {
     try {
-      // Buscar dados do leilão para obter a duração salva
-      const { data: auctionData, error: fetchError } = await supabase
+      const { data: auctionData } = await supabase
         .from('auctions')
         .select('auction_duration, start_time, end_time')
         .eq('id', auctionId)
         .single()
 
-      if (fetchError) {
-        console.error('❌ Erro ao buscar dados do leilão:', fetchError)
+      if (!auctionData) {
+        toast.error('Leilão não encontrado')
         return
       }
 
-      // Determinar a duração correta
-      let durationMinutes = 5 // fallback padrão
-      
-      // Prioridade 1: Usar auction_duration se existir
-      if (auctionData.auction_duration) {
-        durationMinutes = auctionData.auction_duration
-        console.log(`⏰ Usando duração salva: ${durationMinutes} minutos`)
-      } 
-      // Prioridade 2: Calcular a partir de start_time e end_time
-      else if (auctionData.start_time && auctionData.end_time) {
-        const startTime = new Date(auctionData.start_time).getTime()
-        const endTime = new Date(auctionData.end_time).getTime()
-        durationMinutes = Math.round((endTime - startTime) / 60000)
-        console.log(`⏰ Calculando duração: ${durationMinutes} minutos`)
-      }
-
-      console.log(`🎬 Iniciando leilão ${auctionId} com ${durationMinutes} minutos`)
+      let durationMinutes = auctionData.auction_duration || 5
 
       const { error } = await supabase
         .from('auctions')
@@ -833,13 +714,13 @@ export default function PaginaLeilao() {
 
       if (error) throw error
 
-      alert('🎉 Leilão iniciado!')
+      toast.success('Leilão iniciado!')
       await loadAuctions()
       setActiveTab('active')
 
     } catch (error: any) {
       console.error('❌ Erro ao iniciar leilão:', error)
-      alert(`Erro: ${error.message}`)
+      toast.error(`Erro: ${error.message}`)
     }
   }
 
@@ -857,195 +738,85 @@ export default function PaginaLeilao() {
         .delete()
         .eq('auction_id', auctionId)
 
-      alert('✅ Leilão cancelado!')
+      toast.success('Leilão cancelado!')
       await loadAuctions()
       await loadFreePlayers()
 
     } catch (error: any) {
       console.error('❌ Erro ao cancelar leilão:', error)
-      alert(`Erro: ${error.message}`)
+      toast.error(`Erro: ${error.message}`)
     }
   }
 
-  // FUNÇÃO ATUALIZADA: Dar lance apenas com valor do seletor
+  // FUNÇÃO ATUALIZADA: Dar lance usando RPC atômica
   const handlePlaceBid = async (auctionId: string, amount: number) => {
-    console.log(`💰 INICIANDO LANCE - Leilão: ${auctionId}, Valor: ${amount}`)
+    console.log(`💰 LANCE ATÔMICO - Leilão: ${auctionId}, Valor: ${amount}`)
     
     if (!team || !team.id) {
-      alert('❌ Você precisa ter um time para dar lances.')
+      toast.error('❌ Você precisa ter um time para dar lances.')
       return
     }
 
-    console.log('🏆 Time do usuário:', { id: team.id, name: team.name })
+    if (isProcessingRef.current) {
+      toast.warning('Aguarde o lance anterior ser processado')
+      return
+    }
 
     if (!amount || amount <= 0) {
-      alert('Selecione um valor de lance válido')
-      return
-    }
-
-    // BUSCAR DADOS ATUALIZADOS DO LEILÃO DIRETO DO BANCO
-    const { data: currentAuction, error: fetchError } = await supabase
-      .from('auctions')
-      .select('*')
-      .eq('id', auctionId)
-      .single()
-
-    if (fetchError || !currentAuction) {
-      console.error('❌ Erro ao buscar leilão atualizado:', fetchError)
-      alert('Erro ao carregar dados do leilão')
-      return
-    }
-
-    console.log('📊 DADOS ATUAIS DO LEILÃO (do banco):', {
-      leilao_id: currentAuction.id,
-      current_bid: currentAuction.current_bid,
-      current_bidder: currentAuction.current_bidder,
-      team_atual: team.id
-    })
-
-    // VALIDAÇÕES COM DADOS ATUAIS
-    
-    // 1. Lance deve ser maior que o atual
-    if (amount <= currentAuction.current_bid) {
-      alert(`❌ O lance deve ser maior que o atual: R$ ${formatToMillions(currentAuction.current_bid)}`)
-      return
-    }
-
-    // 2. CORREÇÃO: Diferença mínima de 1 milhão
-    const diferencaMinima = 1000000
-    const diferencaAtual = amount - currentAuction.current_bid
-    
-    if (diferencaAtual < diferencaMinima) {
-      alert(`❌ O lance deve ser pelo menos R$ 1.000.000,00 maior que o atual\n\nLance atual: R$ ${formatToMillions(currentAuction.current_bid)}\nSeu lance: R$ ${formatToMillions(amount)}\nDiferença: R$ ${formatToMillions(diferencaAtual)}\n\nVocê precisa dar um lance de pelo menos: R$ ${formatToMillions(currentAuction.current_bid + diferencaMinima)}`)
-      return
-    }
-
-    // 3. Validação de saldo (agora considerando saldo temporário)
-    const saldoDisponivel = getSaldoDisponivel()
-    if (amount > saldoDisponivel) {
-      alert(`❌ Saldo insuficiente para este lance.\n\nSeu saldo: R$ ${formatToMillions(team.balance)}\nSaldo reservado em outros lances: R$ ${formatToMillions(getSaldoReservado())}\nSaldo disponível: R$ ${formatToMillions(saldoDisponivel)}`)
+      toast.error('Selecione um valor de lance válido')
       return
     }
 
     setBidding(true)
+    isProcessingRef.current = true
 
     try {
-      // 1. CALCULAR NOVO TEMPO SE NECESSÁRIO
-      let newEndTime = currentAuction.end_time
-      if (currentAuction.end_time) {
-        const currentEndTime = new Date(currentAuction.end_time).getTime()
-        const timeRemaining = currentEndTime - Date.now()
-        console.log('⏰ Tempo restante atual:', timeRemaining)
-        
-        if (timeRemaining <= 30000) {
-          newEndTime = new Date(Date.now() + 60000).toISOString()
-          console.log('⏰ Adicionando 1 minuto. Novo fim:', newEndTime)
-        }
-      }
-
-      // 2. ATUALIZAR LEILÃO - TRANSAÇÃO CRÍTICA
-      console.log('🔄 ATUALIZANDO LEILÃO NO BANCO:', {
-        current_bid: amount,
-        current_bidder: team.id,
-        end_time: newEndTime
+      // Usar RPC com transação atômica
+      const { data, error } = await supabase.rpc('place_bid_atomic', {
+        p_auction_id: auctionId,
+        p_team_id: team.id,
+        p_amount: amount
       })
 
-      const { data: updatedAuction, error: auctionError } = await supabase
-        .from('auctions')
-        .update({
-          current_bid: amount,
-          current_bidder: team.id,
-          end_time: newEndTime
-        })
-        .eq('id', auctionId)
-        .select()
-
-      if (auctionError) {
-        console.error('❌ ERRO CRÍTICO ao atualizar leilão:', auctionError)
-        throw new Error(`Falha ao atualizar leilão: ${auctionError.message}`)
+      if (error) {
+        console.error('❌ Erro na RPC:', error)
+        throw new Error(`Erro técnico: ${error.message}`)
       }
 
-      console.log('✅ LEILÃO ATUALIZADO NO BANCO:', updatedAuction?.[0])
-
-      // 3. REGISTRAR LANCE NA TABELA BIDS
-      const { error: bidError } = await supabase
-        .from('bids')
-        .insert([{
-          auction_id: auctionId,
-          team_id: team.id,
-          amount: amount
-        }])
-
-      if (bidError) {
-        console.error('❌ Erro ao registrar lance:', bidError)
-        
-        // REVERTER a atualização do leilão se o lance falhar
-        await supabase
-          .from('auctions')
-          .update({
-            current_bid: currentAuction.current_bid,
-            current_bidder: currentAuction.current_bidder,
-            end_time: currentAuction.end_time
-          })
-          .eq('id', auctionId)
-        
-        throw new Error(`Falha ao registrar lance: ${bidError.message}`)
+      if (!data.success) {
+        toast.error(data.error)
+        return
       }
 
-      console.log('✅ LANCE REGISTRADO na tabela bids')
-
-      // 4. CORREÇÃO: Reservar saldo temporariamente (PERSISTENTE E ESPECÍFICO POR TIME)
+      console.log('✅ LANCE BEM-SUCEDIDO:', data)
+      
+      // Reservar saldo localmente
       reservarSaldo(auctionId, amount)
-
-      // 5. VERIFICAÇÃO FINAL - BUSCAR DADOS ATUALIZADOS PARA CONFIRMAR
-      const { data: finalVerification, error: verifyError } = await supabase
-        .from('auctions')
-        .select('*')
-        .eq('id', auctionId)
-        .single()
-
-      if (!verifyError && finalVerification) {
-        console.log('🔍 VERIFICAÇÃO FINAL - Leilão após todas as operações:', {
-          id: finalVerification.id,
-          current_bid: finalVerification.current_bid,
-          current_bidder: finalVerification.current_bidder,
-          current_bidder_correto: finalVerification.current_bidder === team.id,
-          team_esperado: team.id,
-          team_atual: finalVerification.current_bidder
-        })
-
-        if (finalVerification.current_bidder !== team.id) {
-          console.error('🚨 ERRO GRAVE: current_bidder não foi atualizado corretamente!')
-          throw new Error('Falha crítica: current_bidder não foi atualizado')
-        }
-      }
-
-      // 6. ATUALIZAR INTERFACE
+      
+      // Atualizar interface
       setSelectedBidAmount(null)
       setBiddingAuctionId(null)
       
-      // 7. RECARREGAR DADOS COMPLETAMENTE
+      // Recarregar dados
       await loadAuctions()
-      await loadBids(auctionId)
-
-      console.log('🎉 LANCE CONCLUÍDO COM SUCESSO!')
-      alert('✅ Lance realizado com sucesso! O valor foi reservado do seu saldo.')
+      
+      toast.success('Lance realizado com sucesso!')
 
     } catch (error: any) {
-      console.error('❌ ERRO NO PROCESSO DE LANCE:', error)
-      alert(`Erro: ${error.message}`)
+      console.error('❌ ERRO NO LANCE:', error)
+      toast.error(`Erro: ${error.message || 'Falha ao processar lance'}`)
     } finally {
       setBidding(false)
+      isProcessingRef.current = false
     }
   }
 
-  // CORREÇÃO: Função finishAuction usando RPC segura com transação completa
+  // Função finishAuction (apenas para emergência)
   const finishAuction = async (auctionId: string) => {
     try {
-      console.log(`🏁 Iniciando finalização do leilão ${auctionId}`)
+      console.log(`🏁 Finalizando leilão manualmente: ${auctionId}`)
       
-      // Buscar dados atualizados do leilão
-      const { data: auctionData, error: fetchError } = await supabase
+      const { data: auctionData } = await supabase
         .from('auctions')
         .select(`
           *,
@@ -1055,118 +826,25 @@ export default function PaginaLeilao() {
         .eq('id', auctionId)
         .single()
 
-      if (fetchError) {
-        console.error('❌ Erro ao buscar leilão:', fetchError)
+      if (!auctionData || auctionData.status !== 'active') {
+        toast.info('Leilão já finalizado ou não encontrado')
         return
       }
 
-      const auction = auctionData
-      if (!auction || auction.status !== 'active') {
-        console.log('ℹ️ Leilão já finalizado ou não encontrado')
-        return
-      }
-
-      console.log('📊 Dados do leilão para finalização:', {
-        id: auction.id,
-        current_bid: auction.current_bid,
-        start_price: auction.start_price,
-        current_bidder: auction.current_bidder,
-        player: auction.player?.name
-      })
-
-      // Atualizar status do leilão para FINISHED
-      const { error: auctionError } = await supabase
+      // Apenas atualizar status - o trigger vai processar o resto
+      const { error } = await supabase
         .from('auctions')
         .update({ status: 'finished' })
         .eq('id', auctionId)
 
-      if (auctionError) {
-        console.error('❌ Erro ao atualizar status do leilão:', auctionError)
-        throw auctionError
-      }
+      if (error) throw error
 
-      console.log('✅ Status do leilão atualizado para FINISHED')
-
-      // CORREÇÃO CRÍTICA: Processar vencedor e saldo COM RPC SEGURA
-      if (auction.current_bidder && auction.current_bid > auction.start_price) {
-        console.log(`💰 Processando transferência para ${auction.current_bidder}`)
-        
-        // 1. Transferir jogador para o time vencedor
-        const { error: playerError } = await supabase
-          .from('players')
-          .update({ team_id: auction.current_bidder })
-          .eq('id', auction.player_id)
-
-        if (playerError) {
-          console.error('❌ Erro ao transferir jogador:', playerError)
-          throw playerError
-        }
-        console.log('✅ Jogador transferido para o time vencedor')
-
-        // 2. CORREÇÃO: Usar RPC segura para debitar saldo
-        console.log(`💰 Debitando saldo do time vencedor via RPC: ${auction.current_bidder}`)
-        
-        const { data: debitResult, error: debitError } = await supabase
-          .rpc('debitar_saldo_leilao', {
-            p_team_id: auction.current_bidder,
-            p_amount: auction.current_bid
-          })
-
-        if (debitError) {
-          console.error('❌ Erro ao debitar saldo via RPC:', debitError)
-          throw new Error(`Falha ao debitar saldo: ${debitError.message}`)
-        }
-
-        if (!debitResult.success) {
-          console.error('❌ Falha na operação de débito:', debitResult.error)
-          throw new Error(debitResult.error || 'Falha ao debitar saldo')
-        }
-
-        console.log('✅ Saldo debitado com sucesso via RPC. Novo saldo:', debitResult.new_balance)
-
-        // 3. CORREÇÃO: Registrar transação com mais detalhes
-        try {
-          const { error: transactionError } = await supabase
-            .from('balance_transactions')
-            .insert([{
-              team_id: auction.current_bidder,
-              amount: auction.current_bid,
-              type: 'debit',
-              description: `Compra do jogador ${auction.player?.name} no leilão`,
-              player_name: auction.player?.name,
-              transfer_type: 'buy',
-              created_at: new Date().toISOString()
-            }])
-
-          if (transactionError) {
-            console.warn('⚠️ Aviso ao registrar transação:', transactionError)
-          } else {
-            console.log('✅ Transação registrada com detalhes completos')
-          }
-        } catch (transactionError) {
-          console.warn('⚠️ Aviso ao tentar registrar transação:', transactionError)
-        }
-
-        console.log(`🎉 Leilão finalizado! Vencedor: ${auction.current_bidder_team?.name}`)
-
-      } else {
-        console.log('🔄 Leilão finalizado sem lances válidos - jogador permanece livre')
-      }
-
-      // CORREÇÃO CRÍTICA: Liberar saldo reservado APENAS se o usuário atual tinha saldo reservado
-      if (team && saldoReservado[auctionId]) {
-        console.log(`🔄 Liberando saldo reservado do leilão finalizado ${auctionId} para time ${team.id}`)
-        liberarSaldo(auctionId)
-      }
-
-      // Recarregar dados
+      toast.success('Leilão finalizado com sucesso!')
       await loadAuctions()
-      await loadInitialData()
       
-      console.log(`✅ Leilão ${auctionId} finalizado com sucesso!`)
-
     } catch (error: any) {
       console.error('💥 Erro ao finalizar leilão:', error)
+      toast.error(`Erro: ${error.message}`)
     }
   }
 
@@ -1194,9 +872,9 @@ export default function PaginaLeilao() {
     return times
   }
 
-  // FUNÇÃO SIMPLES PARA FILTRAR LEILÕES
+  // Função para filtrar leilões
   const getAuctionsByTab = () => {
-    const filtered = auctions.filter(auction => {
+    return auctions.filter(auction => {
       switch (activeTab) {
         case 'active': return auction.status === 'active'
         case 'pending': return auction.status === 'pending'
@@ -1204,8 +882,6 @@ export default function PaginaLeilao() {
         default: return false
       }
     })
-    
-    return filtered
   }
 
   // Criar objetos compatíveis com os componentes de chat
@@ -1259,6 +935,7 @@ export default function PaginaLeilao() {
             onBid={handlePlaceBid}
             onStartAuction={handleStartAuction}
             onCancelAuction={handleCancelAuction}
+            onFinishAuction={finishAuction}
             bids={bids[auction.id]}
             isAdmin={isAdmin}
             team={team}
@@ -1281,7 +958,10 @@ export default function PaginaLeilao() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <p className="text-2xl text-white animate-pulse">Carregando leilão...</p>
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-orange-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-2xl text-white animate-pulse">Carregando leilão...</p>
+        </div>
       </div>
     )
   }
@@ -1299,10 +979,21 @@ export default function PaginaLeilao() {
       <div className="flex-1 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-orange-950/20 to-zinc-950 text-white p-8">
           <div className="max-w-7xl mx-auto">
-            {/* Header */}
+            {/* Header com botão de refresh */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
               <div>
-                <h1 className="text-5xl font-black text-white mb-2">LEILÃO DE JOGADORES</h1>
+                <div className="flex items-center gap-4">
+                  <h1 className="text-5xl font-black text-white mb-2">LEILÃO DE JOGADORES</h1>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={loadAuctions}
+                    className="hover:bg-zinc-800/50"
+                    title="Recarregar leilões"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                  </Button>
+                </div>
                 <p className="text-zinc-400 text-lg">
                   Adquira os melhores jogadores livres no mercado
                 </p>
@@ -1320,18 +1011,20 @@ export default function PaginaLeilao() {
                   )}
                   <div>
                     <p className="font-semibold text-white">{team.name}</p>
-                    <p className="text-green-400">
-                      Saldo: R$ {formatToMillions(team.balance)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-green-400">
+                        Saldo: R$ {formatToMillions(team.balance)}
+                      </p>
+                      {getSaldoReservado() > 0 && (
+                        <Badge variant="outline" className="text-yellow-400 border-yellow-400/50">
+                          -R$ {formatToMillions(getSaldoReservado())}
+                        </Badge>
+                      )}
+                    </div>
                     {getSaldoReservado() > 0 && (
-                      <div className="text-sm">
-                        <p className="text-yellow-400">
-                          Disponível: R$ {formatToMillions(getSaldoDisponivel())}
-                        </p>
-                        <p className="text-zinc-400">
-                          Reserva: R$ {formatToMillions(getSaldoReservado())}
-                        </p>
-                      </div>
+                      <p className="text-sm text-yellow-400 mt-1">
+                        Disponível: R$ {formatToMillions(getSaldoDisponivel())}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -1573,13 +1266,14 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD ATUALIZADO - CORREÇÃO DO PROBLEMA DE ATUALIZAÇÃO EM TEMPO REAL
+// COMPONENTE AUCTIONCARD ATUALIZADO
 const AuctionCard = ({ 
   auction, 
   type, 
   onBid, 
   onStartAuction, 
-  onCancelAuction, 
+  onCancelAuction,
+  onFinishAuction,
   bids, 
   isAdmin, 
   team,
@@ -1593,72 +1287,51 @@ const AuctionCard = ({
   saldoReservado
 }: any) => {
 
-  // NOVO ESTADO: Opções de lance dinâmicas
   const [bidOptions, setBidOptions] = useState<{ value: number; label: string }[]>([])
-  
-  // NOVO ESTADO: Controlar se o modal de lance está aberto
   const [isBidModalOpen, setIsBidModalOpen] = useState(false)
 
-  // ATUALIZAR OPÇÕES QUANDO O LEILÃO MUDAR E O MODAL ESTIVER ABERTO
+  // Atualizar opções quando o leilão mudar
   useEffect(() => {
     if (auction && isBidModalOpen) {
       const options = generateBidOptions(auction.current_bid)
       setBidOptions(options)
-      console.log('🔄 Opções de lance atualizadas para leilão:', auction.id, 'lance atual:', auction.current_bid)
     }
   }, [auction, isBidModalOpen])
 
-  // NOVO: Sincronizar o estado do modal com biddingAuctionId
+  // Sincronizar modal
   useEffect(() => {
     setIsBidModalOpen(biddingAuctionId === auction.id)
-    
-    // Se o modal está sendo fechado, resetar a seleção
     if (biddingAuctionId !== auction.id) {
       setSelectedBidAmount(null)
     }
   }, [biddingAuctionId, auction.id])
 
-  // NOVA FUNÇÃO: Abrir modal de lance
   const handleOpenBidModal = () => {
     setBiddingAuctionId(auction.id)
     setIsBidModalOpen(true)
-    
-    // Gerar opções imediatamente ao abrir
     const options = generateBidOptions(auction.current_bid)
     setBidOptions(options)
-    setSelectedBidAmount(null) // Resetar seleção ao abrir
+    setSelectedBidAmount(null)
   }
 
-  // NOVA FUNÇÃO: Fechar modal de lance
   const handleCloseBidModal = () => {
     setBiddingAuctionId(null)
     setIsBidModalOpen(false)
     setSelectedBidAmount(null)
   }
 
-  // NOVA FUNÇÃO: Manipular seleção de lance
   const handleBidSelect = (value: string) => {
     const numericValue = parseInt(value)
     if (!isNaN(numericValue)) {
       setSelectedBidAmount(numericValue)
-      console.log('✅ Valor selecionado:', numericValue)
     }
   }
 
-  // NOVA FUNÇÃO: Dar lance com validações
   const handlePlaceBid = async () => {
     if (!selectedBidAmount) {
-      alert('Selecione um valor de lance')
+      toast.error('Selecione um valor de lance')
       return
     }
-
-    console.log('🎯 Tentando dar lance:', {
-      auctionId: auction.id,
-      selectedAmount: selectedBidAmount,
-      currentBid: auction.current_bid,
-      difference: selectedBidAmount - auction.current_bid
-    })
-
     await onBid(auction.id, selectedBidAmount)
   }
 
@@ -1675,21 +1348,13 @@ const AuctionCard = ({
     }
   }
 
-  // Calcular tempo restante em tempo real
   const timeRemaining = calculateTimeRemaining(auction)
-
-  // CORREÇÃO CRÍTICA: Lógica melhorada para mostrar o líder
-  const shouldShowLeader = auction.current_bidder !== null
-
-  // CORREÇÃO: Verificar se o usuário atual é o líder atual
   const isCurrentUserLeader = team && auction.current_bidder === team.id
-
-  // CORREÇÃO: Verificar se tem saldo reservado neste leilão
   const temSaldoReservado = saldoReservado && saldoReservado[auction.id]
 
   return (
     <Card className={cn("p-6 relative", getCardStyles())}>
-      {/* CORREÇÃO: Badge de saldo reservado no canto superior direito */}
+      {/* Badge de saldo reservado */}
       {temSaldoReservado && (
         <Badge className="absolute -top-2 -right-2 bg-blue-500 text-white">
           Reserva
@@ -1720,7 +1385,7 @@ const AuctionCard = ({
               </div>
             </div>
             <div className="text-right">
-              {/* CONTAGEM REGRESSIVA EM TEMPO REAL */}
+              {/* Contagem regressiva */}
               {type === 'active' && timeRemaining > 0 && (
                 <div className="flex items-center gap-1 text-red-400 mb-1">
                   <Timer className="w-4 h-4" />
@@ -1766,8 +1431,8 @@ const AuctionCard = ({
               </span>
             </div>
             
-            {/* CORREÇÃO CRÍTICA: Mostrar líder sempre que houver current_bidder */}
-            {shouldShowLeader && (
+            {/* Mostrar líder */}
+            {auction.current_bidder !== null && (
               <div className={cn(
                 "flex justify-between items-center p-3 rounded-lg border",
                 isCurrentUserLeader 
@@ -1806,7 +1471,7 @@ const AuctionCard = ({
           </>
         )}
 
-        {/* CORREÇÃO: Permitir lances para usuários comuns com time - APENAS COM SELETOR */}
+        {/* Botão de lance */}
         {type === 'active' && timeRemaining > 0 && (
           isBidModalOpen ? (
             <div className="space-y-3 p-4 bg-zinc-800/30 rounded-lg border border-zinc-600">
@@ -1817,7 +1482,6 @@ const AuctionCard = ({
                 </Badge>
               </div>
               
-              {/* SELETOR DE OPÇÕES DE LANCE */}
               <div className="space-y-2">
                 <label className="text-zinc-400 text-sm font-medium">
                   Selecione o valor do lance:
@@ -1825,7 +1489,7 @@ const AuctionCard = ({
                 <Select 
                   onValueChange={handleBidSelect} 
                   value={selectedBidAmount?.toString() || ''}
-                  key={auction.current_bid} // Forçar recriação quando o lance atual mudar
+                  key={auction.current_bid}
                 >
                   <SelectTrigger className="w-full bg-zinc-800/50 border-zinc-600 text-white">
                     <SelectValue placeholder="Selecione um valor de lance" />
@@ -1851,13 +1515,8 @@ const AuctionCard = ({
               
               <div className="text-sm text-yellow-400 text-center p-2 bg-yellow-500/10 rounded">
                 💰 <strong>Lance mínimo:</strong> R$ {formatToMillions(auction.current_bid + 1000000)}
-                <br />
-                <span className="text-zinc-300">
-                  {bidOptions.length} opções disponíveis (incrementos de 1M)
-                </span>
               </div>
 
-              {/* INFO DO LANCE SELECIONADO */}
               {selectedBidAmount && (
                 <div className="p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg">
                   <div className="flex justify-between items-center text-sm">
@@ -1895,7 +1554,7 @@ const AuctionCard = ({
                       Processando...
                     </div>
                   ) : (
-                    `Dar Lance - R$ ${selectedBidAmount ? formatToMillions(selectedBidAmount) : ''}`
+                    `Dar Lance`
                   )}
                 </Button>
               </div>
@@ -1921,6 +1580,15 @@ const AuctionCard = ({
               >
                 <Play className="w-4 h-4 mr-2" />
                 Iniciar Agora
+              </Button>
+            )}
+            {type === 'active' && timeRemaining <= 0 && (
+              <Button
+                onClick={() => onFinishAuction(auction.id)}
+                className="flex-1 bg-red-600 hover:bg-red-700"
+              >
+                <AlertCircle className="w-4 h-4 mr-2" />
+                Finalizar
               </Button>
             )}
             <Button
