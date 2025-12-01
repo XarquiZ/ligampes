@@ -22,7 +22,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import FloatingChatButton from '@/components/FloatingChatButton'
@@ -63,6 +63,7 @@ interface Bid {
   team_id: string
   amount: number
   created_at: string
+  is_leading?: boolean
   team?: {
     name: string
     logo_url: string
@@ -86,7 +87,7 @@ interface UserProfile {
 
 type TabType = 'active' | 'pending' | 'finished'
 
-// NOVA FUNÇÃO: Formatar valores para exibição (ex: 50M)
+// Formatar valores para exibição (ex: 50M)
 const formatToMillions = (value: number): string => {
   if (value >= 1000000) {
     return `${(value / 1000000).toFixed(0)}M`
@@ -94,13 +95,13 @@ const formatToMillions = (value: number): string => {
   return value.toLocaleString('pt-BR')
 }
 
-// NOVA FUNÇÃO: Gerar opções de lance
+// Gerar opções de lance
 const generateBidOptions = (currentBid: number): { value: number; label: string }[] => {
   const options = []
   const minBid = currentBid + 1000000 // Lance mínimo: 1 milhão acima
   
-  for (let i = 0; i < 50; i++) {
-    const bidValue = minBid + (i * 1000000) // Incrementos de 1 milhão
+  for (let i = 0; i < 20; i++) { // Reduzido para 20 opções
+    const bidValue = minBid + (i * 1000000)
     options.push({
       value: bidValue,
       label: `${formatToMillions(bidValue)}`
@@ -110,7 +111,7 @@ const generateBidOptions = (currentBid: number): { value: number; label: string 
   return options
 }
 
-// Hook para saldo reservado específico por time (SIMPLIFICADO)
+// Hook para saldo reservado
 const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
 
@@ -204,7 +205,7 @@ export default function PaginaLeilao() {
     }
   }, [])
 
-  // CONTAGEM REGRESSIVA SEPARADA (apenas para UI)
+  // CONTAGEM REGRESSIVA SEPARADA
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now())
@@ -231,7 +232,6 @@ export default function PaginaLeilao() {
         async (payload) => {
           console.log('🔄 Atualização de leilão em tempo real:', payload)
           
-          // Se for um UPDATE e o leilão está na lista atual
           if (payload.eventType === 'UPDATE') {
             const updatedAuction = payload.new as Auction
             
@@ -771,6 +771,8 @@ export default function PaginaLeilao() {
     isProcessingRef.current = true
 
     try {
+      console.log('📤 Enviando lance para RPC...')
+      
       // Usar RPC com transação atômica
       const { data, error } = await supabase.rpc('place_bid_atomic', {
         p_auction_id: auctionId,
@@ -783,8 +785,10 @@ export default function PaginaLeilao() {
         throw new Error(`Erro técnico: ${error.message}`)
       }
 
+      console.log('📥 Resposta da RPC:', data)
+
       if (!data.success) {
-        toast.error(data.error)
+        toast.error(data.error || 'Erro ao processar lance')
         return
       }
 
@@ -801,6 +805,10 @@ export default function PaginaLeilao() {
       await loadAuctions()
       
       toast.success('Lance realizado com sucesso!')
+      
+      if (data.time_extended) {
+        toast.info('⏰ Tempo do leilão estendido em 30 segundos!')
+      }
 
     } catch (error: any) {
       console.error('❌ ERRO NO LANCE:', error)
@@ -1043,6 +1051,9 @@ export default function PaginaLeilao() {
                       <DialogTitle className="text-2xl font-bold">
                         Criar Novo Leilão
                       </DialogTitle>
+                      <DialogDescription className="text-zinc-400">
+                        Agende um novo leilão para jogadores livres
+                      </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4 py-4">
