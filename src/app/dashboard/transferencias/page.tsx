@@ -36,19 +36,6 @@ function formatDateTime(dateString: string) {
 }
 
 // Função de formatação de moeda
-const formatCurrencyInput = (value: string): string => {
-  // Remove tudo que não é número
-  const onlyNumbers = value.replace(/\D/g, '')
-  if (onlyNumbers === '') return ''
-  
-  // Converte para número e formata
-  const number = parseInt(onlyNumbers) / 100
-  return number.toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-}
-
 const parseCurrencyToNumber = (value: string): number => {
   if (!value) return 0
   const cleaned = value.replace(/\./g, '').replace(',', '.')
@@ -521,7 +508,7 @@ export default function PaginaTransferencias() {
   const pendingCount = allTransfers.filter(t => t.status === 'pending').length
   const completedCount = allTransfers.filter(t => t.status === 'approved').length
 
-  // Funções para o Mercado
+  // Funções para o Mercado - CORRIGIDAS
   const loadMarketData = async () => {
     if (!team?.id) return
     
@@ -541,7 +528,7 @@ export default function PaginaTransferencias() {
             base_price,
             team_id
           ),
-          team:teams!team_id (
+          team:teams!market_listings_team_id_fkey (
             id,
             name,
             logo_url
@@ -561,6 +548,38 @@ export default function PaginaTransferencias() {
       setMarketPlayers(formattedData)
     } catch (error) {
       console.error('Erro ao carregar mercado:', error)
+      // Fallback se a relação não funcionar
+      try {
+        const { data } = await supabase
+          .from('market_listings')
+          .select('*')
+          .eq('is_active', true)
+          .neq('team_id', team.id)
+          .order('created_at', { ascending: false })
+
+        if (data && data.length > 0) {
+          const teamIds = [...new Set(data.map(item => item.team_id))]
+          const { data: teamsData } = await supabase
+            .from('teams')
+            .select('id, name, logo_url')
+            .in('id', teamIds)
+
+          const teamsMap = new Map(
+            teamsData?.map(team => [team.id, team]) || []
+          )
+
+          const formattedData = data.map(item => ({
+            ...item,
+            team_name: teamsMap.get(item.team_id)?.name || 'Time desconhecido',
+            team_logo: teamsMap.get(item.team_id)?.logo_url || null,
+            player: undefined
+          }))
+
+          setMarketPlayers(formattedData)
+        }
+      } catch (fallbackError) {
+        console.error('Erro no fallback:', fallbackError)
+      }
     } finally {
       setLoadingMarket(false)
     }
@@ -592,6 +611,11 @@ export default function PaginaTransferencias() {
             photo_url,
             base_price,
             team_id
+          ),
+          team:teams!market_listings_team_id_fkey (
+            id,
+            name,
+            logo_url
           )
         `)
         .eq('team_id', team.id)
@@ -599,6 +623,8 @@ export default function PaginaTransferencias() {
 
       const formattedMarketData = (marketData || []).map(item => ({
         ...item,
+        team_name: item.team?.name || team?.name || 'Meu Time',
+        team_logo: item.team?.logo_url || team?.logo_url || null,
         player: item.player || undefined
       }))
 
@@ -607,6 +633,46 @@ export default function PaginaTransferencias() {
       console.error('Erro ao carregar meus jogadores:', error)
     }
   }, [team?.id])
+
+  // Handler para mudança de preço - CORRIGIDO (não perde foco)
+  const handlePriceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    
+    // Remove todos os caracteres não numéricos
+    const onlyNumbers = inputValue.replace(/\D/g, '');
+    
+    // Se estiver vazio, retorna vazio
+    if (onlyNumbers === '') {
+      setMarketPrice('');
+      return;
+    }
+    
+    // Converte para número e formata
+    const numericValue = parseInt(onlyNumbers, 10);
+    const formattedValue = (numericValue / 100).toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    
+    setMarketPrice(formattedValue);
+  }, []);
+
+  // Handler para quando o campo de preço perde foco
+  const handlePriceBlur = useCallback(() => {
+    if (marketPrice && parseCurrencyToNumber(marketPrice) > 0) {
+      // Garante que tenha sempre 2 casas decimais
+      const numericValue = parseCurrencyToNumber(marketPrice);
+      setMarketPrice(numericValue.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }));
+    }
+  }, [marketPrice]);
+
+  // Handler para mudança de descrição
+  const handleDescChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setMarketDescription(e.target.value);
+  }, []);
 
   const handleAddToMarket = async () => {
     if (!selectedPlayer || !team?.id || !marketPrice) {
@@ -659,19 +725,25 @@ export default function PaginaTransferencias() {
     }
   }
 
+  // DELETAR REALMENTE o anúncio - CORRIGIDO
   const handleRemoveFromMarket = async (listingId: string) => {
-    if (!confirm('Tem certeza que deseja remover este jogador do mercado?')) return
+    if (!confirm('Tem certeza que deseja REMOVER este jogador do mercado? Esta ação não pode ser desfeita.')) return
 
     try {
+      // DELETA completamente o registro da tabela
       const { error } = await supabase
         .from('market_listings')
-        .update({ is_active: false })
+        .delete()
         .eq('id', listingId)
 
       if (error) throw error
 
-      // Atualizar estado local - remover da lista
+      // Atualizar estado local - remover imediatamente
       setMyMarketPlayers(prev => prev.filter(item => item.id !== listingId))
+      
+      // Se estiver na aba "disponiveis", também remover de lá
+      setMarketPlayers(prev => prev.filter(item => item.id !== listingId))
+      
       alert('✅ Jogador removido do mercado com sucesso!')
     } catch (error: any) {
       console.error('Erro ao remover jogador:', error)
@@ -774,10 +846,10 @@ export default function PaginaTransferencias() {
 
       if (transferError) throw transferError
 
-      // Remover do mercado
+      // Remover do mercado (DELETAR completamente)
       await supabase
         .from('market_listings')
-        .update({ is_active: false })
+        .delete()
         .eq('id', listing.id)
 
       alert('✅ Proposta de compra enviada! Aguarde a aprovação do vendedor.')
@@ -1421,19 +1493,8 @@ export default function PaginaTransferencias() {
     </>
   )
 
-  // Componente principal do Mercado - SIMPLIFICADO
+  // Componente principal do Mercado - CORRIGIDO
   const MercadoView = () => {
-    // Handler para mudança de preço - SIMPLIFICADO
-    const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const formattedValue = formatCurrencyInput(e.target.value)
-      setMarketPrice(formattedValue)
-    }
-
-    // Handler para mudança de descrição - SIMPLIFICADO
-    const handleDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setMarketDescription(e.target.value)
-    }
-
     return (
       <>
         {/* Tabs do Mercado */}
@@ -1544,7 +1605,7 @@ export default function PaginaTransferencias() {
 
                 {selectedPlayer && (
                   <>
-                    {/* Preço - SIMPLIFICADO */}
+                    {/* Preço - CORRIGIDO (não perde foco) */}
                     <div>
                       <label className="text-zinc-400 text-sm font-medium mb-2 block">
                         Preço de Venda
@@ -1555,6 +1616,8 @@ export default function PaginaTransferencias() {
                           placeholder="0,00"
                           value={marketPrice}
                           onChange={handlePriceChange}
+                          onBlur={handlePriceBlur}
+                          onFocus={(e) => e.target.select()}
                           className="pl-10 bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
@@ -1563,7 +1626,7 @@ export default function PaginaTransferencias() {
                       </p>
                     </div>
 
-                    {/* Descrição - SIMPLIFICADA */}
+                    {/* Descrição - CORRIGIDA */}
                     <div>
                       <label className="text-zinc-400 text-sm font-medium mb-2 block">
                         Descrição (opcional)
