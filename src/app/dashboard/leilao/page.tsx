@@ -100,7 +100,7 @@ const generateBidOptions = (currentBid: number): { value: number; label: string 
   const options = []
   const minBid = currentBid + 1000000 // Lance mínimo: 1 milhão acima
   
-  for (let i = 0; i < 20; i++) { // Reduzido para 20 opções
+  for (let i = 0; i < 20; i++) {
     const bidValue = minBid + (i * 1000000)
     options.push({
       value: bidValue,
@@ -553,44 +553,6 @@ export default function PaginaLeilao() {
     return Math.max(0, endTime - currentTime)
   }, [currentTime])
 
-  // Função startPendingAuction
-  const startPendingAuction = async (auctionId: string) => {
-    try {
-      console.log(`🎬 Iniciando leilão pendente: ${auctionId}`)
-      
-      const { data: auctionData } = await supabase
-        .from('auctions')
-        .select('*')
-        .eq('id', auctionId)
-        .single()
-
-      if (!auctionData) {
-        toast.error('Leilão não encontrado')
-        return
-      }
-
-      let durationMinutes = auctionData.auction_duration || 5
-
-      const { error } = await supabase
-        .from('auctions')
-        .update({ 
-          status: 'active',
-          start_time: new Date().toISOString(),
-          end_time: new Date(Date.now() + durationMinutes * 60000).toISOString()
-        })
-        .eq('id', auctionId)
-
-      if (error) throw error
-
-      toast.success('Leilão iniciado com sucesso!')
-      await loadAuctions()
-
-    } catch (error: any) {
-      console.error('❌ Erro ao iniciar leilão:', error)
-      toast.error(`Erro: ${error.message}`)
-    }
-  }
-
   const formatTimeRemaining = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
     const seconds = Math.floor((ms % 60000) / 1000)
@@ -748,7 +710,7 @@ export default function PaginaLeilao() {
     }
   }
 
-  // FUNÇÃO ATUALIZADA: Dar lance usando RPC atômica
+  // FUNÇÃO CORRIGIDA: Dar lance usando RPC atômica
   const handlePlaceBid = async (auctionId: string, amount: number) => {
     console.log(`💰 LANCE ATÔMICO - Leilão: ${auctionId}, Valor: ${amount}`)
     
@@ -771,7 +733,13 @@ export default function PaginaLeilao() {
     isProcessingRef.current = true
 
     try {
-      console.log('📤 Enviando lance para RPC...')
+      console.log('📤 Enviando lance para RPC...', {
+        auctionId,
+        teamId: team.id,
+        amount,
+        teamBalance: team.balance,
+        time: new Date().toISOString()
+      })
       
       // Usar RPC com transação atômica
       const { data, error } = await supabase.rpc('place_bid_atomic', {
@@ -780,15 +748,16 @@ export default function PaginaLeilao() {
         p_amount: amount
       })
 
+      console.log('📥 Resposta da RPC:', { data, error })
+
       if (error) {
         console.error('❌ Erro na RPC:', error)
-        throw new Error(`Erro técnico: ${error.message}`)
+        throw new Error(`Erro ao processar lance: ${error.message}`)
       }
 
-      console.log('📥 Resposta da RPC:', data)
-
-      if (!data.success) {
-        toast.error(data.error || 'Erro ao processar lance')
+      if (!data || !data.success) {
+        const errorMessage = data?.error || 'Erro desconhecido ao processar lance'
+        toast.error(errorMessage)
         return
       }
 
@@ -804,7 +773,7 @@ export default function PaginaLeilao() {
       // Recarregar dados
       await loadAuctions()
       
-      toast.success('Lance realizado com sucesso!')
+      toast.success(data.message || 'Lance realizado com sucesso!')
       
       if (data.time_extended) {
         toast.info('⏰ Tempo do leilão estendido em 30 segundos!')
@@ -1277,7 +1246,7 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD ATUALIZADO
+// COMPONENTE AUCTIONCARD
 const AuctionCard = ({ 
   auction, 
   type, 
