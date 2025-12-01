@@ -17,7 +17,8 @@ import {
   RefreshCw,
   AlertCircle,
   Lock,
-  Trash2
+  Trash2,
+  PartyPopper
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -91,6 +92,15 @@ interface UserProfile {
 
 type TabType = 'active' | 'pending' | 'finished'
 
+// Estado para notificações de vitória
+interface WinNotification {
+  auctionId: string
+  playerName: string
+  amount: number
+  teamName: string
+  show: boolean
+}
+
 // Formatar valores para exibição (ex: 50M)
 const formatToMillions = (value: number): string => {
   if (value >= 1000000) {
@@ -120,7 +130,6 @@ const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
   const [isLoading, setIsLoading] = useState(false)
 
-  // Carregar saldo reservado pendente do banco de dados
   const loadPendingReserves = useCallback(async (teamId: string) => {
     if (!teamId) return
     
@@ -332,7 +341,6 @@ const useSaldoReservado = (teamId: string | null) => {
 
   const verificarLeiloesAtivos = async (teamId: string, auctionIds: string[]) => {
     try {
-      // Para cada saldo reservado, verificar se o leilão ainda existe e está ativo
       const leiloesParaManter: string[] = []
       
       for (const auctionId of auctionIds) {
@@ -397,6 +405,9 @@ export default function PaginaLeilao() {
   const [bidding, setBidding] = useState(false)
   const [bids, setBids] = useState<{[key: string]: Bid[]}>({})
 
+  // Estado para notificações de vitória
+  const [winNotification, setWinNotification] = useState<WinNotification | null>(null)
+
   // Hook de saldo reservado
   const {
     saldoReservado,
@@ -421,7 +432,6 @@ export default function PaginaLeilao() {
     loadInitialData()
     
     return () => {
-      // Limpar todas as subscriptions ao desmontar
       subscriptionsRef.current.forEach(sub => {
         supabase.removeChannel(sub)
       })
@@ -457,7 +467,6 @@ export default function PaginaLeilao() {
           event: '*',
           schema: 'public',
           table: 'auctions',
-          filter: 'status=eq.active'
         },
         async (payload) => {
           console.log('🔄 Atualização de leilão em tempo real:', payload)
@@ -473,7 +482,7 @@ export default function PaginaLeilao() {
                 player:players(*),
                 current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
               `)
-              .eq('id', updatedAuction.id)
+              .eq('id', payload.new.id)
               .single()
             
             if (fullAuction) {
@@ -487,15 +496,31 @@ export default function PaginaLeilao() {
                       ? Math.max(0, new Date(fullAuction.end_time).getTime() - currentTime)
                       : 0
                   }
+                  
+                  // Verificar se o leilão acabou E o usuário atual é o vencedor
+                  if (fullAuction.status === 'finished' && 
+                      fullAuction.current_bidder === team.id) {
+                    
+                    // Mostrar notificação de vitória
+                    setWinNotification({
+                      auctionId: fullAuction.id,
+                      playerName: fullAuction.player?.name || 'Jogador',
+                      amount: fullAuction.current_bid,
+                      teamName: team.name,
+                      show: true
+                    })
+                  }
+                  
                   return newAuctions
+                } else {
+                  return [...prev, {
+                    ...fullAuction,
+                    time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
+                      ? Math.max(0, new Date(fullAuction.end_time).getTime() - currentTime)
+                      : 0
+                  }]
                 }
-                return prev
               })
-
-              // Se o usuário atual perdeu o leilão, liberar saldo
-              if (team && updatedAuction.current_bidder !== team.id) {
-                liberarSaldo(updatedAuction.id, team.id)
-              }
             }
           }
         }
@@ -508,37 +533,40 @@ export default function PaginaLeilao() {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
-          table: 'bids'
+          table: 'bids',
         },
         async (payload) => {
-          const newBid = payload.new as Bid
-          console.log('💰 Novo lance em tempo real:', newBid)
+          console.log('💰 Atualização de lance em tempo real:', payload)
           
-          // Carregar lances atualizados para este leilão
-          const { data: updatedBids } = await supabase
-            .from('bids')
-            .select(`
-              *,
-              team:teams(name, logo_url)
-            `)
-            .eq('auction_id', newBid.auction_id)
-            .order('created_at', { ascending: false })
+          // Verificar se temos auction_id
+          const auctionId = payload.new?.auction_id || payload.old?.auction_id
           
-          if (updatedBids) {
-            setBids(prev => ({
-              ...prev,
-              [newBid.auction_id]: updatedBids
-            }))
+          if (!auctionId) {
+            console.log('❌ Sem auction_id no payload:', payload)
+            return
           }
-
-          // Se o lance não é do time atual, liberar saldo reservado se houver
-          if (team && newBid.team_id !== team.id) {
-            // Verificar se temos saldo reservado neste leilão
-            if (saldoReservado[newBid.auction_id]) {
-              await liberarSaldo(newBid.auction_id, team.id)
+          
+          try {
+            // Carregar lances atualizados para este leilão
+            const { data: updatedBids } = await supabase
+              .from('bids')
+              .select(`
+                *,
+                team:teams(name, logo_url)
+              `)
+              .eq('auction_id', auctionId)
+              .order('created_at', { ascending: false })
+            
+            if (updatedBids) {
+              setBids(prev => ({
+                ...prev,
+                [auctionId]: updatedBids
+              }))
             }
+          } catch (error) {
+            console.error('❌ Erro ao carregar lances atualizados:', error)
           }
         }
       )
@@ -571,32 +599,53 @@ export default function PaginaLeilao() {
     }
   }, [user, team, currentTime, saldoReservado, liberarSaldo])
 
-  // VERIFICAR LEILÕES EXPIRADOS PERIODICAMENTE
+  // VERIFICAR LEILÕES EXPIRADOS PERIODICAMENTE (com verificação mais precisa)
   useEffect(() => {
     if (!team || auctions.length === 0) return
     
     const checkExpiredAuctions = async () => {
       try {
-        // Chamar a função RPC para verificar leilões expirados
-        const { data: count, error } = await supabase.rpc('check_and_finish_expired_auctions')
+        // Verificar leilões ativos que expiraram
+        const now = new Date()
         
-        if (error) {
-          console.error('❌ Erro ao verificar leilões expirados:', error)
-        } else if (count && count > 0) {
-          console.log(`✅ ${count} leilão(ões) expirado(s) finalizado(s)`)
-          // Recarregar dados se algum leilão foi finalizado
-          await loadAuctions()
+        for (const auction of auctions.filter(a => a.status === 'active')) {
+          if (auction.end_time && new Date(auction.end_time) <= now) {
+            console.log(`⏰ Leilão ${auction.id} expirou, finalizando...`)
+            
+            // Chamar a função RPC para finalizar leilão expirado
+            const { data: result, error } = await supabase.rpc('finalize_expired_auction', {
+              p_auction_id: auction.id
+            })
+            
+            if (error) {
+              console.error('❌ Erro ao finalizar leilão expirado:', error)
+            } else if (result && result.success) {
+              console.log('✅ Leilão finalizado:', result.message)
+              
+              // Se o usuário atual é o vencedor, mostrar notificação
+              if (result.winner_team_id === team.id) {
+                setWinNotification({
+                  auctionId: auction.id,
+                  playerName: auction.player?.name || 'Jogador',
+                  amount: auction.current_bid,
+                  teamName: team.name,
+                  show: true
+                })
+              }
+            }
+          }
         }
+        
       } catch (error) {
         console.error('❌ Erro na verificação de leilões expirados:', error)
       }
     }
     
-    // Verificar a cada 30 segundos
-    const interval = setInterval(checkExpiredAuctions, 30000)
+    // Verificar a cada 10 segundos (mais frequente)
+    const interval = setInterval(checkExpiredAuctions, 10000)
     
     return () => clearInterval(interval)
-  }, [team, auctions.length])
+  }, [team, auctions])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -1116,47 +1165,6 @@ export default function PaginaLeilao() {
     }
   }
 
-  // Função finishAuction (apenas para emergência)
-  const finishAuction = async (auctionId: string) => {
-    try {
-      console.log(`🏁 Finalizando leilão manualmente: ${auctionId}`)
-      
-      const { data: auctionData } = await supabase
-        .from('auctions')
-        .select(`
-          *,
-          player:players(*),
-          current_bidder_team:teams!auctions_current_bidder_fkey(*)
-        `)
-        .eq('id', auctionId)
-        .single()
-
-      if (!auctionData || auctionData.status !== 'active') {
-        toast.info('Leilão já finalizado ou não encontrado')
-        return
-      }
-
-      // Chamar função RPC para finalizar
-      const { data: count, error } = await supabase.rpc('check_and_finish_expired_auctions')
-      
-      if (error) {
-        throw error
-      }
-
-      toast.success('Leilão finalizado com sucesso!')
-      await loadAuctions()
-      
-      // Recarregar saldos reservados
-      if (team?.id) {
-        await loadPendingReserves(team.id)
-      }
-      
-    } catch (error: any) {
-      console.error('💥 Erro ao finalizar leilão:', error)
-      toast.error(`Erro: ${error.message}`)
-    }
-  }
-
   const resetCreateAuctionForm = () => {
     setSelectedPlayer('')
     setStartPrice('')
@@ -1244,7 +1252,6 @@ export default function PaginaLeilao() {
             onBid={handlePlaceBid}
             onStartAuction={handleStartAuction}
             onCancelAuction={handleCancelAuction}
-            onFinishAuction={finishAuction}
             bids={bids[auction.id]}
             isAdmin={isAdmin}
             team={team}
@@ -1289,6 +1296,46 @@ export default function PaginaLeilao() {
       {/* Conteúdo Principal */}
       <div className="flex-1 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-orange-950/20 to-zinc-950 text-white p-8">
+          {/* NOTIFICAÇÃO DE VITÓRIA */}
+          {winNotification?.show && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <div className="bg-gradient-to-br from-yellow-600/90 to-orange-600/90 rounded-2xl p-8 max-w-md w-full mx-4 border-2 border-yellow-400/50 shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="text-center">
+                  <div className="flex justify-center mb-6">
+                    <div className="relative">
+                      <Trophy className="w-20 h-20 text-yellow-300" />
+                      <PartyPopper className="w-8 h-8 text-pink-400 absolute -top-2 -right-2 animate-bounce" />
+                    </div>
+                  </div>
+                  
+                  <h2 className="text-3xl font-bold text-white mb-2">🎉 PARABÉNS! 🎉</h2>
+                  <p className="text-yellow-100 text-lg mb-4">Você venceu o leilão!</p>
+                  
+                  <div className="bg-black/30 rounded-xl p-4 mb-6">
+                    <p className="text-white font-semibold text-xl">{winNotification.playerName}</p>
+                    <p className="text-yellow-300 text-2xl font-bold mt-2">
+                      R$ {formatToMillions(winNotification.amount)}
+                    </p>
+                    <p className="text-yellow-100 text-sm mt-1">
+                      Agora faz parte do <span className="font-bold">{winNotification.teamName}</span>!
+                    </p>
+                  </div>
+                  
+                  <Button
+                    onClick={() => setWinNotification(null)}
+                    className="bg-white text-orange-600 hover:bg-yellow-100 font-bold py-3 px-8 text-lg"
+                  >
+                    Fechar
+                  </Button>
+                  
+                  <p className="text-yellow-200/70 text-sm mt-4">
+                    O jogador foi adicionado ao seu elenco e o valor foi debitado do seu saldo.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="max-w-7xl mx-auto">
             {/* Header com botão de refresh */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
@@ -1601,14 +1648,13 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD
+// COMPONENTE AUCTIONCARD ATUALIZADO (sem botão de finalizar)
 const AuctionCard = ({ 
   auction, 
   type, 
   onBid, 
   onStartAuction, 
   onCancelAuction,
-  onFinishAuction,
   bids, 
   isAdmin, 
   team,
@@ -1960,15 +2006,6 @@ const AuctionCard = ({
               >
                 <Play className="w-4 h-4 mr-2" />
                 Iniciar Agora
-              </Button>
-            )}
-            {type === 'active' && timeRemaining <= 0 && (
-              <Button
-                onClick={() => onFinishAuction(auction.id)}
-                className="flex-1 bg-red-600 hover:bg-red-700"
-              >
-                <AlertCircle className="w-4 h-4 mr-2" />
-                Finalizar
               </Button>
             )}
             <Button
