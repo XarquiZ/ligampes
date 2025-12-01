@@ -1,12 +1,12 @@
 // src/app/dashboard/transferencias/page.tsx
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { 
   CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
   Calendar, Users, ArrowRightLeft, X, Ban, Tag, ShoppingCart, 
-  Plus, Trash2, Edit, Save, XCircle, Info 
+  Plus, Trash2, Edit, Save, XCircle, Info, FileText, Check
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -33,13 +33,6 @@ function formatDateTime(dateString: string) {
     date: date.toLocaleDateString('pt-BR'),
     time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
-}
-
-// Função de formatação de moeda
-const parseCurrencyToNumber = (value: string): number => {
-  if (!value) return 0
-  const cleaned = value.replace(/\./g, '').replace(',', '.')
-  return parseFloat(cleaned) || 0
 }
 
 interface UserProfile {
@@ -91,6 +84,106 @@ interface Player {
   team_id: string | null
 }
 
+// Modal para descrição
+const DescriptionModal = ({
+  isOpen,
+  onClose,
+  initialText,
+  onSave,
+  playerName
+}: {
+  isOpen: boolean
+  onClose: () => void
+  initialText: string
+  onSave: (text: string) => void
+  playerName: string
+}) => {
+  const [text, setText] = useState(initialText)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (isOpen && textareaRef.current) {
+      textareaRef.current.focus()
+      setText(initialText)
+    }
+  }, [isOpen, initialText])
+
+  const handleSave = () => {
+    onSave(text.trim())
+    onClose()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose()
+    }
+    if (e.key === 'Enter' && e.ctrlKey) {
+      handleSave()
+    }
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div 
+        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6"
+        onKeyDown={handleKeyDown}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-blue-400" />
+            <h3 className="text-lg font-bold text-white">Descrição para {playerName}</h3>
+          </div>
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-zinc-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        
+        <div className="mb-4">
+          <p className="text-zinc-400 text-sm mb-2">
+            Escreva uma descrição para o jogador (opcional)
+          </p>
+          <Textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Ex: Preciso de grana para reforçar o time, jogador não se adaptou ao sistema..."
+            className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none min-h-[120px]"
+            rows={4}
+          />
+        </div>
+        
+        <div className="flex justify-end gap-3">
+          <Button
+            onClick={onClose}
+            variant="outline"
+            className="text-white border-zinc-600 hover:bg-zinc-800"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSave}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Check className="w-4 h-4 mr-2" />
+            Aplicar Descrição
+          </Button>
+        </div>
+        
+        <div className="mt-3 text-xs text-zinc-500">
+          Dica: Pressione <kbd className="px-1.5 py-0.5 bg-zinc-800 rounded">Ctrl+Enter</kbd> para salvar
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PaginaTransferencias() {
   // Switch principal entre Transferências e Mercado
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
@@ -111,7 +204,7 @@ export default function PaginaTransferencias() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // Estados para o Mercado - SIMPLIFICADOS
+  // Estados para o Mercado
   const [marketPlayers, setMarketPlayers] = useState<MarketPlayer[]>([])
   const [myMarketPlayers, setMyMarketPlayers] = useState<MarketPlayer[]>([])
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([])
@@ -124,6 +217,12 @@ export default function PaginaTransferencias() {
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
   const [editDescriptionText, setEditDescriptionText] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
+  
+  // Novos estados para o modal de descrição
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false)
+  
+  // Estados para o seletor de preços
+  const [priceOptions, setPriceOptions] = useState<{ value: number; label: string }[]>([])
 
   // Carregar dados do usuário e time
   useEffect(() => {
@@ -209,6 +308,27 @@ export default function PaginaTransferencias() {
       subscription.unsubscribe()
     }
   }, [user])
+
+  // Gerar opções de preço quando um jogador é selecionado
+  useEffect(() => {
+    if (selectedPlayer) {
+      const basePrice = selectedPlayer.base_price
+      const options = []
+      
+      // Cria 100 opções, de 1M em 1M, começando do valor base
+      for (let i = 0; i < 100; i++) {
+        const value = basePrice + (i * 1_000_000)
+        options.push({
+          value,
+          label: `R$ ${value.toLocaleString('pt-BR')}`
+        })
+      }
+      
+      setPriceOptions(options)
+      // Define o primeiro valor como padrão (valor base)
+      setMarketPrice(`R$ ${basePrice.toLocaleString('pt-BR')}`)
+    }
+  }, [selectedPlayer])
 
   // Carregar dados do usuário
   const loadUserData = async () => {
@@ -508,7 +628,7 @@ export default function PaginaTransferencias() {
   const pendingCount = allTransfers.filter(t => t.status === 'pending').length
   const completedCount = allTransfers.filter(t => t.status === 'approved').length
 
-  // Funções para o Mercado - CORRIGIDAS
+  // Funções para o Mercado - ATUALIZADAS
   const loadMarketData = async () => {
     if (!team?.id) return
     
@@ -634,45 +754,23 @@ export default function PaginaTransferencias() {
     }
   }, [team?.id])
 
-  // Handler para mudança de preço - CORRIGIDO (não perde foco)
-  const handlePriceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    
-    // Remove todos os caracteres não numéricos
-    const onlyNumbers = inputValue.replace(/\D/g, '');
-    
-    // Se estiver vazio, retorna vazio
-    if (onlyNumbers === '') {
-      setMarketPrice('');
-      return;
-    }
-    
-    // Converte para número e formata
-    const numericValue = parseInt(onlyNumbers, 10);
-    const formattedValue = (numericValue / 100).toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    
-    setMarketPrice(formattedValue);
-  }, []);
+  // Handler para mudança de preço (seletor)
+  const handlePriceChange = (value: string) => {
+    setMarketPrice(value)
+  }
 
-  // Handler para quando o campo de preço perde foco
-  const handlePriceBlur = useCallback(() => {
-    if (marketPrice && parseCurrencyToNumber(marketPrice) > 0) {
-      // Garante que tenha sempre 2 casas decimais
-      const numericValue = parseCurrencyToNumber(marketPrice);
-      setMarketPrice(numericValue.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }));
-    }
-  }, [marketPrice]);
+  // Handler para modal de descrição
+  const handleOpenDescriptionModal = () => {
+    setShowDescriptionModal(true)
+  }
 
-  // Handler para mudança de descrição
-  const handleDescChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMarketDescription(e.target.value);
-  }, []);
+  const handleCloseDescriptionModal = () => {
+    setShowDescriptionModal(false)
+  }
+
+  const handleSaveDescription = (text: string) => {
+    setMarketDescription(text)
+  }
 
   const handleAddToMarket = async () => {
     if (!selectedPlayer || !team?.id || !marketPrice) {
@@ -680,7 +778,16 @@ export default function PaginaTransferencias() {
       return
     }
 
-    const price = parseCurrencyToNumber(marketPrice)
+    // Extrai o valor numérico do preço selecionado
+    const priceMatch = marketPrice.match(/R\$\s?([\d.,]+)/)
+    if (!priceMatch) {
+      alert('Preço inválido')
+      return
+    }
+
+    const priceString = priceMatch[1].replace(/\./g, '').replace(',', '.')
+    const price = parseFloat(priceString)
+    
     if (isNaN(price) || price <= 0) {
       alert('Preço inválido')
       return
@@ -713,6 +820,7 @@ export default function PaginaTransferencias() {
       setMarketPrice('')
       setMarketDescription('')
       setShowAddForm(false)
+      setShowDescriptionModal(false)
       
       alert('✅ Jogador anunciado no mercado com sucesso!')
       loadMarketData()
@@ -725,7 +833,7 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // DELETAR REALMENTE o anúncio - CORRIGIDO
+  // DELETAR REALMENTE o anúncio
   const handleRemoveFromMarket = async (listingId: string) => {
     if (!confirm('Tem certeza que deseja REMOVER este jogador do mercado? Esta ação não pode ser desfeita.')) return
 
@@ -1493,7 +1601,7 @@ export default function PaginaTransferencias() {
     </>
   )
 
-  // Componente principal do Mercado - CORRIGIDO
+  // Componente principal do Mercado - ATUALIZADO
   const MercadoView = () => {
     return (
       <>
@@ -1573,6 +1681,8 @@ export default function PaginaTransferencias() {
                         )}
                         onClick={() => {
                           setSelectedPlayer(player)
+                          // Resetar descrição quando mudar jogador
+                          setMarketDescription('')
                         }}
                       >
                         {player.photo_url ? (
@@ -1605,40 +1715,74 @@ export default function PaginaTransferencias() {
 
                 {selectedPlayer && (
                   <>
-                    {/* Preço - CORRIGIDO (não perde foco) */}
+                    {/* Preço - SELEÇÃO DE OPÇÕES (100 opções de 1M em 1M) */}
                     <div>
                       <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                        Preço de Venda
+                        Selecione o Preço de Venda
                       </label>
                       <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-                        <Input
-                          placeholder="0,00"
+                        <select
                           value={marketPrice}
-                          onChange={handlePriceChange}
-                          onBlur={handlePriceBlur}
-                          onFocus={(e) => e.target.select()}
-                          className="pl-10 bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
+                          onChange={(e) => handlePriceChange(e.target.value)}
+                          className="w-full p-3 bg-zinc-800/50 border border-zinc-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
+                        >
+                          <option value="">Selecione um preço...</option>
+                          {priceOptions.map((option, index) => (
+                            <option 
+                              key={index} 
+                              value={option.label}
+                              className="bg-zinc-800 text-white"
+                            >
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                          <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
                       </div>
                       <p className="text-zinc-500 text-xs mt-1">
                         Valor base do jogador: R$ {selectedPlayer.base_price.toLocaleString('pt-BR')}
+                        <span className="block mt-1">
+                          Seleção de 100 opções a partir do valor base, aumentando R$ 1.000.000 a cada opção
+                        </span>
                       </p>
                     </div>
 
-                    {/* Descrição - CORRIGIDA */}
+                    {/* Descrição - BOTÃO PARA ABRIR MODAL */}
                     <div>
-                      <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                        Descrição (opcional)
-                        <span className="text-zinc-500 ml-1">- Por que está colocando à venda?</span>
-                      </label>
-                      <Textarea
-                        placeholder="Ex: Preciso de grana para reforçar o time, jogador não se adaptou ao sistema..."
-                        value={marketDescription}
-                        onChange={handleDescChange}
-                        className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                        rows={3}
-                      />
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-zinc-400 text-sm font-medium">
+                          Descrição (opcional)
+                        </label>
+                        <Button
+                          type="button"
+                          onClick={handleOpenDescriptionModal}
+                          variant="outline"
+                          size="sm"
+                          className="text-blue-400 border-blue-400/30 hover:bg-blue-400/10"
+                        >
+                          <FileText className="w-4 h-4 mr-2" />
+                          {marketDescription ? 'Editar Descrição' : 'Adicionar Descrição'}
+                        </Button>
+                      </div>
+                      
+                      {/* Visualização da descrição atual */}
+                      {marketDescription ? (
+                        <div className="mt-2 p-3 bg-zinc-800/30 rounded-lg border border-zinc-700">
+                          <p className="text-zinc-300 text-sm">{marketDescription}</p>
+                        </div>
+                      ) : (
+                        <p className="text-zinc-500 text-sm italic">
+                          Nenhuma descrição adicionada. Clique no botão acima para adicionar uma descrição.
+                        </p>
+                      )}
+                      
+                      <p className="text-zinc-500 text-xs mt-1">
+                        Por que está colocando à venda?
+                      </p>
                     </div>
 
                     {/* Botões */}
@@ -1794,6 +1938,15 @@ export default function PaginaTransferencias() {
             />
           </>
         )}
+
+        {/* Modal de Descrição */}
+        <DescriptionModal
+          isOpen={showDescriptionModal}
+          onClose={handleCloseDescriptionModal}
+          initialText={marketDescription}
+          onSave={handleSaveDescription}
+          playerName={selectedPlayer?.name || 'Jogador'}
+        />
       </div>
     </div>
   )
