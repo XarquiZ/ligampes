@@ -2,11 +2,12 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { 
   CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
   Calendar, Users, ArrowRightLeft, X, Ban, Tag, ShoppingCart, 
-  Plus, Trash2, Edit, Save, XCircle, Info, FileText, Check
+  Plus, Trash2, Edit, Save, XCircle, Info, FileText, Check, ExternalLink
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -185,6 +186,7 @@ const DescriptionModal = ({
 }
 
 export default function PaginaTransferencias() {
+  const router = useRouter()
   // Switch principal entre Transferências e Mercado
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
   
@@ -718,7 +720,7 @@ export default function PaginaTransferencias() {
 
       setAvailablePlayers(playersData || [])
 
-      // Carregar meus jogadores no mercado
+      // Carregar meus jogadores no mercado (SOMENTE os ativos)
       const { data: marketData } = await supabase
         .from('market_listings')
         .select(`
@@ -739,6 +741,7 @@ export default function PaginaTransferencias() {
           )
         `)
         .eq('team_id', team.id)
+        .eq('is_active', true) // IMPORTANTE: Somente jogadores ativos no mercado
         .order('created_at', { ascending: false })
 
       const formattedMarketData = (marketData || []).map(item => ({
@@ -770,6 +773,11 @@ export default function PaginaTransferencias() {
 
   const handleSaveDescription = (text: string) => {
     setMarketDescription(text)
+  }
+
+  // Função para navegar para a página de jogadores com o card expandido
+  const navigateToPlayerPage = (playerId: string) => {
+    router.push(`/dashboard/jogadores#player-${playerId}`)
   }
 
   const handleAddToMarket = async () => {
@@ -823,8 +831,12 @@ export default function PaginaTransferencias() {
       setShowDescriptionModal(false)
       
       alert('✅ Jogador anunciado no mercado com sucesso!')
-      loadMarketData()
-      loadMyPlayers()
+      
+      // Recarregar dados SEM deixar duplicado
+      await Promise.all([
+        loadMarketData(),
+        loadMyPlayers()
+      ])
     } catch (error: any) {
       console.error('Erro ao anunciar jogador:', error)
       alert(`Erro: ${error.message}`)
@@ -1010,7 +1022,7 @@ export default function PaginaTransferencias() {
         </div>
 
         {/* Player info */}
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 mb-3 cursor-pointer" onClick={() => navigateToPlayerPage(player.id)}>
           {player.photo_url ? (
             <img 
               src={player.photo_url} 
@@ -1022,11 +1034,16 @@ export default function PaginaTransferencias() {
               <span className="text-lg font-black text-white">{player.position}</span>
             </div>
           )}
-          <div>
-            <h3 className="font-bold text-lg text-white">{player.name}</h3>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-purple-600">{player.position}</Badge>
-              <Badge className="bg-yellow-600">OVR {player.overall}</Badge>
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg text-white">{player.name}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className="bg-purple-600">{player.position}</Badge>
+                  <Badge className="bg-yellow-600">OVR {player.overall}</Badge>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-zinc-500 hover:text-white transition-colors" />
             </div>
           </div>
         </div>
