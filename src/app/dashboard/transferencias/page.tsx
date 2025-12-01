@@ -90,7 +90,7 @@ interface MarketPlayer {
     overall: number
     photo_url: string | null
     base_price: number
-    club?: string
+    team_id: string | null
   }
 }
 
@@ -102,7 +102,6 @@ interface Player {
   photo_url: string | null
   base_price: number
   team_id: string | null
-  club?: string
 }
 
 export default function PaginaTransferencias() {
@@ -125,7 +124,7 @@ export default function PaginaTransferencias() {
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // Estados para o Mercado
+  // Estados para o Mercado - SIMPLIFICADOS
   const [marketPlayers, setMarketPlayers] = useState<MarketPlayer[]>([])
   const [myMarketPlayers, setMyMarketPlayers] = useState<MarketPlayer[]>([])
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([])
@@ -540,7 +539,7 @@ export default function PaginaTransferencias() {
             overall,
             photo_url,
             base_price,
-            club
+            team_id
           ),
           team:teams!team_id (
             id,
@@ -592,7 +591,7 @@ export default function PaginaTransferencias() {
             overall,
             photo_url,
             base_price,
-            club
+            team_id
           )
         `)
         .eq('team_id', team.id)
@@ -671,9 +670,9 @@ export default function PaginaTransferencias() {
 
       if (error) throw error
 
+      // Atualizar estado local - remover da lista
+      setMyMarketPlayers(prev => prev.filter(item => item.id !== listingId))
       alert('✅ Jogador removido do mercado com sucesso!')
-      loadMarketData()
-      loadMyPlayers()
     } catch (error: any) {
       console.error('Erro ao remover jogador:', error)
       alert(`Erro: ${error.message}`)
@@ -697,11 +696,16 @@ export default function PaginaTransferencias() {
 
       if (error) throw error
 
+      // Atualizar estado local
+      setMyMarketPlayers(prev => prev.map(item => 
+        item.id === listingId 
+          ? { ...item, description: editDescriptionText.trim() }
+          : item
+      ))
+      
       setEditingDescription(null)
       setEditDescriptionText('')
       alert('✅ Descrição atualizada com sucesso!')
-      loadMarketData()
-      loadMyPlayers()
     } catch (error: any) {
       console.error('Erro ao atualizar descrição:', error)
       alert(`Erro: ${error.message}`)
@@ -711,15 +715,6 @@ export default function PaginaTransferencias() {
   const handleStartEditDescription = (listing: MarketPlayer) => {
     setEditingDescription(listing.id)
     setEditDescriptionText(listing.description || '')
-    
-    // Foco no textarea após um pequeno delay para garantir renderização
-    setTimeout(() => {
-      const textarea = document.getElementById(`edit-desc-${listing.id}`) as HTMLTextAreaElement
-      if (textarea) {
-        textarea.focus()
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length)
-      }
-    }, 10)
   }
 
   const handleCancelEdit = () => {
@@ -789,7 +784,6 @@ export default function PaginaTransferencias() {
       
       // Recarregar dados
       loadMarketData()
-      loadMyPlayers()
       
       // Alternar para a view de transferências para ver a proposta
       setActiveView('transferencias')
@@ -799,7 +793,7 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // Componente para exibir jogador do mercado - CORRIGIDO (substring error)
+  // Componente para exibir jogador do mercado
   const MarketPlayerCard = ({ listing, isMine = false }: { listing: MarketPlayer, isMine?: boolean }) => {
     const player = listing.player || {
       id: listing.player_id,
@@ -808,7 +802,7 @@ export default function PaginaTransferencias() {
       overall: 0,
       photo_url: null,
       base_price: 0,
-      club: 'Sem Clube'
+      team_id: null
     }
 
     const teamName = listing.team_name || 'Time desconhecido'
@@ -923,7 +917,7 @@ export default function PaginaTransferencias() {
     )
   }
 
-  // Componente para editar descrição - CORRIGIDO (problema de foco)
+  // Componente para editar descrição
   const EditDescriptionForm = ({ listing }: { listing: MarketPlayer }) => {
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       // Permite submeter com Ctrl+Enter
@@ -940,7 +934,6 @@ export default function PaginaTransferencias() {
     return (
       <div className="mt-3 space-y-2">
         <Textarea
-          id={`edit-desc-${listing.id}`}
           value={editDescriptionText}
           onChange={(e) => setEditDescriptionText(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -1428,28 +1421,16 @@ export default function PaginaTransferencias() {
     </>
   )
 
-  // Componente principal do Mercado - CORRIGIDO (problema de foco nos inputs)
+  // Componente principal do Mercado - SIMPLIFICADO
   const MercadoView = () => {
-    const [priceInputValue, setPriceInputValue] = useState(marketPrice)
-    const [descInputValue, setDescInputValue] = useState(marketDescription)
-
-    // Sincronizar estados quando props mudam
-    useEffect(() => {
-      setPriceInputValue(marketPrice)
-    }, [marketPrice])
-
-    useEffect(() => {
-      setDescInputValue(marketDescription)
-    }, [marketDescription])
-
+    // Handler para mudança de preço - SIMPLIFICADO
     const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const formattedValue = formatCurrencyInput(e.target.value)
-      setPriceInputValue(formattedValue)
       setMarketPrice(formattedValue)
     }
 
+    // Handler para mudança de descrição - SIMPLIFICADO
     const handleDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setDescInputValue(e.target.value)
       setMarketDescription(e.target.value)
     }
 
@@ -1503,8 +1484,6 @@ export default function PaginaTransferencias() {
                     setSelectedPlayer(null)
                     setMarketPrice('')
                     setMarketDescription('')
-                    setPriceInputValue('')
-                    setDescInputValue('')
                   }}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
@@ -1565,7 +1544,7 @@ export default function PaginaTransferencias() {
 
                 {selectedPlayer && (
                   <>
-                    {/* Preço - CORRIGIDO (problema de foco) */}
+                    {/* Preço - SIMPLIFICADO */}
                     <div>
                       <label className="text-zinc-400 text-sm font-medium mb-2 block">
                         Preço de Venda
@@ -1573,19 +1552,10 @@ export default function PaginaTransferencias() {
                       <div className="relative">
                         <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
                         <Input
-                          id="market-price-input"
                           placeholder="0,00"
-                          value={priceInputValue}
+                          value={marketPrice}
                           onChange={handlePriceChange}
                           className="pl-10 bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          onKeyDown={(e) => {
-                            // Navegação com teclado
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              const descInput = document.getElementById('market-desc-input')
-                              if (descInput) descInput.focus()
-                            }
-                          }}
                         />
                       </div>
                       <p className="text-zinc-500 text-xs mt-1">
@@ -1593,24 +1563,16 @@ export default function PaginaTransferencias() {
                       </p>
                     </div>
 
-                    {/* Descrição - CORRIGIDA (problema de foco) */}
+                    {/* Descrição - SIMPLIFICADA */}
                     <div>
                       <label className="text-zinc-400 text-sm font-medium mb-2 block">
                         Descrição (opcional)
                         <span className="text-zinc-500 ml-1">- Por que está colocando à venda?</span>
                       </label>
                       <Textarea
-                        id="market-desc-input"
                         placeholder="Ex: Preciso de grana para reforçar o time, jogador não se adaptou ao sistema..."
-                        value={descInputValue}
+                        value={marketDescription}
                         onChange={handleDescChange}
-                        onKeyDown={(e) => {
-                          // Permite submeter com Ctrl+Enter
-                          if (e.key === 'Enter' && e.ctrlKey) {
-                            e.preventDefault()
-                            handleAddToMarket()
-                          }
-                        }}
                         className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                         rows={3}
                       />
@@ -1631,8 +1593,6 @@ export default function PaginaTransferencias() {
                           setSelectedPlayer(null)
                           setMarketPrice('')
                           setMarketDescription('')
-                          setPriceInputValue('')
-                          setDescInputValue('')
                         }}
                         variant="outline"
                         className="flex-1 text-white border-zinc-600 hover:bg-zinc-800"
@@ -1640,11 +1600,6 @@ export default function PaginaTransferencias() {
                         Cancelar
                       </Button>
                     </div>
-                    {marketPrice && (
-                      <p className="text-xs text-zinc-400">
-                        Dica: Use <kbd className="px-1 bg-zinc-700 rounded">Ctrl+Enter</kbd> no campo de descrição para salvar
-                      </p>
-                    )}
                   </>
                 )}
               </div>
