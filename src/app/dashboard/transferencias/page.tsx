@@ -448,7 +448,7 @@ export default function PaginaTransferencias() {
           // Verifica se todos os jogadores ainda estão no time
           const invalidPlayers = exchangePlayers?.filter(p => p.team_id !== transfer.to_team_id) || []
           if (invalidPlayers.length > 0) {
-            alert('❌ Troca rejeitada! Alguns jogadores não estão mais disponíveis no time.')
+            alert('❌ Troca rejeita! Alguns jogadores não estão mais disponíveis no time.')
             
             const { error: rejectError } = await supabase
               .from('player_transfers')
@@ -585,38 +585,38 @@ export default function PaginaTransferencias() {
     if (players.length === 0) return null
 
     return (
-      <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-        <div className="flex items-center gap-2 mb-3">
-          <ArrowRightLeft className="w-4 h-4 text-blue-400" />
-          <span className="text-blue-400 font-semibold text-sm">Jogadores na Troca</span>
+      <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <ArrowRightLeft className="w-3 h-3 text-blue-400" />
+          <span className="text-blue-400 font-semibold text-xs">Jogadores na Troca</span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-1">
           {players.map((player: any) => (
-            <div key={player.id} className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
+            <div key={player.id} className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1">
                 {player.photo_url ? (
                   <img 
                     src={player.photo_url} 
                     alt={player.name}
-                    className="w-6 h-6 rounded-full object-cover"
+                    className="w-4 h-4 rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">{player.position}</span>
+                  <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center">
+                    <span className="text-[8px] font-bold text-white">{player.position}</span>
                   </div>
                 )}
-                <span className="text-white">{player.name}</span>
-                <Badge className="bg-blue-600 text-xs">{player.position}</Badge>
+                <span className="text-white truncate max-w-[80px]">{player.name}</span>
+                <Badge className="bg-blue-600 text-[10px] px-1">{player.position}</Badge>
               </div>
-              <span className="text-emerald-400 text-xs">
+              <span className="text-emerald-400 text-[10px]">
                 R$ {player.base_price?.toLocaleString('pt-BR')}
               </span>
             </div>
           ))}
           {transfer.exchange_value > 0 && (
-            <div className="flex items-center justify-between border-t border-blue-500/30 pt-2">
-              <span className="text-blue-300 text-sm">+ Dinheiro</span>
-              <span className="text-emerald-400 text-sm font-semibold">
+            <div className="flex items-center justify-between border-t border-blue-500/30 pt-1">
+              <span className="text-blue-300 text-xs">+ Dinheiro</span>
+              <span className="text-emerald-400 text-xs font-semibold">
                 R$ {transfer.exchange_value.toLocaleString('pt-BR')}
               </span>
             </div>
@@ -1194,7 +1194,7 @@ export default function PaginaTransferencias() {
     </div>
   )
 
-  // Componente TransferenciasView
+  // Componente TransferenciasView - ATUALIZADO para layout grid
   const TransferenciasView = () => (
     <>
       {/* Seletor de Abas */}
@@ -1247,8 +1247,8 @@ export default function PaginaTransferencias() {
         </Card>
       ) : (
         <div className={cn(
-          "gap-6",
-          activeTab === 'completed' ? "grid grid-cols-1 md:grid-cols-2" : "space-y-6"
+          "gap-4",
+          activeTab === 'pending' ? "grid grid-cols-1 lg:grid-cols-2" : "grid grid-cols-1 md:grid-cols-2"
         )}>
           {transfers.map((t) => {
             // Verificar se é uma dispensa (to_team_id é null ou transfer_type é 'dismiss')
@@ -1261,14 +1261,15 @@ export default function PaginaTransferencias() {
                   "bg-white/5 backdrop-blur-xl border transition-all",
                   t.status === 'approved' 
                     ? "border-green-500/20 hover:border-green-500/40 p-4" 
-                    : "border-white/10 hover:border-white/20 p-6",
+                    : "border-white/10 hover:border-white/20 p-5",
                   t.is_exchange && "border-blue-500/20 hover:border-blue-500/40",
                   isDismissal && "border-red-500/20 hover:border-red-500/40"
                 )}
               >
                 {/* Badge de tipo de transferência */}
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-3">
                   <Badge className={cn(
+                    "text-xs",
                     t.is_exchange ? "bg-blue-600" : 
                     isDismissal ? "bg-red-600" : "bg-purple-600"
                   )}>
@@ -1290,7 +1291,7 @@ export default function PaginaTransferencias() {
                     )}
                   </Badge>
                   {t.status === 'approved' && (
-                    <Badge className="bg-green-600 text-white">
+                    <Badge className="bg-green-600 text-white text-xs">
                       <CheckCircle className="w-3 h-3 mr-1" />
                       Concluída
                     </Badge>
@@ -1298,97 +1299,90 @@ export default function PaginaTransferencias() {
                 </div>
 
                 {t.status === 'pending' ? (
-                  // LAYOUT PARA TRANSFERÊNCIAS PENDENTES (completo)
+                  // LAYOUT COMPACTO PARA EM ANDAMENTO (2 por linha)
                   <>
-                    {/* ANÚNCIO CENTRALIZADO */}
-                    <div className="flex flex-col lg:flex-row items-center justify-center gap-6 mb-6">
+                    {/* Times e Valor em linha compacta */}
+                    <div className="flex items-center justify-between mb-4">
                       {/* Time Vendedor */}
-                      <div className="flex flex-col items-center text-center">
+                      <div className="flex flex-col items-center text-center flex-1">
                         {t.from_team.logo_url ? (
                           <img 
                             src={t.from_team.logo_url} 
                             alt={t.from_team.name}
-                            className="w-16 h-16 rounded-full object-cover border-2 border-red-500/50 mb-2"
+                            className="w-10 h-10 rounded-full object-cover border-2 border-red-500/50 mb-1"
                           />
                         ) : (
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center mb-2">
-                            <span className="text-sm font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center mb-1">
+                            <span className="text-xs font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
                           </div>
                         )}
-                        <div>
-                          <p className="text-zinc-400 text-sm mb-1">Vendedor</p>
-                          <p className="text-white font-bold text-lg">{t.from_team.name}</p>
-                        </div>
+                        <p className="text-white text-sm font-medium truncate w-full">{t.from_team.name}</p>
+                        <p className="text-zinc-400 text-xs">Vendedor</p>
                       </div>
 
-                      {/* Seta e Valor - CENTRO */}
-                      <div className="flex flex-col items-center">
-                        <div className="flex items-center gap-4">
-                          <ArrowRight className="w-8 h-8 text-yellow-400" />
-                          
-                          {/* Valor */}
+                      {/* Setas e Valor - Compacto */}
+                      <div className="flex flex-col items-center mx-2">
+                        <div className="flex items-center gap-1">
+                          <ArrowRight className="w-4 h-4 text-yellow-400" />
                           <div className="flex flex-col items-center">
                             <div className="flex items-center gap-1">
                               {t.is_exchange ? (
-                                <ArrowRightLeft className="w-5 h-5 text-blue-400" />
+                                <ArrowRightLeft className="w-3 h-3 text-blue-400" />
                               ) : (
-                                <DollarSign className="w-5 h-5 text-emerald-400" />
+                                <DollarSign className="w-3 h-3 text-emerald-400" />
                               )}
                               <span className={cn(
-                                "font-bold text-2xl",
+                                "font-bold text-sm",
                                 t.is_exchange ? "text-blue-400" : "text-emerald-400"
                               )}>
                                 {formatBalance(t.value)}
                               </span>
                             </div>
-                            <p className="text-zinc-400 text-sm mt-1">
-                              {t.is_exchange ? 'Valor Total da Troca' : 'Valor da Transferência'}
-                            </p>
                           </div>
-                          
-                          <ArrowRight className="w-8 h-8 text-yellow-400" />
+                          <ArrowRight className="w-4 h-4 text-yellow-400" />
                         </div>
+                        <p className="text-zinc-400 text-xs mt-1 text-center">
+                          {t.is_exchange ? 'Troca' : 'Venda'}
+                        </p>
                       </div>
 
                       {/* Time Comprador */}
-                      <div className="flex flex-col items-center text-center">
+                      <div className="flex flex-col items-center text-center flex-1">
                         {t.to_team.logo_url ? (
                           <img 
                             src={t.to_team.logo_url} 
                             alt={t.to_team.name}
-                            className="w-16 h-16 rounded-full object-cover border-2 border-green-500/50 mb-2"
+                            className="w-10 h-10 rounded-full object-cover border-2 border-green-500/50 mb-1"
                           />
                         ) : (
-                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center mb-2">
-                            <span className="text-sm font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center mb-1">
+                            <span className="text-xs font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
                           </div>
                         )}
-                        <div>
-                          <p className="text-zinc-400 text-sm mb-1">Comprador</p>
-                          <p className="text-white font-bold text-lg">{t.to_team.name}</p>
-                        </div>
+                        <p className="text-white text-sm font-medium truncate w-full">{t.to_team.name}</p>
+                        <p className="text-zinc-400 text-xs">Comprador</p>
                       </div>
                     </div>
 
-                    {/* Jogador Principal */}
-                    <div className="flex flex-col items-center gap-4 p-4 bg-zinc-800/30 rounded-lg mb-6">
+                    {/* Jogador Principal - Compacto */}
+                    <div className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg mb-4">
                       {t.player.photo_url ? (
                         <img 
                           src={t.player.photo_url} 
                           alt={t.player.name}
-                          className="w-20 h-20 rounded-full object-cover border-2 border-purple-500"
+                          className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
                         />
                       ) : (
-                        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-xl font-black text-white">{t.player.position}</span>
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                          <span className="text-sm font-black text-white">{t.player.position}</span>
                         </div>
                       )}
-                      <div className="text-center">
-                        <h3 className="text-2xl font-bold text-white mb-2">{t.player.name}</h3>
-                        <div className="flex items-center gap-2 justify-center">
-                          <Badge className="bg-purple-600 text-base py-1 px-3">{t.player.position}</Badge>
-                          <span className="text-yellow-400 text-sm font-semibold">
-                            ⏳ Aguardando Aprovações
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base font-bold text-white truncate">{t.player.name}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className="bg-purple-600 text-xs">{t.player.position}</Badge>
+                          <span className="text-yellow-400 text-xs font-semibold">
+                            ⏳ Aguardando
                           </span>
                         </div>
                       </div>
@@ -1397,99 +1391,96 @@ export default function PaginaTransferencias() {
                     {/* Jogadores da Troca (se for troca) */}
                     {t.is_exchange && <ExchangePlayers transfer={t} />}
 
-                    {/* Aprovações */}
-                    <div className="flex gap-8 items-center justify-center mb-6">
+                    {/* Aprovações - Compacto */}
+                    <div className="flex items-center justify-between mb-4 px-2">
                       {/* Vendedor */}
                       <div className="text-center group relative">
                         <CheckCircle2
                           className={cn(
-                            "h-12 w-12 transition-all",
+                            "h-8 w-8 transition-all",
                             t.approved_by_seller ? "text-green-400" : "text-zinc-600"
                           )}
                         />
-                        <p className="text-sm text-zinc-400 mt-1">Vendedor</p>
-                        <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
-                          {t.from_team.name}
-                        </div>
+                        <p className="text-xs text-zinc-400 mt-1">Vendedor</p>
                       </div>
 
                       {/* Comprador */}
                       <div className="text-center group relative">
                         <CheckCircle2
                           className={cn(
-                            "h-12 w-12 transition-all",
+                            "h-8 w-8 transition-all",
                             t.approved_by_buyer ? "text-green-400" : "text-zinc-600"
                           )}
                         />
-                        <p className="text-sm text-zinc-400 mt-1">Comprador</p>
-                        <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
-                          {t.to_team.name}
-                        </div>
+                        <p className="text-xs text-zinc-400 mt-1">Comprador</p>
                       </div>
 
                       {/* Admin */}
                       <div className="text-center group relative">
                         <CheckCircle2
                           className={cn(
-                            "h-12 w-12 transition-all",
+                            "h-8 w-8 transition-all",
                             t.approved_by_admin ? "text-green-400" : "text-zinc-600"
                           )}
                         />
-                        <p className="text-sm text-zinc-400 mt-1">Admin</p>
-                        <div className="invisible group-hover:visible absolute bg-black/90 text-white text-xs px-3 py-2 rounded-lg -mt-16 z-10">
-                          Sistema
-                        </div>
+                        <p className="text-xs text-zinc-400 mt-1">Admin</p>
                       </div>
                     </div>
 
-                    {/* Botões de aprovação E cancelamento (APENAS ADMIN PODE CANCELAR) */}
+                    {/* Botões de aprovação */}
                     {(userTeamId === t.from_team_id || userTeamId === t.to_team_id || isAdmin) && (
-                      <div className="mt-6 flex flex-wrap gap-4 justify-center items-center">
-                        <div className="flex flex-wrap gap-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2 justify-center">
                           {userTeamId === t.from_team_id && !t.approved_by_seller && (
                             <Button
                               onClick={() => aprovar(t.id, 'seller')}
-                              className="bg-green-600 hover:bg-green-700 text-white"
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white text-xs px-3"
                             >
-                              Aprovar como Vendedor
+                              Aprovar Vendedor
                             </Button>
                           )}
                           {userTeamId === t.to_team_id && !t.approved_by_buyer && (
                             <Button
                               onClick={() => aprovar(t.id, 'buyer')}
-                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3"
                             >
-                              Aprovar como Comprador
+                              Aprovar Comprador
                             </Button>
                           )}
                           {isAdmin && !t.approved_by_admin && (
                             <Button
                               onClick={() => aprovar(t.id, 'admin')}
-                              className="bg-purple-600 hover:bg-purple-700 text-white"
+                              size="sm"
+                              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3"
                             >
-                              Aprovar como Admin
+                              Aprovar Admin
                             </Button>
                           )}
                         </div>
 
                         {/* BOTÃO DE CANCELAR - APENAS PARA ADMIN */}
                         {isAdmin && (
-                          <Button
-                            onClick={() => rejeitarTransferencia(t.id)}
-                            variant="outline"
-                            className="bg-red-600 hover:bg-red-700 text-white border-red-600"
-                          >
-                            <Ban className="w-4 h-4 mr-2" />
-                            Cancelar Transferência
-                          </Button>
+                          <div className="flex justify-center">
+                            <Button
+                              onClick={() => rejeitarTransferencia(t.id)}
+                              variant="outline"
+                              size="sm"
+                              className="bg-red-600 hover:bg-red-700 text-white border-red-600 text-xs"
+                            >
+                              <Ban className="w-3 h-3 mr-1" />
+                              Cancelar
+                            </Button>
+                          </div>
                         )}
 
                         {/* Mensagem se já aprovou */}
                         {((userTeamId === t.from_team_id && t.approved_by_seller) ||
                           (userTeamId === t.to_team_id && t.approved_by_buyer) ||
                           (isAdmin && t.approved_by_admin)) && (
-                          <p className="text-green-400 font-bold flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4" />
+                          <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
+                            <CheckCircle className="w-3 h-3" />
                             Você já aprovou esta negociação
                           </p>
                         )}
@@ -1498,12 +1489,12 @@ export default function PaginaTransferencias() {
                   </>
                 ) : (
                   // LAYOUT PARA TRANSFERÊNCIAS FINALIZADAS (compacto)
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {/* Header com data/hora */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-zinc-400">
-                        <Calendar className="w-4 h-4" />
-                        <span className="text-sm">
+                        <Calendar className="w-3 h-3" />
+                        <span className="text-xs">
                           {formatDateTime(t.created_at).date} às {formatDateTime(t.created_at).time}
                         </span>
                       </div>
@@ -1512,75 +1503,75 @@ export default function PaginaTransferencias() {
                     {/* Conteúdo principal */}
                     <div className="flex items-center justify-between">
                       {/* Time de Origem */}
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         {t.from_team.logo_url ? (
                           <img 
                             src={t.from_team.logo_url} 
                             alt={t.from_team.name}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-red-500/50"
+                            className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
                             <span className="text-xs font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
                           </div>
                         )}
                         <div className="text-right">
-                          <p className="text-white font-semibold text-sm">{t.from_team.name}</p>
-                          <p className="text-zinc-400 text-xs">
-                            {isDismissal ? 'Clube Anterior' : 'Vendedor'}
+                          <p className="text-white text-xs font-semibold truncate max-w-[60px]">{t.from_team.name}</p>
+                          <p className="text-zinc-400 text-[10px]">
+                            {isDismissal ? 'Anterior' : 'Vendedor'}
                           </p>
                         </div>
                       </div>
 
                       {/* Setas e Valor */}
-                      <div className="flex flex-col items-center flex-1 mx-4">
-                        <div className="flex items-center gap-2">
-                          <ArrowRight className="w-5 h-5 text-yellow-400" />
+                      <div className="flex flex-col items-center flex-1 mx-2">
+                        <div className="flex items-center gap-1">
+                          <ArrowRight className="w-3 h-3 text-yellow-400" />
                           <div className="flex items-center gap-1">
                             {isDismissal ? (
-                              <X className="w-4 h-4 text-red-400" />
+                              <X className="w-3 h-3 text-red-400" />
                             ) : t.is_exchange ? (
-                              <ArrowRightLeft className="w-4 h-4 text-blue-400" />
+                              <ArrowRightLeft className="w-3 h-3 text-blue-400" />
                             ) : (
-                              <DollarSign className="w-4 h-4 text-emerald-400" />
+                              <DollarSign className="w-3 h-3 text-emerald-400" />
                             )}
                             <span className={cn(
-                              "font-bold text-lg",
+                              "font-bold text-sm",
                               isDismissal ? "text-red-400" : 
                               t.is_exchange ? "text-blue-400" : "text-emerald-400"
                             )}>
                               {formatBalance(t.value)}
                             </span>
                           </div>
-                          <ArrowRight className="w-5 h-5 text-yellow-400" />
+                          <ArrowRight className="w-3 h-3 text-yellow-400" />
                         </div>
-                        <p className="text-zinc-400 text-xs mt-1">
+                        <p className="text-zinc-400 text-[10px] mt-1">
                           {isDismissal ? 'Dispensa' : t.is_exchange ? 'Troca' : 'Venda'}
                         </p>
                       </div>
 
-                      {/* Destino - para dispensas mostra "Sem Clube" */}
-                      <div className="flex items-center gap-3">
+                      {/* Destino */}
+                      <div className="flex items-center gap-2">
                         <div className="text-left">
-                          <p className="text-white font-semibold text-sm">
+                          <p className="text-white text-xs font-semibold truncate max-w-[60px]">
                             {isDismissal ? 'Sem Clube' : t.to_team.name}
                           </p>
-                          <p className="text-zinc-400 text-xs">
+                          <p className="text-zinc-400 text-[10px]">
                             {isDismissal ? 'Destino' : 'Comprador'}
                           </p>
                         </div>
                         {isDismissal ? (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-600 to-gray-400 flex items-center justify-center">
-                            <Users className="w-6 h-6 text-gray-300" />
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-400 flex items-center justify-center">
+                            <Users className="w-4 h-4 text-gray-300" />
                           </div>
                         ) : t.to_team.logo_url ? (
                           <img 
                             src={t.to_team.logo_url} 
                             alt={t.to_team.name}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-green-500/50"
+                            className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
                             <span className="text-xs font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
                           </div>
                         )}
@@ -1588,21 +1579,21 @@ export default function PaginaTransferencias() {
                     </div>
 
                     {/* Jogador Principal */}
-                    <div className="flex items-center gap-3 pt-3 border-t border-zinc-700/50">
+                    <div className="flex items-center gap-2 pt-2 border-t border-zinc-700/50">
                       {t.player.photo_url ? (
                         <img 
                           src={t.player.photo_url} 
                           alt={t.player.name}
-                          className="w-10 h-10 rounded-full object-cover border-2 border-purple-500"
+                          className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
                         />
                       ) : (
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-sm font-black text-white">{t.player.position}</span>
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                          <span className="text-xs font-black text-white">{t.player.position}</span>
                         </div>
                       )}
-                      <div>
-                        <p className="text-white font-semibold">{t.player.name}</p>
-                        <Badge className="bg-purple-600 text-xs">{t.player.position}</Badge>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-semibold truncate">{t.player.name}</p>
+                        <Badge className="bg-purple-600 text-[10px]">{t.player.position}</Badge>
                       </div>
                     </div>
 
