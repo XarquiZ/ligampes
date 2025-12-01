@@ -1079,7 +1079,7 @@ export default function PaginaLeilao() {
     }
   }
 
-  // FUNÇÃO CORRIGIDA: Dar lance usando RPC atômica
+  // FUNÇÃO CORRIGIDA: Dar lance usando RPC atômica COM 90 SEGUNDOS
   const handlePlaceBid = async (auctionId: string, amount: number) => {
     console.log(`💰 LANCE ATÔMICO - Leilão: ${auctionId}, Valor: ${amount}`)
     
@@ -1118,7 +1118,7 @@ export default function PaginaLeilao() {
         time: new Date().toISOString()
       })
       
-      // Usar RPC com transação atômica
+      // Usar RPC com transação atômica (atualizada para 90 segundos)
       const { data, error } = await supabase.rpc('place_bid_atomic', {
         p_auction_id: auctionId,
         p_team_id: team.id,
@@ -1152,8 +1152,9 @@ export default function PaginaLeilao() {
       
       toast.success(data.message || 'Lance realizado com sucesso!')
       
+      // ATUALIZADO: Mostrar mensagem de 90 segundos
       if (data.time_extended) {
-        toast.info('⏰ Tempo do leilão estendido em 30 segundos!')
+        toast.info('⏰ Tempo do leilão estendido em 90 segundos!')
       }
 
     } catch (error: any) {
@@ -1648,7 +1649,7 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD ATUALIZADO (sem botão de finalizar)
+// COMPONENTE AUCTIONCARD ATUALIZADO
 const AuctionCard = ({ 
   auction, 
   type, 
@@ -2022,6 +2023,7 @@ const AuctionCard = ({
           </div>
         )}
 
+        {/* HISTÓRICO DE LANCES COM NOME DOS TIMES E VALORES EM BRANCO */}
         {bids && bids.length > 0 && type === 'active' && (
           <div className="mt-4">
             <h4 className="text-sm font-semibold text-zinc-400 mb-2">Histórico de Lances</h4>
@@ -2040,13 +2042,18 @@ const AuctionCard = ({
                     {bid.team?.logo_url && (
                       <img src={bid.team.logo_url} alt="" className="w-4 h-4 rounded-full" />
                     )}
-                    <span className={index === 0 ? "font-bold text-yellow-400" : ""}>
+                    {/* NOME DO TIME EM BRANCO */}
+                    <span className={cn(
+                      "font-medium",
+                      index === 0 ? "text-yellow-400" : "text-white"
+                    )}>
                       {bid.team?.name}
                     </span>
                   </div>
+                  {/* VALOR DO LANCE EM BRANCO */}
                   <span className={cn(
                     "font-bold",
-                    index === 0 ? "text-yellow-400" : ""
+                    index === 0 ? "text-yellow-400" : "text-white"
                   )}>
                     R$ {formatToMillions(bid.amount)}
                   </span>
