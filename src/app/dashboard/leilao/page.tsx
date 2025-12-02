@@ -18,7 +18,8 @@ import {
   AlertCircle,
   Lock,
   Trash2,
-  PartyPopper
+  PartyPopper,
+  Zap
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -59,6 +60,7 @@ interface Auction {
   }
   time_remaining?: number
   updated_at?: string
+  synchronized_end_time?: number // NOVO: timestamp sincronizado
 }
 
 interface Bid {
@@ -80,6 +82,7 @@ interface Team {
   logo_url: string
   balance: number
   updated_at?: string
+  last_balance_update?: string // NOVO: timestamp da última atualização
 }
 
 interface UserProfile {
@@ -98,6 +101,7 @@ interface WinNotification {
   amount: number
   teamName: string
   show: boolean
+  timestamp: number // NOVO: quando foi exibido
 }
 
 interface BidCoveredNotification {
@@ -105,6 +109,7 @@ interface BidCoveredNotification {
   playerName: string
   coveredAmount: number
   show: boolean
+  timestamp: number // NOVO: quando foi exibido
 }
 
 // Formatar valores para exibição (ex: 50M)
@@ -131,18 +136,149 @@ const generateBidOptions = (currentBid: number): { value: number; label: string 
   return options
 }
 
-// Hook para saldo reservado - ATUALIZADO
+// NOVO: Classe para gerenciar sincronização de finalização
+class AuctionFinalizer {
+  private static instance: AuctionFinalizer
+  private processingSet: Set<string> = new Set()
+  private notificationQueue: Map<string, WinNotification> = new Map()
+  private callbacks: Map<string, Function[]> = new Map()
+  private lastSyncTime: number = 0
+  private syncInterval: NodeJS.Timeout | null = null
+
+  static getInstance(): AuctionFinalizer {
+    if (!AuctionFinalizer.instance) {
+      AuctionFinalizer.instance = new AuctionFinalizer()
+    }
+    return AuctionFinalizer.instance
+  }
+
+  async finalizeAuction(auctionId: string, serverTimeOffset: number): Promise<any> {
+    if (this.processingSet.has(auctionId)) {
+      console.log(`⏳ Leilão ${auctionId} já está sendo finalizado, aguardando...`)
+      return new Promise((resolve) => {
+        const checkInterval = setInterval(() => {
+          if (!this.processingSet.has(auctionId)) {
+            clearInterval(checkInterval)
+            resolve({ alreadyProcessed: true })
+          }
+        }, 500)
+      })
+    }
+
+    this.processingSet.add(auctionId)
+    
+    try {
+      console.log(`🔄 FINALIZANDO LEILÃO PARA TODOS: ${auctionId}`)
+      
+      // Usar função RPC que garante finalização atômica
+      const { data, error } = await supabase.rpc('finalize_expired_auction', {
+        p_auction_id: auctionId
+      })
+
+      if (error) {
+        console.error(`❌ Erro ao finalizar leilão ${auctionId}:`, error)
+        throw error
+      }
+
+      console.log(`✅ LEILÃO FINALIZADO PARA TODOS:`, data)
+
+      // Notificar todos os ouvintes
+      this.notifyListeners(auctionId, data)
+      
+      return data
+
+    } finally {
+      // Remover após 5 segundos para evitar conflitos
+      setTimeout(() => {
+        this.processingSet.delete(auctionId)
+      }, 5000)
+    }
+  }
+
+  registerCallback(auctionId: string, callback: Function) {
+    if (!this.callbacks.has(auctionId)) {
+      this.callbacks.set(auctionId, [])
+    }
+    this.callbacks.get(auctionId)!.push(callback)
+  }
+
+  unregisterCallback(auctionId: string, callback: Function) {
+    if (this.callbacks.has(auctionId)) {
+      const callbacks = this.callbacks.get(auctionId)!
+      const index = callbacks.indexOf(callback)
+      if (index > -1) {
+        callbacks.splice(index, 1)
+      }
+    }
+  }
+
+  private notifyListeners(auctionId: string, data: any) {
+    if (this.callbacks.has(auctionId)) {
+      this.callbacks.get(auctionId)!.forEach(callback => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('Erro ao notificar callback:', error)
+        }
+      })
+    }
+  }
+
+  addWinNotification(notification: WinNotification) {
+    this.notificationQueue.set(notification.auctionId, notification)
+  }
+
+  getWinNotification(auctionId: string): WinNotification | null {
+    return this.notificationQueue.get(auctionId) || null
+  }
+
+  clearNotification(auctionId: string) {
+    this.notificationQueue.delete(auctionId)
+  }
+
+  startSyncService() {
+    if (this.syncInterval) return
+    
+    this.syncInterval = setInterval(async () => {
+      try {
+        this.lastSyncTime = Date.now()
+        // Aqui podemos adicionar lógica de sincronização periódica se necessário
+      } catch (error) {
+        console.error('Erro no serviço de sincronização:', error)
+      }
+    }, 30000) // Sincronizar a cada 30 segundos
+  }
+
+  stopSyncService() {
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval)
+      this.syncInterval = null
+    }
+  }
+}
+
+// Hook para saldo reservado - ATUALIZADO COM POLLING
 const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now())
   const [isLoading, setIsLoading] = useState(false)
+  const pollingIntervalRef = useRef<NodeJS.Timeout>()
+  const lastFetchedRef = useRef<{[key: string]: number}>({})
 
-  const loadPendingReserves = useCallback(async (teamId: string) => {
+  const loadPendingReserves = useCallback(async (teamId: string, force: boolean = false) => {
     if (!teamId) return
+    
+    const now = Date.now()
+    const cacheKey = `saldo_${teamId}`
+    
+    // Cache de 500ms para evitar chamadas excessivas
+    if (!force && lastFetchedRef.current[cacheKey] && 
+        now - lastFetchedRef.current[cacheKey] < 500) {
+      return
+    }
     
     setIsLoading(true)
     try {
-      console.log('🔄 Carregando saldos reservados do banco:', teamId)
-      
       // Buscar APENAS leilões ATIVOS com reservas pendentes
       const { data: pendingTransactions, error } = await supabase
         .from('balance_transactions')
@@ -165,8 +301,6 @@ const useSaldoReservado = (teamId: string | null) => {
         return
       }
 
-      console.log('💾 Transações pendentes ativas do banco:', pendingTransactions)
-
       const reserves: {[key: string]: number} = {}
       pendingTransactions?.forEach(transaction => {
         if (transaction.auction_id) {
@@ -175,8 +309,14 @@ const useSaldoReservado = (teamId: string | null) => {
       })
 
       setSaldoReservado(reserves)
+      setLastUpdate(now)
+      lastFetchedRef.current[cacheKey] = now
       
-      console.log('💰 Saldos reservados carregados:', reserves)
+      console.log('💰 Saldos reservados atualizados:', {
+        time: new Date().toISOString(),
+        count: Object.keys(reserves).length,
+        total: Object.values(reserves).reduce((a, b) => a + b, 0)
+      })
 
     } catch (error) {
       console.error('❌ Erro ao carregar saldos reservados:', error)
@@ -185,19 +325,41 @@ const useSaldoReservado = (teamId: string | null) => {
     }
   }, [])
 
+  // Iniciar polling automático
+  useEffect(() => {
+    if (!teamId) return
+    
+    console.log('🔄 Iniciando polling de saldo reservado para time:', teamId)
+    
+    // Carregar imediatamente
+    loadPendingReserves(teamId, true)
+    
+    // Configurar polling a cada 1 segundo
+    pollingIntervalRef.current = setInterval(() => {
+      loadPendingReserves(teamId, false)
+    }, 1000)
+    
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = undefined
+      }
+    }
+  }, [teamId, loadPendingReserves])
+
   const liberarSaldo = async (auctionId: string, teamId: string) => {
     if (!auctionId || !teamId) return
     
     try {
-      console.log(`🔄 Removendo saldo reservado do estado local: ${auctionId}`)
-      
-      // Apenas remove do estado local - o banco já liberou
+      // Atualizar estado local imediatamente
       setSaldoReservado(prev => {
         const novo = { ...prev }
         delete novo[auctionId]
         return novo
       })
 
+      setLastUpdate(Date.now())
+      
       console.log(`💰 Saldo liberado do estado local: ${auctionId}`)
       
     } catch (error) {
@@ -205,20 +367,21 @@ const useSaldoReservado = (teamId: string | null) => {
     }
   }
 
-  // NOVA FUNÇÃO: Remover reserva quando vencedor (já convertida em débito no banco)
   const debitarSaldoVencedor = async (auctionId: string, teamId: string, valor: number) => {
     if (!auctionId || !teamId || !valor) return
     
     try {
       console.log(`💰 Removendo reserva do estado local (vencedor): ${auctionId}`)
       
-      // Apenas remove do estado local - o banco já converteu em débito
+      // Atualizar estado local imediatamente
       setSaldoReservado(prev => {
         const novo = { ...prev }
         delete novo[auctionId]
         return novo
       })
 
+      setLastUpdate(Date.now())
+      
       console.log(`✅ Reserva removida do estado local (vencedor): ${auctionId}`)
       
     } catch (error) {
@@ -256,12 +419,44 @@ const useSaldoReservado = (teamId: string | null) => {
   return {
     saldoReservado,
     isLoading,
-    liberarSaldo,           // Apenas remove do estado local
-    debitarSaldoVencedor,   // Remove do estado local quando vence
+    lastUpdate,
+    liberarSaldo,
+    debitarSaldoVencedor,
     getSaldoReservado,
     loadPendingReserves,
     verificarLeiloesAtivos
   }
+}
+
+// NOVO: Componente para indicador de atualização de saldo
+const SaldoUpdateIndicator = ({ lastUpdate }: { lastUpdate: number }) => {
+  const [now, setNow] = useState(Date.now())
+  
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(interval)
+  }, [])
+  
+  const secondsAgo = Math.floor((now - lastUpdate) / 1000)
+  const isRecent = secondsAgo < 2
+  const isStale = secondsAgo > 5
+  
+  return (
+    <div className="flex items-center gap-1 justify-end">
+      <div className={`w-2 h-2 rounded-full animate-pulse ${
+        isRecent ? 'bg-green-500' : 
+        isStale ? 'bg-red-500' : 
+        'bg-yellow-500'
+      }`} />
+      <span className={`text-xs ${
+        isRecent ? 'text-green-400' : 
+        isStale ? 'text-red-400' : 
+        'text-yellow-400'
+      }`}>
+        {isRecent ? 'Agora' : `${secondsAgo}s atrás`}
+      </span>
+    </div>
+  )
 }
 
 export default function PaginaLeilao() {
@@ -299,16 +494,22 @@ export default function PaginaLeilao() {
   const [forceRefresh, setForceRefresh] = useState(0)
   const pollingIntervalRef = useRef<NodeJS.Timeout>()
 
-  // Estados para server time - CORRIGIDO: DENTRO do componente
+  // Estados para server time
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
   const [isSyncingTime, setIsSyncingTime] = useState<boolean>(false)
-  const [isTimeSynced, setIsTimeSynced] = useState<boolean>(false) // Estado movido para dentro do componente
+  const [isTimeSynced, setIsTimeSynced] = useState<boolean>(false)
+  const [serverTime, setServerTime] = useState<number>(Date.now())
+
+  // NOVO: Instância do finalizador global
+  const auctionFinalizer = useRef(AuctionFinalizer.getInstance())
+  const [finalizingAuctions, setFinalizingAuctions] = useState<Set<string>>(new Set())
 
   const {
     saldoReservado,
     isLoading: isLoadingSaldo,
+    lastUpdate: lastSaldoUpdate,
     liberarSaldo,
-    debitarSaldoVencedor, // NOVA FUNÇÃO
+    debitarSaldoVencedor,
     getSaldoReservado,
     loadPendingReserves,
     verificarLeiloesAtivos
@@ -319,27 +520,37 @@ export default function PaginaLeilao() {
   const isProcessingRef = useRef(false)
   const subscriptionsRef = useRef<any[]>([])
   const processingAuctionsRef = useRef<Set<string>>(new Set())
+  const lastBalanceUpdateRef = useRef<number>(0)
 
-  // FUNÇÃO PARA OBTER TEMPO DO SERVIDOR - CORRIGIDA
-  const getServerTime = async (): Promise<number> => {
-    try {
-      const { data, error } = await supabase.rpc('get_server_time')
-      
-      if (error) {
-        console.error('❌ Erro ao obter tempo do servidor:', error)
-        return Date.now()
+  // NOVO: Atualizar tempo do servidor periodicamente
+  useEffect(() => {
+    const updateServerTime = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_server_time')
+        if (!error && data) {
+          const serverTimestamp = new Date(data).getTime()
+          const localTime = Date.now()
+          const offset = serverTimestamp - localTime
+          
+          setServerTimeOffset(offset)
+          setServerTime(serverTimestamp)
+          
+          if (!isTimeSynced) {
+            setIsTimeSynced(true)
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar tempo do servidor:', error)
       }
-      
-      const serverTimestamp = new Date(data).getTime()
-      console.log('🕐 Tempo do servidor obtido:', data, 'Timestamp:', serverTimestamp)
-      return serverTimestamp
-    } catch (error) {
-      console.error('❌ Erro ao obter tempo do servidor:', error)
-      return Date.now()
     }
-  }
+    
+    // Atualizar a cada 30 segundos
+    const interval = setInterval(updateServerTime, 30000)
+    
+    return () => clearInterval(interval)
+  }, [isTimeSynced])
 
-  // FUNÇÃO SINCRONIZAR TEMPO DO SERVIDOR - CORRIGIDA
+  // FUNÇÃO SINCRONIZAR TEMPO DO SERVIDOR
   const syncServerTime = async () => {
     if (isSyncingTime) return
     
@@ -348,20 +559,28 @@ export default function PaginaLeilao() {
     try {
       console.log('🕐 Sincronizando tempo com servidor...')
       
-      // Obter tempo do servidor
-      const serverTime = await getServerTime()
+      const { data, error } = await supabase.rpc('get_server_time')
+      
+      if (error) {
+        console.error('❌ Erro ao obter tempo do servidor:', error)
+        // Fallback
+        setIsTimeSynced(true)
+        return
+      }
+      
+      const serverTimestamp = new Date(data).getTime()
       const localTime = Date.now()
-      const offset = serverTime - localTime
+      const offset = serverTimestamp - localTime
       
       setServerTimeOffset(offset)
+      setServerTime(serverTimestamp)
       setIsTimeSynced(true)
       
       console.log('✅ Tempo sincronizado. Offset:', offset, 'ms')
       
     } catch (error) {
       console.error('❌ Erro ao sincronizar tempo:', error)
-      // Fallback: marcar como sincronizado mesmo com erro
-      setIsTimeSynced(true)
+      setIsTimeSynced(true) // Marcar como sincronizado mesmo com erro
     } finally {
       setIsSyncingTime(false)
     }
@@ -371,30 +590,40 @@ export default function PaginaLeilao() {
   useEffect(() => {
     loadInitialData()
     
+    // Iniciar serviço de sincronização
+    auctionFinalizer.current.startSyncService()
+    
     return () => {
       subscriptionsRef.current.forEach(sub => {
         supabase.removeChannel(sub)
       })
+      auctionFinalizer.current.stopSyncService()
     }
   }, [])
 
   // CARREGAR SALDOS RESERVADOS QUANDO TIME MUDAR
   useEffect(() => {
     if (team?.id) {
-      loadPendingReserves(team.id)
+      loadPendingReserves(team.id, true)
     }
   }, [team?.id, loadPendingReserves])
 
   // CONTAGEM REGRESSIVA SINCRONIZADA (1 SEGUNDO PARA TODOS)
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentTime(Date.now())
+      const now = Date.now()
+      setCurrentTime(now)
+      
+      // Atualizar tempo do servidor sincronizado
+      if (serverTimeOffset !== 0) {
+        setServerTime(now + serverTimeOffset)
+      }
     }, 1000)
     
     return () => clearInterval(interval)
-  }, [])
+  }, [serverTimeOffset])
 
-  // PARTE 2: useEffect para polling inteligente
+  // PARTE 2: useEffect para polling inteligente de leilões
   useEffect(() => {
     if (activeTab !== 'active') {
       if (pollingIntervalRef.current) {
@@ -405,14 +634,14 @@ export default function PaginaLeilao() {
 
     pollingIntervalRef.current = setInterval(async () => {
       try {
-        // 1. Atualizar força de refresh para timers
+        // Atualizar força de refresh para timers
         setForceRefresh(prev => prev + 1)
         
-        // 2. Verificar se há leilões ativos
+        // Verificar se há leilões ativos
         const activeAuctions = auctions.filter(a => a.status === 'active')
         if (activeAuctions.length === 0) return
         
-        // 3. Buscar atualizações recentes dos leilões ativos
+        // Buscar atualizações recentes dos leilões ativos
         const { data: recentUpdates, error } = await supabase
           .from('auctions')
           .select('id, updated_at, current_bid, current_bidder, end_time, status')
@@ -426,7 +655,7 @@ export default function PaginaLeilao() {
 
         if (!recentUpdates || recentUpdates.length === 0) return
 
-        // 4. Identificar quais leilões mudaram
+        // Identificar quais leilões mudaram
         const auctionsToUpdate: string[] = []
         const updatedTimes: {[key: string]: number} = {}
         
@@ -453,7 +682,7 @@ export default function PaginaLeilao() {
           }
         })
 
-        // 5. Se houver leilões para atualizar, buscar dados completos
+        // Se houver leilões para atualizar, buscar dados completos
         if (auctionsToUpdate.length > 0) {
           console.log('🔄 Polling: Atualizando leilões:', auctionsToUpdate)
           
@@ -474,12 +703,14 @@ export default function PaginaLeilao() {
               updatedAuctions.forEach(updatedAuction => {
                 const index = newAuctions.findIndex(a => a.id === updatedAuction.id)
                 if (index >= 0) {
-                  const synchronizedTime = Date.now() + serverTimeOffset
+                  const synchronizedTime = serverTime
                   newAuctions[index] = {
                     ...updatedAuction,
                     time_remaining: updatedAuction.end_time && updatedAuction.status === 'active' 
                       ? Math.max(0, new Date(updatedAuction.end_time).getTime() - synchronizedTime)
-                      : 0
+                      : 0,
+                    synchronized_end_time: updatedAuction.end_time ? 
+                      new Date(updatedAuction.end_time).getTime() : undefined
                   }
                 }
               })
@@ -504,7 +735,107 @@ export default function PaginaLeilao() {
         clearInterval(pollingIntervalRef.current)
       }
     }
-  }, [activeTab, auctions, serverTimeOffset])
+  }, [activeTab, auctions, serverTime, serverTimeOffset])
+
+  // NOVO: VERIFICAÇÃO SINCRONIZADA DE LEILÕES EXPIRADOS
+  useEffect(() => {
+    if (!team || !isTimeSynced) return
+    
+    const checkExpiredAuctions = async () => {
+      try {
+        const now = serverTime
+        const activeAuctions = auctions.filter(a => a.status === 'active')
+        
+        for (const auction of activeAuctions) {
+          // Pular se já está sendo finalizado
+          if (finalizingAuctions.has(auction.id) || 
+              processingAuctionsRef.current.has(auction.id)) {
+            continue
+          }
+          
+          // Verificar se expirou (com margem de 1 segundo)
+          if (auction.end_time) {
+            const endTime = new Date(auction.end_time).getTime()
+            const timeRemaining = endTime - now
+            
+            // Se expirou ou está a menos de 1 segundo do fim
+            if (timeRemaining <= 1000) {
+              console.log(`⏰ LEILÃO EXPIRADO (sincronizado): ${auction.id}`, {
+                endTime: new Date(endTime).toISOString(),
+                now: new Date(now).toISOString(),
+                diff: timeRemaining,
+                player: auction.player?.name
+              })
+              
+              // Marcar como sendo finalizado
+              setFinalizingAuctions(prev => new Set(prev).add(auction.id))
+              processingAuctionsRef.current.add(auction.id)
+              
+              try {
+                // Usar o finalizador global para garantir sincronização
+                const result = await auctionFinalizer.current.finalizeAuction(
+                  auction.id, 
+                  serverTimeOffset
+                )
+                
+                if (result && result.success) {
+                  console.log(`✅ Leilão ${auction.id} finalizado para todos os usuários`)
+                  
+                  // Se o usuário atual é o vencedor
+                  if (team?.id && result.winner_team_id === team.id) {
+                    // Notificar vitória (com delay para evitar conflitos)
+                    setTimeout(() => {
+                      setWinNotification({
+                        auctionId: auction.id,
+                        playerName: auction.player?.name || 'Jogador',
+                        amount: result.final_amount || auction.current_bid,
+                        teamName: team.name,
+                        show: true,
+                        timestamp: Date.now()
+                      })
+                      
+                      // Atualizar saldo local
+                      debitarSaldoVencedor(
+                        auction.id,
+                        team.id,
+                        result.final_amount || auction.current_bid
+                      )
+                    }, 1000)
+                  }
+                  
+                  // Recarregar leilões após finalização
+                  setTimeout(() => {
+                    loadAuctions()
+                    if (team.id) {
+                      loadPendingReserves(team.id, true)
+                    }
+                  }, 2000)
+                }
+              } catch (error) {
+                console.error(`❌ Erro ao finalizar leilão ${auction.id}:`, error)
+              } finally {
+                // Remover dos conjuntos de processamento
+                setTimeout(() => {
+                  setFinalizingAuctions(prev => {
+                    const newSet = new Set(prev)
+                    newSet.delete(auction.id)
+                    return newSet
+                  })
+                  processingAuctionsRef.current.delete(auction.id)
+                }, 3000)
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro na verificação de leilões expirados:', error)
+      }
+    }
+    
+    // Verificar a cada 500ms para precisão
+    const interval = setInterval(checkExpiredAuctions, 500)
+    return () => clearInterval(interval)
+  }, [team, auctions, isTimeSynced, serverTime, serverTimeOffset, debitarSaldoVencedor, loadPendingReserves])
 
   // CONFIGURAR REALTIME SUPABASE - ATUALIZADO
   useEffect(() => {
@@ -525,6 +856,7 @@ export default function PaginaLeilao() {
           console.log('🔄 Atualização de leilão em tempo real:', {
             event: payload.eventType,
             id: payload.new?.id,
+            status: payload.new?.status,
             old_current_bidder: payload.old?.current_bidder,
             new_current_bidder: payload.new?.current_bidder,
             team_id: team?.id
@@ -551,7 +883,8 @@ export default function PaginaLeilao() {
                 auctionId: payload.new?.id,
                 playerName: auctionData.player.name,
                 coveredAmount: payload.old?.current_bid || 0,
-                show: true
+                show: true,
+                timestamp: Date.now()
               })
               
               toast.success('💰 Seu saldo foi liberado! Lance coberto por outro time.', {
@@ -566,6 +899,46 @@ export default function PaginaLeilao() {
             }
           }
           
+          // Quando o leilão é finalizado
+          if (payload.new?.status === 'finished' && payload.old?.status === 'active') {
+            console.log('🏁 LEILÃO FINALIZADO VIA REALTIME:', payload.new?.id)
+            
+            // Se o usuário atual é o vencedor
+            if (payload.new?.current_bidder === team.id) {
+              setTimeout(() => {
+                // Buscar dados completos para notificação
+                supabase
+                  .from('auctions')
+                  .select(`
+                    *,
+                    player:players(name)
+                  `)
+                  .eq('id', payload.new?.id)
+                  .single()
+                  .then(({ data: auctionData }) => {
+                    if (auctionData) {
+                      setWinNotification({
+                        auctionId: auctionData.id,
+                        playerName: auctionData.player?.name || 'Jogador',
+                        amount: auctionData.current_bid,
+                        teamName: team.name,
+                        show: true,
+                        timestamp: Date.now()
+                      })
+                      
+                      // Atualizar estado local
+                      debitarSaldoVencedor(
+                        auctionData.id,
+                        team.id,
+                        auctionData.current_bid
+                      )
+                    }
+                  })
+              }, 1000)
+            }
+          }
+          
+          // Atualizar dados do leilão
           const { data: fullAuction } = await supabase
             .from('auctions')
             .select(`
@@ -579,58 +952,26 @@ export default function PaginaLeilao() {
           if (fullAuction) {
             setAuctions(prev => {
               const index = prev.findIndex(a => a.id === fullAuction.id)
+              const synchronizedTime = serverTime
               if (index >= 0) {
                 const newAuctions = [...prev]
-                const synchronizedTime = Date.now() + serverTimeOffset
                 newAuctions[index] = {
                   ...fullAuction,
                   time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
                     ? Math.max(0, new Date(fullAuction.end_time).getTime() - synchronizedTime)
-                    : 0
+                    : 0,
+                  synchronized_end_time: fullAuction.end_time ? 
+                    new Date(fullAuction.end_time).getTime() : undefined
                 }
-                
-                // Quando o usuário vence o leilão
-                if (fullAuction.status === 'finished' && 
-                    fullAuction.current_bidder === team.id) {
-                  
-                  console.log('🎉 USUÁRIO ATUAL VENCEU O LEILÃO:', {
-                    auctionId: fullAuction.id,
-                    playerName: fullAuction.player?.name,
-                    teamId: team.id,
-                    amount: fullAuction.current_bid
-                  })
-                  
-                  setWinNotification({
-                    auctionId: fullAuction.id,
-                    playerName: fullAuction.player?.name || 'Jogador',
-                    amount: fullAuction.current_bid,
-                    teamName: team.name,
-                    show: true
-                  })
-                  
-                  // Atualizar o estado local
-                  setTimeout(async () => {
-                    try {
-                      await debitarSaldoVencedor(
-                        fullAuction.id,
-                        team.id,
-                        fullAuction.current_bid
-                      )
-                      console.log(`✅ Estado local atualizado para leilão vencido ${fullAuction.id}`)
-                    } catch (error) {
-                      console.error('❌ Erro ao atualizar estado local:', error)
-                    }
-                  }, 1000)
-                }
-                
                 return newAuctions
               } else {
-                const synchronizedTime = Date.now() + serverTimeOffset
                 return [...prev, {
                   ...fullAuction,
                   time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
                     ? Math.max(0, new Date(fullAuction.end_time).getTime() - synchronizedTime)
-                    : 0
+                    : 0,
+                  synchronized_end_time: fullAuction.end_time ? 
+                    new Date(fullAuction.end_time).getTime() : undefined
                 }]
               }
             })
@@ -692,8 +1033,24 @@ export default function PaginaLeilao() {
           filter: `id=eq.${team.id}`
         },
         (payload) => {
-          console.log('💰 Saldo do time atualizado em tempo real:', payload.new.balance)
-          setTeam(prev => prev ? { ...prev, balance: payload.new.balance } : null)
+          const now = Date.now()
+          // Evitar atualizações muito rápidas
+          if (now - lastBalanceUpdateRef.current < 100) return
+          
+          lastBalanceUpdateRef.current = now
+          
+          console.log('💰 Saldo do time atualizado em tempo real:', {
+            novo: payload.new.balance,
+            anterior: payload.old.balance,
+            diff: payload.new.balance - payload.old.balance
+          })
+          
+          setTeam(prev => prev ? { 
+            ...prev, 
+            balance: payload.new.balance,
+            updated_at: new Date().toISOString(),
+            last_balance_update: now.toString()
+          } : null)
         }
       )
       .subscribe()
@@ -731,189 +1088,36 @@ export default function PaginaLeilao() {
       )
       .subscribe()
 
-    subscriptionsRef.current = [auctionsChannel, bidsChannel, balanceChannel, playersChannel]
+    // NOVO: Subscription para transações de saldo
+    const transactionsChannel = supabase
+      .channel('balance_transactions_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'balance_transactions',
+          filter: `team_id=eq.${team.id}`
+        },
+        () => {
+          // Forçar atualização do saldo reservado
+          if (team.id) {
+            loadPendingReserves(team.id, true)
+          }
+        }
+      )
+      .subscribe()
+
+    subscriptionsRef.current = [auctionsChannel, bidsChannel, balanceChannel, playersChannel, transactionsChannel]
 
     return () => {
       supabase.removeChannel(auctionsChannel)
       supabase.removeChannel(bidsChannel)
       supabase.removeChannel(balanceChannel)
       supabase.removeChannel(playersChannel)
+      supabase.removeChannel(transactionsChannel)
     }
-  }, [user, team, serverTimeOffset, saldoReservado, liberarSaldo, debitarSaldoVencedor])
-
-  // VERIFICAR LEILÕES EXPIRADOS PERIODICAMENTE - ATUALIZADO
-  useEffect(() => {
-    if (!team || auctions.length === 0 || !isTimeSynced) return
-    
-    const checkExpiredAuctions = async () => {
-      try {
-        const nowServerTime = Date.now() + serverTimeOffset
-        const now = new Date(nowServerTime)
-        console.log('⏰ Verificando leilões expirados com server time sincronizado...', now.toISOString())
-        
-        for (const auction of auctions.filter(a => a.status === 'active')) {
-          if (processingAuctionsRef.current.has(auction.id)) {
-            console.log(`⏳ Leilão ${auction.id} já está sendo processado, pulando...`)
-            continue
-          }
-          
-          if (auction.end_time && new Date(auction.end_time).getTime() <= nowServerTime) {
-            console.log(`⏰ Leilão ${auction.id} expirou, finalizando...`, {
-              endTime: auction.end_time,
-              now: now.toISOString(),
-              playerId: auction.player_id,
-              currentBidder: auction.current_bidder
-            })
-            
-            processingAuctionsRef.current.add(auction.id)
-            
-            try {
-              const { data: result, error } = await supabase.rpc('finalize_expired_auction', {
-                p_auction_id: auction.id
-              })
-              
-              if (error) {
-                console.error('❌ Erro ao finalizar leilão expirado:', error)
-              } else if (result) {
-                console.log('✅ Leilão finalizado via RPC:', {
-                  success: result.success,
-                  message: result.message,
-                  winnerTeamId: result.winner_team_id,
-                  playerId: result.player_id,
-                  auctionId: result.auction_id
-                })
-                
-                if (result.success && result.winner_team_id) {
-                  console.log('🔄 Verificando transferência do jogador...')
-                  
-                  setTimeout(async () => {
-                    try {
-                      const { data: playerData, error: playerError } = await supabase
-                        .from('players')
-                        .select('*')
-                        .eq('id', auction.player_id)
-                        .single()
-                      
-                      if (playerError) {
-                        console.error('❌ Erro ao verificar jogador:', playerError)
-                      } else {
-                        console.log('🔍 STATUS DO JOGADOR APÓS FINALIZAÇÃO:', {
-                          playerName: playerData.name,
-                          playerId: playerData.id,
-                          team_id: playerData.team_id,
-                          expected_team_id: result.winner_team_id,
-                          is_correct: playerData.team_id === result.winner_team_id
-                        })
-                        
-                        if (playerData.team_id !== result.winner_team_id) {
-                          console.error('⚠️ ALERTA: Jogador não foi transferido para o time vencedor!')
-                          console.log('🔄 Tentando corrigir manualmente...')
-                          
-                          const { error: updateError } = await supabase
-                            .from('players')
-                            .update({ team_id: result.winner_team_id })
-                            .eq('id', auction.player_id)
-                          
-                          if (updateError) {
-                            console.error('❌ Erro ao corrigir transferência:', updateError)
-                          } else {
-                            console.log('✅ Transferência corrigida manualmente')
-                          }
-                        }
-                      }
-                    } catch (error) {
-                      console.error('❌ Erro ao verificar status do jogador:', error)
-                    }
-                  }, 3000)
-                }
-                
-                if (result.winner_team_id === team.id) {
-                  setWinNotification({
-                    auctionId: auction.id,
-                    playerName: auction.player?.name || 'Jogador',
-                    amount: auction.current_bid,
-                    teamName: team.name,
-                    show: true
-                  })
-                  
-                  // Atualizar estado local quando vence via expiração
-                  setTimeout(async () => {
-                    try {
-                      await debitarSaldoVencedor(
-                        auction.id,
-                        team.id,
-                        auction.current_bid
-                      )
-                      console.log(`✅ Estado local atualizado para leilão expirado ${auction.id}`)
-                    } catch (error) {
-                      console.error('❌ Erro ao atualizar estado local:', error)
-                    }
-                  }, 1000)
-                }
-              }
-            } finally {
-              processingAuctionsRef.current.delete(auction.id)
-            }
-          }
-        }
-        
-      } catch (error) {
-        console.error('❌ Erro na verificação de leilões expirados:', error)
-      }
-    }
-    
-    const interval = setInterval(checkExpiredAuctions, 5000)
-    return () => clearInterval(interval)
-  }, [team, auctions, serverTimeOffset, isTimeSynced, debitarSaldoVencedor])
-
-  // NOVO useEffect: Verificar leilões finalizados e atualizar estado local
-  useEffect(() => {
-    if (!team?.id || !auctions.length) return
-    
-    const verificarLeiloesFinalizados = async () => {
-      try {
-        console.log('🔍 Verificando leilões finalizados para atualizar estado local...')
-        
-        const leiloesFinalizados = auctions.filter(a => 
-          a.status === 'finished' && 
-          a.current_bidder === team.id &&
-          saldoReservado[a.id]
-        )
-        
-        if (leiloesFinalizados.length === 0) {
-          console.log('✅ Nenhum leilão finalizado com saldo reservado pendente')
-          return
-        }
-        
-        console.log(`🔄 Atualizando estado local para ${leiloesFinalizados.length} leilão(ões) finalizado(s):`)
-        
-        for (const auction of leiloesFinalizados) {
-          console.log(`   - Leilão ${auction.id}: R$ ${auction.current_bid}`)
-          
-          try {
-            await debitarSaldoVencedor(
-              auction.id,
-              team.id,
-              auction.current_bid
-            )
-            console.log(`   ✅ Estado local atualizado para leilão ${auction.id}`)
-          } catch (error) {
-            console.error(`   ❌ Erro ao atualizar estado local do leilão ${auction.id}:`, error)
-          }
-        }
-        
-        console.log('🎯 Verificação de leilões finalizados concluída')
-        
-      } catch (error) {
-        console.error('❌ Erro ao verificar leilões finalizados:', error)
-      }
-    }
-    
-    // Executar verificação quando os dados forem carregados
-    if (!loading && team && auctions.length > 0) {
-      verificarLeiloesFinalizados()
-    }
-  }, [loading, team, auctions, saldoReservado, debitarSaldoVencedor])
+  }, [user, team, serverTime, serverTimeOffset, saldoReservado, liberarSaldo, debitarSaldoVencedor, loadPendingReserves])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -1093,14 +1297,23 @@ export default function PaginaLeilao() {
 
       console.log('🎯 Leilões encontrados:', auctionsData?.length)
       
+      const synchronizedTime = serverTime
       const auctionsWithTime = (auctionsData || []).map(auction => {
         if (auction.status !== 'active' || !auction.end_time) {
-          return { ...auction, time_remaining: 0 }
+          return { 
+            ...auction, 
+            time_remaining: 0,
+            synchronized_end_time: auction.end_time ? 
+              new Date(auction.end_time).getTime() : undefined
+          }
         }
-        const synchronizedServerTime = Date.now() + serverTimeOffset
         const endTime = new Date(auction.end_time).getTime()
-        const timeRemaining = Math.max(0, endTime - synchronizedServerTime)
-        return { ...auction, time_remaining: timeRemaining }
+        const timeRemaining = Math.max(0, endTime - synchronizedTime)
+        return { 
+          ...auction, 
+          time_remaining: timeRemaining,
+          synchronized_end_time: endTime
+        }
       })
 
       setAuctions(auctionsWithTime)
@@ -1170,11 +1383,11 @@ export default function PaginaLeilao() {
       return 0
     }
     
-    const synchronizedTime = Date.now() + serverTimeOffset
+    const synchronizedTime = serverTime
     const endTime = new Date(auction.end_time).getTime()
     
     return Math.max(0, endTime - synchronizedTime)
-  }, [serverTimeOffset])
+  }, [serverTime])
 
   const formatTimeRemaining = (ms: number) => {
     const minutes = Math.floor(ms / 60000)
@@ -1331,7 +1544,7 @@ export default function PaginaLeilao() {
       await loadFreePlayers()
 
       if (team?.id) {
-        await loadPendingReserves(team.id)
+        await loadPendingReserves(team.id, true)
       }
 
     } catch (error: any) {
@@ -1399,7 +1612,7 @@ export default function PaginaLeilao() {
       console.log('✅ LANCE BEM-SUCEDIDO:', data)
       
       // Atualizar reservas do banco
-      await loadPendingReserves(team.id)
+      await loadPendingReserves(team.id, true)
       
       setSelectedBidAmount(null)
       setBiddingAuctionId(null)
@@ -1427,23 +1640,20 @@ export default function PaginaLeilao() {
     try {
       console.log('🔧 FORÇANDO FINALIZAÇÃO DO LEILÃO:', auctionId)
       
-      const { data, error } = await supabase.rpc('finalize_expired_auction', {
-        p_auction_id: auctionId
-      })
+      // Usar o finalizador global para garantir sincronização
+      const result = await auctionFinalizer.current.finalizeAuction(auctionId, serverTimeOffset)
       
-      if (error) {
-        console.error('❌ Erro ao forçar finalização:', error)
-        toast.error('Erro: ' + error.message)
+      if (!result || !result.success) {
+        toast.error('Erro ao finalizar leilão')
       } else {
-        console.log('✅ Leilão forçado a finalizar:', data)
-        toast.success('Leilão finalizado')
+        toast.success('Leilão finalizado para todos os usuários!')
         await loadAuctions()
         
         // Atualizar estado local se o time atual é o vencedor
-        if (team?.id && data?.winner_team_id === team.id) {
+        if (team?.id && result.winner_team_id === team.id) {
           setTimeout(async () => {
             try {
-              await debitarSaldoVencedor(auctionId, team.id, data?.final_amount || 0)
+              await debitarSaldoVencedor(auctionId, team.id, result.final_amount || 0)
               console.log(`✅ Estado local atualizado para leilão forçado ${auctionId}`)
             } catch (error) {
               console.error('❌ Erro ao atualizar estado local:', error)
@@ -1598,9 +1808,10 @@ export default function PaginaLeilao() {
             formatTimeRemaining={formatTimeRemaining}
             saldoReservado={saldoReservado}
             liberarSaldo={liberarSaldo}
-            loadPendingReserves={() => team?.id && loadPendingReserves(team.id)}
+            loadPendingReserves={() => team?.id && loadPendingReserves(team.id, true)}
             serverTimeOffset={serverTimeOffset}
             forceRefresh={forceRefresh}
+            finalizingAuctions={finalizingAuctions}
           />
         ))}
       </div>
@@ -1752,6 +1963,7 @@ export default function PaginaLeilao() {
                             <p className="text-xl font-bold text-white">
                               R$ {formatToMillions(getSaldoDisponivel())}
                             </p>
+                            <SaldoUpdateIndicator lastUpdate={lastSaldoUpdate} />
                           </div>
                           <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-2">
                             <div className="flex items-center gap-1 mb-1">
@@ -1761,6 +1973,7 @@ export default function PaginaLeilao() {
                             <p className="text-xl font-bold text-white">
                               R$ {formatToMillions(getSaldoReservado())}
                             </p>
+                            <SaldoUpdateIndicator lastUpdate={lastSaldoUpdate} />
                           </div>
                         </div>
                         <div className="mt-3 bg-zinc-800/50 rounded-lg p-2">
@@ -1770,11 +1983,13 @@ export default function PaginaLeilao() {
                               R$ {formatToMillions(team.balance)}
                             </span>
                           </div>
-                          {isLoadingSaldo && (
-                            <p className="text-xs text-zinc-500 mt-1 text-center animate-pulse">
-                              Sincronizando saldos...
-                            </p>
-                          )}
+                          <div className="flex items-center justify-between mt-1">
+                            <SaldoUpdateIndicator lastUpdate={lastSaldoUpdate} />
+                            <div className="flex items-center gap-1">
+                              <Zap className="w-3 h-3 text-green-400" />
+                              <span className="text-xs text-green-400">Auto-atualizando</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2018,7 +2233,7 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD
+// COMPONENTE AUCTIONCARD ATUALIZADO
 const AuctionCard = ({ 
   auction, 
   type, 
@@ -2041,11 +2256,13 @@ const AuctionCard = ({
   liberarSaldo,
   loadPendingReserves,
   serverTimeOffset,
-  forceRefresh
+  forceRefresh,
+  finalizingAuctions // NOVO: prop para leilões sendo finalizados
 }: any) => {
 
   const [bidOptions, setBidOptions] = useState<{ value: number; label: string }[]>([])
   const [isBidModalOpen, setIsBidModalOpen] = useState(false)
+  const [localTimeRemaining, setLocalTimeRemaining] = useState<number>(0)
 
   useEffect(() => {
     if (auction && isBidModalOpen) {
@@ -2061,9 +2278,22 @@ const AuctionCard = ({
     }
   }, [biddingAuctionId, auction.id])
 
-  const timeRemaining = useMemo(() => {
-    return calculateTimeRemaining(auction)
-  }, [auction, calculateTimeRemaining, forceRefresh])
+  // Atualizar timer local para precisão
+  useEffect(() => {
+    if (type === 'active' && auction.status === 'active' && auction.end_time) {
+      const updateTimer = () => {
+        const timeRemaining = calculateTimeRemaining(auction)
+        setLocalTimeRemaining(timeRemaining)
+      }
+      
+      updateTimer()
+      const interval = setInterval(updateTimer, 100)
+      
+      return () => clearInterval(interval)
+    } else {
+      setLocalTimeRemaining(0)
+    }
+  }, [auction, type, calculateTimeRemaining, forceRefresh])
 
   const handleOpenBidModal = () => {
     setBiddingAuctionId(auction.id)
@@ -2126,8 +2356,9 @@ const AuctionCard = ({
 
   const isCurrentUserLeader = team && auction.current_bidder === team.id
   const temSaldoReservado = saldoReservado && saldoReservado[auction.id]
+  const isFinalizing = finalizingAuctions && finalizingAuctions.has(auction.id)
   
-  // CORREÇÃO: Não mostrar "Reservado" em leilões finalizados que o usuário venceu
+  // Não mostrar "Reservado" em leilões finalizados
   const mostrarReservado = type !== 'finished' && temSaldoReservado
 
   return (
@@ -2138,6 +2369,16 @@ const AuctionCard = ({
             <Lock className="w-3 h-3 mr-1" />
             Reservado
           </Badge>
+        </div>
+      )}
+
+      {isFinalizing && (
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 text-yellow-400 animate-spin mx-auto mb-2" />
+            <p className="text-white font-bold">Finalizando...</p>
+            <p className="text-yellow-300 text-sm">Sincronizando para todos</p>
+          </div>
         </div>
       )}
 
@@ -2165,11 +2406,11 @@ const AuctionCard = ({
               </div>
             </div>
             <div className="text-right">
-              {type === 'active' && timeRemaining > 0 && (
+              {type === 'active' && localTimeRemaining > 0 && (
                 <div className="flex items-center gap-1 text-red-400 mb-1">
                   <Timer className="w-4 h-4" />
                   <span className="font-mono font-bold">
-                    {formatTimeRemaining(timeRemaining)}
+                    {formatTimeRemaining(localTimeRemaining)}
                   </span>
                 </div>
               )}
@@ -2188,9 +2429,9 @@ const AuctionCard = ({
               Início: {new Date(auction.start_time).toLocaleString('pt-BR')}
             </div>
           )}
-          {serverTimeOffset !== 0 && timeRemaining > 0 && (
+          {serverTimeOffset !== 0 && localTimeRemaining > 0 && (
             <div className="text-xs text-zinc-500 mt-1">
-              Server time offset: {serverTimeOffset > 0 ? '+' : ''}{Math.round(serverTimeOffset / 1000)}s
+              Sincronizado com servidor
             </div>
           )}
         </div>
@@ -2254,7 +2495,7 @@ const AuctionCard = ({
           </>
         )}
 
-        {type === 'active' && timeRemaining > 0 && (
+        {type === 'active' && localTimeRemaining > 0 && (
           isBidModalOpen ? (
             <div className="space-y-3 p-4 bg-zinc-800/30 rounded-lg border border-zinc-600">
               <div className="flex justify-between items-center mb-2">
@@ -2345,7 +2586,7 @@ const AuctionCard = ({
             <Button
               onClick={handleOpenBidModal}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3"
-              disabled={!team || type === 'finished'}
+              disabled={!team || type === 'finished' || isFinalizing}
             >
               {!team ? (
                 'Sem Time'
@@ -2375,6 +2616,7 @@ const AuctionCard = ({
               <Button
                 onClick={() => onStartAuction(auction.id)}
                 className="flex-1 bg-orange-600 hover:bg-orange-700"
+                disabled={isFinalizing}
               >
                 <Play className="w-4 h-4 mr-2" />
                 Iniciar Agora
@@ -2387,6 +2629,7 @@ const AuctionCard = ({
                 "flex-1 bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30",
                 type === 'pending' ? "flex-1" : "w-full"
               )}
+              disabled={isFinalizing}
             >
               <Minus className="w-4 h-4 mr-2" />
               Cancelar
