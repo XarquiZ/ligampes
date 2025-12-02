@@ -426,6 +426,7 @@ export default function PaginaLeilao() {
   // REF para evitar múltiplas execuções
   const isProcessingRef = useRef(false)
   const subscriptionsRef = useRef<any[]>([])
+  const processingAuctionsRef = useRef<Set<string>>(new Set())
 
   // CARREGAMENTO INICIAL
   useEffect(() => {
@@ -458,6 +459,8 @@ export default function PaginaLeilao() {
   useEffect(() => {
     if (!user || !team) return
 
+    console.log('🔌 Configurando subscriptions para leilões...')
+
     // Canal para atualizações de leilões
     const auctionsChannel = supabase
       .channel('auctions_realtime')
@@ -469,10 +472,56 @@ export default function PaginaLeilao() {
           table: 'auctions',
         },
         async (payload) => {
-          console.log('🔄 Atualização de leilão em tempo real:', payload)
+          console.log('🔄 Atualização de leilão em tempo real:', {
+            event: payload.eventType,
+            id: payload.new?.id,
+            status: payload.new?.status,
+            player_id: payload.new?.player_id,
+            current_bidder: payload.new?.current_bidder
+          })
           
           if (payload.eventType === 'UPDATE') {
             const updatedAuction = payload.new as Auction
+            
+            // DEBUG: Verificar se o leilão foi finalizado
+            if (updatedAuction.status === 'finished') {
+              console.log('🏁 LEILÃO FINALIZADO DETECTADO:', {
+                auctionId: updatedAuction.id,
+                playerId: updatedAuction.player_id,
+                winnerTeamId: updatedAuction.current_bidder,
+                endTime: updatedAuction.end_time
+              })
+              
+              // Verificar se o jogador foi transferido para o time vencedor
+              setTimeout(async () => {
+                try {
+                  const { data: playerData, error: playerError } = await supabase
+                    .from('players')
+                    .select('*')
+                    .eq('id', updatedAuction.player_id)
+                    .single()
+                  
+                  console.log('🔍 VERIFICANDO STATUS DO JOGADOR APÓS LEILÃO:', {
+                    auctionId: updatedAuction.id,
+                    playerId: updatedAuction.player_id,
+                    playerData,
+                    playerError,
+                    expectedTeamId: updatedAuction.current_bidder
+                  })
+                  
+                  if (playerData) {
+                    console.log('📊 STATUS ATUAL DO JOGADOR:', {
+                      name: playerData.name,
+                      team_id: playerData.team_id,
+                      expected_team_id: updatedAuction.current_bidder,
+                      match: playerData.team_id === updatedAuction.current_bidder
+                    })
+                  }
+                } catch (error) {
+                  console.error('❌ Erro ao verificar status do jogador:', error)
+                }
+              }, 2000)
+            }
             
             // Buscar dados completos do leilão atualizado
             const { data: fullAuction } = await supabase
@@ -500,6 +549,13 @@ export default function PaginaLeilao() {
                   // Verificar se o leilão acabou E o usuário atual é o vencedor
                   if (fullAuction.status === 'finished' && 
                       fullAuction.current_bidder === team.id) {
+                    
+                    console.log('🎉 USUÁRIO ATUAL VENCEU O LEILÃO:', {
+                      auctionId: fullAuction.id,
+                      playerName: fullAuction.player?.name,
+                      teamId: team.id,
+                      amount: fullAuction.current_bid
+                    })
                     
                     // Mostrar notificação de vitória
                     setWinNotification({
@@ -590,12 +646,48 @@ export default function PaginaLeilao() {
       )
       .subscribe()
 
-    subscriptionsRef.current = [auctionsChannel, bidsChannel, balanceChannel]
+    // Canal para atualizações de jogadores
+    const playersChannel = supabase
+      .channel('players_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'players',
+        },
+        (payload) => {
+          console.log('👤 Atualização de jogador em tempo real:', {
+            playerId: payload.new?.id,
+            playerName: payload.new?.name,
+            team_id: payload.new?.team_id,
+            old_team_id: payload.old?.team_id
+          })
+          
+          // Atualizar jogadores nos leilões se necessário
+          setAuctions(prev => prev.map(auction => {
+            if (auction.player_id === payload.new?.id) {
+              return {
+                ...auction,
+                player: {
+                  ...auction.player,
+                  team_id: payload.new?.team_id
+                } as Player
+              }
+            }
+            return auction
+          }))
+        }
+      )
+      .subscribe()
+
+    subscriptionsRef.current = [auctionsChannel, bidsChannel, balanceChannel, playersChannel]
 
     return () => {
       supabase.removeChannel(auctionsChannel)
       supabase.removeChannel(bidsChannel)
       supabase.removeChannel(balanceChannel)
+      supabase.removeChannel(playersChannel)
     }
   }, [user, team, currentTime, saldoReservado, liberarSaldo])
 
@@ -607,31 +699,101 @@ export default function PaginaLeilao() {
       try {
         // Verificar leilões ativos que expiraram
         const now = new Date()
+        console.log('⏰ Verificando leilões expirados...', now.toISOString())
         
         for (const auction of auctions.filter(a => a.status === 'active')) {
+          if (processingAuctionsRef.current.has(auction.id)) {
+            console.log(`⏳ Leilão ${auction.id} já está sendo processado, pulando...`)
+            continue
+          }
+          
           if (auction.end_time && new Date(auction.end_time) <= now) {
-            console.log(`⏰ Leilão ${auction.id} expirou, finalizando...`)
-            
-            // Chamar a função RPC para finalizar leilão expirado
-            const { data: result, error } = await supabase.rpc('finalize_expired_auction', {
-              p_auction_id: auction.id
+            console.log(`⏰ Leilão ${auction.id} expirou, finalizando...`, {
+              endTime: auction.end_time,
+              now: now.toISOString(),
+              playerId: auction.player_id,
+              currentBidder: auction.current_bidder
             })
             
-            if (error) {
-              console.error('❌ Erro ao finalizar leilão expirado:', error)
-            } else if (result && result.success) {
-              console.log('✅ Leilão finalizado:', result.message)
+            processingAuctionsRef.current.add(auction.id)
+            
+            try {
+              // Chamar a função RPC para finalizar leilão expirado
+              const { data: result, error } = await supabase.rpc('finalize_expired_auction', {
+                p_auction_id: auction.id
+              })
               
-              // Se o usuário atual é o vencedor, mostrar notificação
-              if (result.winner_team_id === team.id) {
-                setWinNotification({
-                  auctionId: auction.id,
-                  playerName: auction.player?.name || 'Jogador',
-                  amount: auction.current_bid,
-                  teamName: team.name,
-                  show: true
+              if (error) {
+                console.error('❌ Erro ao finalizar leilão expirado:', error)
+              } else if (result) {
+                console.log('✅ Leilão finalizado via RPC:', {
+                  success: result.success,
+                  message: result.message,
+                  winnerTeamId: result.winner_team_id,
+                  playerId: result.player_id,
+                  auctionId: result.auction_id
                 })
+                
+                // Verificar se o jogador foi transferido
+                if (result.success && result.winner_team_id) {
+                  console.log('🔄 Verificando transferência do jogador...')
+                  
+                  // Aguardar um pouco e verificar o status do jogador
+                  setTimeout(async () => {
+                    try {
+                      const { data: playerData, error: playerError } = await supabase
+                        .from('players')
+                        .select('*')
+                        .eq('id', auction.player_id)
+                        .single()
+                      
+                      if (playerError) {
+                        console.error('❌ Erro ao verificar jogador:', playerError)
+                      } else {
+                        console.log('🔍 STATUS DO JOGADOR APÓS FINALIZAÇÃO:', {
+                          playerName: playerData.name,
+                          playerId: playerData.id,
+                          team_id: playerData.team_id,
+                          expected_team_id: result.winner_team_id,
+                          is_correct: playerData.team_id === result.winner_team_id
+                        })
+                        
+                        if (playerData.team_id !== result.winner_team_id) {
+                          console.error('⚠️ ALERTA: Jogador não foi transferido para o time vencedor!')
+                          console.log('🔄 Tentando corrigir manualmente...')
+                          
+                          // Tentar corrigir manualmente
+                          const { error: updateError } = await supabase
+                            .from('players')
+                            .update({ team_id: result.winner_team_id })
+                            .eq('id', auction.player_id)
+                          
+                          if (updateError) {
+                            console.error('❌ Erro ao corrigir transferência:', updateError)
+                          } else {
+                            console.log('✅ Transferência corrigida manualmente')
+                          }
+                        }
+                      }
+                    } catch (error) {
+                      console.error('❌ Erro ao verificar status do jogador:', error)
+                    }
+                  }, 3000)
+                }
+                
+                // Se o usuário atual é o vencedor, mostrar notificação
+                if (result.winner_team_id === team.id) {
+                  setWinNotification({
+                    auctionId: auction.id,
+                    playerName: auction.player?.name || 'Jogador',
+                    amount: auction.current_bid,
+                    teamName: team.name,
+                    show: true
+                  })
+                }
               }
+            } finally {
+              processingAuctionsRef.current.delete(auction.id)
             }
           }
         }
@@ -641,8 +803,8 @@ export default function PaginaLeilao() {
       }
     }
     
-    // Verificar a cada 10 segundos (mais frequente)
-    const interval = setInterval(checkExpiredAuctions, 10000)
+    // Verificar a cada 5 segundos (mais frequente para debug)
+    const interval = setInterval(checkExpiredAuctions, 5000)
     
     return () => clearInterval(interval)
   }, [team, auctions])
@@ -824,6 +986,32 @@ export default function PaginaLeilao() {
       }
 
       console.log('🎯 Leilões encontrados:', auctionsData?.length)
+      
+      // DEBUG: Verificar status dos leilões finalizados
+      const finishedAuctions = (auctionsData || []).filter(a => a.status === 'finished')
+      if (finishedAuctions.length > 0) {
+        console.log('🏁 LEILÕES FINALIZADOS ENCONTRADOS:', finishedAuctions.map(a => ({
+          id: a.id,
+          player_id: a.player_id,
+          player_name: a.player?.name,
+          current_bidder: a.current_bidder,
+          player_team_id: a.player?.team_id
+        })))
+        
+        // Verificar se algum jogador não foi transferido
+        for (const auction of finishedAuctions) {
+          if (auction.current_bidder && auction.player && auction.player.team_id !== auction.current_bidder) {
+            console.error('⚠️ PROBLEMA DETECTADO:', {
+              auctionId: auction.id,
+              playerId: auction.player_id,
+              playerName: auction.player.name,
+              expectedTeam: auction.current_bidder,
+              actualTeam: auction.player.team_id,
+              issue: 'Jogador não foi transferido para o time vencedor!'
+            })
+          }
+        }
+      }
       
       // Calcular tempo restante
       const auctionsWithTime = (auctionsData || []).map(auction => {
@@ -1166,6 +1354,74 @@ export default function PaginaLeilao() {
     }
   }
 
+  // FUNÇÃO ADICIONAL: Forçar finalização do leilão com debug
+  const handleForceFinishAuction = async (auctionId: string) => {
+    if (!confirm('⚠️ Forçar finalização do leilão? Isso pode causar problemas.')) return
+    
+    try {
+      console.log('🔧 FORÇANDO FINALIZAÇÃO DO LEILÃO:', auctionId)
+      
+      const { data, error } = await supabase.rpc('finalize_expired_auction', {
+        p_auction_id: auctionId
+      })
+      
+      if (error) {
+        console.error('❌ Erro ao forçar finalização:', error)
+        toast.error('Erro: ' + error.message)
+      } else {
+        console.log('✅ Leilão forçado a finalizar:', data)
+        toast.success('Leilão finalizado')
+        await loadAuctions()
+      }
+    } catch (error: any) {
+      console.error('❌ Erro:', error)
+      toast.error('Erro: ' + error.message)
+    }
+  }
+
+  // FUNÇÃO ADICIONAL: Verificar status do jogador
+  const handleCheckPlayerStatus = async (auctionId: string, playerId: string) => {
+    try {
+      console.log('🔍 VERIFICANDO STATUS DO JOGADOR...')
+      
+      const { data: auction, error: auctionError } = await supabase
+        .from('auctions')
+        .select('*')
+        .eq('id', auctionId)
+        .single()
+      
+      const { data: player, error: playerError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', playerId)
+        .single()
+      
+      console.log('📊 STATUS DO LEILÃO:', {
+        auctionId: auction?.id,
+        status: auction?.status,
+        currentBidder: auction?.current_bidder,
+        endTime: auction?.end_time
+      })
+      
+      console.log('📊 STATUS DO JOGADOR:', {
+        playerId: player?.id,
+        playerName: player?.name,
+        team_id: player?.team_id,
+        expectedTeam: auction?.current_bidder,
+        match: player?.team_id === auction?.current_bidder
+      })
+      
+      if (player?.team_id !== auction?.current_bidder && auction?.status === 'finished') {
+        console.error('⚠️ PROBLEMA: Jogador não está no time correto!')
+        toast.error('Problema detectado: jogador não transferido')
+      } else {
+        toast.success('Status verificado - tudo OK')
+      }
+    } catch (error) {
+      console.error('❌ Erro ao verificar status:', error)
+    }
+  }
+
   const resetCreateAuctionForm = () => {
     setSelectedPlayer('')
     setStartPrice('')
@@ -1253,6 +1509,8 @@ export default function PaginaLeilao() {
             onBid={handlePlaceBid}
             onStartAuction={handleStartAuction}
             onCancelAuction={handleCancelAuction}
+            onForceFinish={handleForceFinishAuction}
+            onCheckPlayerStatus={handleCheckPlayerStatus}
             bids={bids[auction.id]}
             isAdmin={isAdmin}
             team={team}
@@ -1649,13 +1907,15 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD ATUALIZADO
+// COMPONENTE AUCTIONCARD ATUALIZADO COM DEBUG
 const AuctionCard = ({ 
   auction, 
   type, 
   onBid, 
   onStartAuction, 
   onCancelAuction,
+  onForceFinish,
+  onCheckPlayerStatus,
   bids, 
   isAdmin, 
   team,
@@ -1673,6 +1933,7 @@ const AuctionCard = ({
 
   const [bidOptions, setBidOptions] = useState<{ value: number; label: string }[]>([])
   const [isBidModalOpen, setIsBidModalOpen] = useState(false)
+  const [showDebugInfo, setShowDebugInfo] = useState(false)
 
   // Atualizar opções quando o leilão mudar
   useEffect(() => {
@@ -1753,8 +2014,36 @@ const AuctionCard = ({
   const isCurrentUserLeader = team && auction.current_bidder === team.id
   const temSaldoReservado = saldoReservado && saldoReservado[auction.id]
 
+  // Verificar se há problema com o jogador
+  const hasPlayerIssue = type === 'finished' && 
+    auction.current_bidder && 
+    auction.player?.team_id !== auction.current_bidder
+
   return (
-    <Card className={cn("p-6 relative", getCardStyles())}>
+    <Card className={cn("p-6 relative", getCardStyles(), hasPlayerIssue && "border-red-500 border-2")}>
+      {/* Indicador de problema */}
+      {hasPlayerIssue && (
+        <div className="absolute -top-2 -left-2">
+          <Badge className="bg-red-500 text-white animate-pulse">
+            <AlertCircle className="w-3 h-3 mr-1" />
+            PROBLEMA
+          </Badge>
+        </div>
+      )}
+
+      {/* Botão de debug (admin only) */}
+      {isAdmin && (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowDebugInfo(!showDebugInfo)}
+          className="absolute top-2 right-2 h-6 w-6 text-zinc-500 hover:text-white"
+          title="Mostrar informações de debug"
+        >
+          <AlertCircle className="w-3 h-3" />
+        </Button>
+      )}
+
       {/* Badge de saldo reservado */}
       {temSaldoReservado && (
         <div className="absolute -top-2 -right-2 flex flex-col items-end">
@@ -1827,6 +2116,73 @@ const AuctionCard = ({
           )}
         </div>
       </div>
+
+      {/* Informações de debug */}
+      {showDebugInfo && (
+        <div className="mb-4 p-3 bg-black/30 rounded-lg border border-yellow-500/30">
+          <div className="text-xs font-mono space-y-1">
+            <div className="flex justify-between">
+              <span className="text-yellow-400">ID:</span>
+              <span className="text-white">{auction.id.substring(0, 8)}...</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-yellow-400">Player ID:</span>
+              <span className="text-white">{auction.player_id?.substring(0, 8)}...</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-yellow-400">Status:</span>
+              <span className={cn(
+                "font-bold",
+                auction.status === 'active' ? 'text-green-400' : 
+                auction.status === 'finished' ? 'text-red-400' : 'text-yellow-400'
+              )}>
+                {auction.status}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-yellow-400">Vencedor:</span>
+              <span className="text-white">{auction.current_bidder?.substring(0, 8)}...</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-yellow-400">Time do Jogador:</span>
+              <span className={cn(
+                "font-bold",
+                auction.player?.team_id === auction.current_bidder ? 'text-green-400' : 'text-red-400'
+              )}>
+                {auction.player?.team_id?.substring(0, 8) || 'null'}
+              </span>
+            </div>
+            {auction.end_time && (
+              <div className="flex justify-between">
+                <span className="text-yellow-400">Fim:</span>
+                <span className="text-white">{new Date(auction.end_time).toLocaleTimeString()}</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Botões de debug para admin */}
+          {isAdmin && (
+            <div className="flex gap-2 mt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onForceFinish(auction.id)}
+                className="text-xs h-6 bg-red-500/20 border-red-500 text-red-400 hover:bg-red-500/30"
+              >
+                Forçar Fim
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onCheckPlayerStatus(auction.id, auction.player_id)}
+                className="text-xs h-6 bg-blue-500/20 border-blue-500 text-blue-400 hover:bg-blue-500/30"
+              >
+                Verificar
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3">
         {type === 'active' && auction.current_bid === auction.start_price ? (
