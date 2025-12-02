@@ -101,6 +101,14 @@ interface WinNotification {
   show: boolean
 }
 
+// Estado para notificações de lance coberto
+interface BidCoveredNotification {
+  auctionId: string
+  playerName: string
+  coveredAmount: number
+  show: boolean
+}
+
 // Formatar valores para exibição (ex: 50M)
 const formatToMillions = (value: number): string => {
   if (value >= 1000000) {
@@ -408,6 +416,9 @@ export default function PaginaLeilao() {
   // Estado para notificações de vitória
   const [winNotification, setWinNotification] = useState<WinNotification | null>(null)
 
+  // Estado para notificações de lance coberto
+  const [bidCoveredNotification, setBidCoveredNotification] = useState<BidCoveredNotification | null>(null)
+
   // Hook de saldo reservado
   const {
     saldoReservado,
@@ -420,7 +431,7 @@ export default function PaginaLeilao() {
     verificarLeiloesAtivos
   } = useSaldoReservado(team?.id || null)
 
-  // Estado para contagem regressiva
+  // Estado para contagem regressiva - ÚNICO para sincronização
   const [currentTime, setCurrentTime] = useState(Date.now())
 
   // REF para evitar múltiplas execuções
@@ -446,7 +457,7 @@ export default function PaginaLeilao() {
     }
   }, [team?.id, loadPendingReserves])
 
-  // CONTAGEM REGRESSIVA SEPARADA
+  // CONTAGEM REGRESSIVA SINCRONIZADA (1 SEGUNDO PARA TODOS)
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now())
@@ -455,7 +466,7 @@ export default function PaginaLeilao() {
     return () => clearInterval(interval)
   }, [])
 
-  // CONFIGURAR REALTIME SUPABASE
+  // CONFIGURAR REALTIME SUPABASE - ATUALIZADO PARA DETECTAR LANCE COBERTO
   useEffect(() => {
     if (!user || !team) return
 
@@ -467,7 +478,7 @@ export default function PaginaLeilao() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'auctions',
         },
@@ -475,109 +486,104 @@ export default function PaginaLeilao() {
           console.log('🔄 Atualização de leilão em tempo real:', {
             event: payload.eventType,
             id: payload.new?.id,
-            status: payload.new?.status,
-            player_id: payload.new?.player_id,
-            current_bidder: payload.new?.current_bidder
+            old_current_bidder: payload.old?.current_bidder,
+            new_current_bidder: payload.new?.current_bidder,
+            team_id: team?.id
           })
           
-          if (payload.eventType === 'UPDATE') {
-            const updatedAuction = payload.new as Auction
+          // DETECTAR SE O USUÁRIO ATUAL PERDEU A LIDERANÇA
+          if (team && 
+              payload.old?.current_bidder === team.id && 
+              payload.new?.current_bidder !== team.id) {
             
-            // DEBUG: Verificar se o leilão foi finalizado
-            if (updatedAuction.status === 'finished') {
-              console.log('🏁 LEILÃO FINALIZADO DETECTADO:', {
-                auctionId: updatedAuction.id,
-                playerId: updatedAuction.player_id,
-                winnerTeamId: updatedAuction.current_bidder,
-                endTime: updatedAuction.end_time
-              })
-              
-              // Verificar se o jogador foi transferido para o time vencedor
-              setTimeout(async () => {
-                try {
-                  const { data: playerData, error: playerError } = await supabase
-                    .from('players')
-                    .select('*')
-                    .eq('id', updatedAuction.player_id)
-                    .single()
-                  
-                  console.log('🔍 VERIFICANDO STATUS DO JOGADOR APÓS LEILÃO:', {
-                    auctionId: updatedAuction.id,
-                    playerId: updatedAuction.player_id,
-                    playerData,
-                    playerError,
-                    expectedTeamId: updatedAuction.current_bidder
-                  })
-                  
-                  if (playerData) {
-                    console.log('📊 STATUS ATUAL DO JOGADOR:', {
-                      name: playerData.name,
-                      team_id: playerData.team_id,
-                      expected_team_id: updatedAuction.current_bidder,
-                      match: playerData.team_id === updatedAuction.current_bidder
-                    })
-                  }
-                } catch (error) {
-                  console.error('❌ Erro ao verificar status do jogador:', error)
-                }
-              }, 2000)
-            }
+            console.log('⚠️ USUÁRIO PERDEU A LIDERANÇA NO LEILÃO:', payload.new?.id)
             
-            // Buscar dados completos do leilão atualizado
-            const { data: fullAuction } = await supabase
+            // Buscar nome do jogador para a notificação
+            const { data: auctionData } = await supabase
               .from('auctions')
               .select(`
                 *,
-                player:players(*),
-                current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+                player:players(name)
               `)
-              .eq('id', payload.new.id)
+              .eq('id', payload.new?.id)
               .single()
             
-            if (fullAuction) {
-              setAuctions(prev => {
-                const index = prev.findIndex(a => a.id === fullAuction.id)
-                if (index >= 0) {
-                  const newAuctions = [...prev]
-                  newAuctions[index] = {
-                    ...fullAuction,
-                    time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
-                      ? Math.max(0, new Date(fullAuction.end_time).getTime() - currentTime)
-                      : 0
-                  }
-                  
-                  // Verificar se o leilão acabou E o usuário atual é o vencedor
-                  if (fullAuction.status === 'finished' && 
-                      fullAuction.current_bidder === team.id) {
-                    
-                    console.log('🎉 USUÁRIO ATUAL VENCEU O LEILÃO:', {
-                      auctionId: fullAuction.id,
-                      playerName: fullAuction.player?.name,
-                      teamId: team.id,
-                      amount: fullAuction.current_bid
-                    })
-                    
-                    // Mostrar notificação de vitória
-                    setWinNotification({
-                      auctionId: fullAuction.id,
-                      playerName: fullAuction.player?.name || 'Jogador',
-                      amount: fullAuction.current_bid,
-                      teamName: team.name,
-                      show: true
-                    })
-                  }
-                  
-                  return newAuctions
-                } else {
-                  return [...prev, {
-                    ...fullAuction,
-                    time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
-                      ? Math.max(0, new Date(fullAuction.end_time).getTime() - currentTime)
-                      : 0
-                  }]
-                }
+            if (auctionData?.player) {
+              // Mostrar notificação de lance coberto
+              setBidCoveredNotification({
+                auctionId: payload.new?.id,
+                playerName: auctionData.player.name,
+                coveredAmount: payload.old?.current_bid || 0,
+                show: true
               })
+              
+              // Também mostrar um toast
+              toast.success('💰 Seu saldo foi liberado! Lance coberto por outro time.', {
+                duration: 5000,
+                icon: '🔄'
+              })
+              
+              // Liberar saldo localmente
+              if (team.id) {
+                await liberarSaldo(payload.new?.id, team.id)
+              }
             }
+          }
+          
+          // Buscar dados completos do leilão atualizado
+          const { data: fullAuction } = await supabase
+            .from('auctions')
+            .select(`
+              *,
+              player:players(*),
+              current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+            `)
+            .eq('id', payload.new?.id)
+            .single()
+          
+          if (fullAuction) {
+            setAuctions(prev => {
+              const index = prev.findIndex(a => a.id === fullAuction.id)
+              if (index >= 0) {
+                const newAuctions = [...prev]
+                newAuctions[index] = {
+                  ...fullAuction,
+                  time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
+                    ? Math.max(0, new Date(fullAuction.end_time).getTime() - currentTime)
+                    : 0
+                }
+                
+                // Verificar se o leilão acabou E o usuário atual é o vencedor
+                if (fullAuction.status === 'finished' && 
+                    fullAuction.current_bidder === team.id) {
+                  
+                  console.log('🎉 USUÁRIO ATUAL VENCEU O LEILÃO:', {
+                    auctionId: fullAuction.id,
+                    playerName: fullAuction.player?.name,
+                    teamId: team.id,
+                    amount: fullAuction.current_bid
+                  })
+                  
+                  // Mostrar notificação de vitória
+                  setWinNotification({
+                    auctionId: fullAuction.id,
+                    playerName: fullAuction.player?.name || 'Jogador',
+                    amount: fullAuction.current_bid,
+                    teamName: team.name,
+                    show: true
+                  })
+                }
+                
+                return newAuctions
+              } else {
+                return [...prev, {
+                  ...fullAuction,
+                  time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
+                    ? Math.max(0, new Date(fullAuction.end_time).getTime() - currentTime)
+                    : 0
+                }]
+              }
+            })
           }
         }
       )
@@ -803,7 +809,7 @@ export default function PaginaLeilao() {
       }
     }
     
-    // Verificar a cada 5 segundos (mais frequente para debug)
+    // Verificar a cada 5 segundos
     const interval = setInterval(checkExpiredAuctions, 5000)
     
     return () => clearInterval(interval)
@@ -987,33 +993,7 @@ export default function PaginaLeilao() {
 
       console.log('🎯 Leilões encontrados:', auctionsData?.length)
       
-      // DEBUG: Verificar status dos leilões finalizados
-      const finishedAuctions = (auctionsData || []).filter(a => a.status === 'finished')
-      if (finishedAuctions.length > 0) {
-        console.log('🏁 LEILÕES FINALIZADOS ENCONTRADOS:', finishedAuctions.map(a => ({
-          id: a.id,
-          player_id: a.player_id,
-          player_name: a.player?.name,
-          current_bidder: a.current_bidder,
-          player_team_id: a.player?.team_id
-        })))
-        
-        // Verificar se algum jogador não foi transferido
-        for (const auction of finishedAuctions) {
-          if (auction.current_bidder && auction.player && auction.player.team_id !== auction.current_bidder) {
-            console.error('⚠️ PROBLEMA DETECTADO:', {
-              auctionId: auction.id,
-              playerId: auction.player_id,
-              playerName: auction.player.name,
-              expectedTeam: auction.current_bidder,
-              actualTeam: auction.player.team_id,
-              issue: 'Jogador não foi transferido para o time vencedor!'
-            })
-          }
-        }
-      }
-      
-      // Calcular tempo restante
+      // Calcular tempo restante usando o currentTime sincronizado
       const auctionsWithTime = (auctionsData || []).map(auction => {
         if (auction.status !== 'active' || !auction.end_time) {
           return { ...auction, time_remaining: 0 }
@@ -1086,7 +1066,7 @@ export default function PaginaLeilao() {
     }
   }
 
-  // FUNÇÃO PARA CALCULAR TEMPO RESTANTE
+  // FUNÇÃO PARA CALCULAR TEMPO RESTANTE USANDO O currentTime SINCRONIZADO
   const calculateTimeRemaining = useCallback((auction: Auction) => {
     if (auction.status !== 'active' || !auction.end_time) {
       return 0
@@ -1595,75 +1575,107 @@ export default function PaginaLeilao() {
             </div>
           )}
 
+          {/* NOTIFICAÇÃO DE LANCE COBERTO */}
+          {bidCoveredNotification?.show && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <div className="bg-gradient-to-br from-blue-600/90 to-cyan-600/90 rounded-2xl p-8 max-w-md w-full mx-4 border-2 border-blue-400/50 shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="text-center">
+                  <div className="flex justify-center mb-6">
+                    <div className="relative">
+                      <RefreshCw className="w-20 h-20 text-blue-300 animate-spin" />
+                      <DollarSign className="w-8 h-8 text-green-400 absolute -top-2 -right-2" />
+                    </div>
+                  </div>
+                  
+                  <h2 className="text-3xl font-bold text-white mb-2">💸 LANCE COBERTO!</h2>
+                  <p className="text-blue-100 text-lg mb-4">Seu saldo foi liberado</p>
+                  
+                  <div className="bg-black/30 rounded-xl p-4 mb-6">
+                    <p className="text-white font-semibold text-xl">{bidCoveredNotification.playerName}</p>
+                    <p className="text-green-300 text-2xl font-bold mt-2">
+                      R$ {formatToMillions(bidCoveredNotification.coveredAmount)}
+                    </p>
+                    <p className="text-blue-100 text-sm mt-1">
+                      Disponível novamente no seu saldo!
+                    </p>
+                  </div>
+                  
+                  <Button
+                    onClick={() => setBidCoveredNotification(null)}
+                    className="bg-white text-blue-600 hover:bg-blue-100 font-bold py-3 px-8 text-lg"
+                  >
+                    Fechar
+                  </Button>
+                  
+                  <p className="text-blue-200/70 text-sm mt-4">
+                    Outro usuário deu um lance maior. Seu saldo foi liberado automaticamente.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="max-w-7xl mx-auto">
-            {/* Header com botão de refresh */}
+            {/* Header com informações de saldo */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
-              <div>
+              <div className="flex-1">
                 <div className="flex items-center gap-4">
                   <h1 className="text-5xl font-black text-white mb-2">LEILÃO DE JOGADORES</h1>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={loadInitialData}
-                      className="hover:bg-zinc-800/50"
-                      title="Recarregar tudo"
-                      disabled={isLoadingSaldo}
-                    >
-                      <RefreshCw className={`w-5 h-5 ${isLoadingSaldo ? 'animate-spin' : ''}`} />
-                    </Button>
-                    {team && getSaldoReservado() > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => liberarTodosSaldos(team.id)}
-                        className="hover:bg-red-500/20 text-red-400"
-                        title="Liberar todos os saldos reservados"
-                        disabled={isLoadingSaldo}
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </Button>
-                    )}
-                  </div>
                 </div>
                 <p className="text-zinc-400 text-lg">
                   Adquira os melhores jogadores livres no mercado
                 </p>
               </div>
 
-              {/* Informações do time com saldo reservado */}
+              {/* Cartão de informações do time com design aprimorado */}
               {team && (
-                <div className="flex items-center gap-4 bg-zinc-800/50 rounded-lg p-4 min-w-[300px]">
-                  {team.logo_url && (
-                    <img 
-                      src={team.logo_url} 
-                      alt={team.name}
-                      className="w-10 h-10 rounded-full"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <p className="font-semibold text-white">{team.name}</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-green-400">
-                        Saldo: R$ {formatToMillions(team.balance)}
-                      </p>
-                      {getSaldoReservado() > 0 && (
-                        <Badge variant="outline" className="text-yellow-400 border-yellow-400/50">
-                          <Lock className="w-3 h-3 mr-1" />
-                          R$ {formatToMillions(getSaldoReservado())}
-                        </Badge>
+                <div className="w-full lg:w-auto">
+                  <div className="bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 backdrop-blur-lg rounded-2xl p-4 border border-zinc-700/50 shadow-xl">
+                    <div className="flex items-center gap-4">
+                      {team.logo_url && (
+                        <img 
+                          src={team.logo_url} 
+                          alt={team.name}
+                          className="w-12 h-12 rounded-full border-2 border-orange-500/50"
+                        />
                       )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-white text-lg truncate">{team.name}</h3>
+                        <div className="grid grid-cols-2 gap-3 mt-2">
+                          <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-2">
+                            <div className="flex items-center gap-1 mb-1">
+                              <DollarSign className="w-4 h-4 text-green-400" />
+                              <span className="text-xs text-green-300 font-medium">Disponível</span>
+                            </div>
+                            <p className="text-xl font-bold text-white">
+                              R$ {formatToMillions(getSaldoDisponivel())}
+                            </p>
+                          </div>
+                          <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-2">
+                            <div className="flex items-center gap-1 mb-1">
+                              <Lock className="w-4 h-4 text-yellow-400" />
+                              <span className="text-xs text-yellow-300 font-medium">Reservado</span>
+                            </div>
+                            <p className="text-xl font-bold text-white">
+                              R$ {formatToMillions(getSaldoReservado())}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 bg-zinc-800/50 rounded-lg p-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-zinc-400">Saldo Total:</span>
+                            <span className="text-lg font-bold text-white">
+                              R$ {formatToMillions(team.balance)}
+                            </span>
+                          </div>
+                          {isLoadingSaldo && (
+                            <p className="text-xs text-zinc-500 mt-1 text-center animate-pulse">
+                              Sincronizando saldos...
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    {getSaldoReservado() > 0 && (
-                      <p className="text-sm text-yellow-400 mt-1">
-                        Disponível: R$ {formatToMillions(getSaldoDisponivel())}
-                      </p>
-                    )}
-                    {isLoadingSaldo && (
-                      <p className="text-xs text-zinc-500 mt-1 animate-pulse">
-                        Sincronizando saldos...
-                      </p>
-                    )}
                   </div>
                 </div>
               )}
@@ -1671,7 +1683,7 @@ export default function PaginaLeilao() {
               {isAdmin && (
                 <Dialog open={createAuctionModalOpen} onOpenChange={setCreateAuctionModalOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-orange-600 hover:bg-orange-700 text-white">
+                    <Button className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg">
                       <Gavel className="w-4 h-4 mr-2" />
                       Criar Leilão
                     </Button>
@@ -1907,7 +1919,7 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD ATUALIZADO COM DEBUG
+// COMPONENTE AUCTIONCARD ATUALIZADO SEM BOTÕES DE DEBUG E REFRESH
 const AuctionCard = ({ 
   auction, 
   type, 
@@ -1933,7 +1945,6 @@ const AuctionCard = ({
 
   const [bidOptions, setBidOptions] = useState<{ value: number; label: string }[]>([])
   const [isBidModalOpen, setIsBidModalOpen] = useState(false)
-  const [showDebugInfo, setShowDebugInfo] = useState(false)
 
   // Atualizar opções quando o leilão mudar
   useEffect(() => {
@@ -2014,55 +2025,15 @@ const AuctionCard = ({
   const isCurrentUserLeader = team && auction.current_bidder === team.id
   const temSaldoReservado = saldoReservado && saldoReservado[auction.id]
 
-  // Verificar se há problema com o jogador
-  const hasPlayerIssue = type === 'finished' && 
-    auction.current_bidder && 
-    auction.player?.team_id !== auction.current_bidder
-
   return (
-    <Card className={cn("p-6 relative", getCardStyles(), hasPlayerIssue && "border-red-500 border-2")}>
-      {/* Indicador de problema */}
-      {hasPlayerIssue && (
-        <div className="absolute -top-2 -left-2">
-          <Badge className="bg-red-500 text-white animate-pulse">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            PROBLEMA
-          </Badge>
-        </div>
-      )}
-
-      {/* Botão de debug (admin only) */}
-      {isAdmin && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowDebugInfo(!showDebugInfo)}
-          className="absolute top-2 right-2 h-6 w-6 text-zinc-500 hover:text-white"
-          title="Mostrar informações de debug"
-        >
-          <AlertCircle className="w-3 h-3" />
-        </Button>
-      )}
-
-      {/* Badge de saldo reservado */}
+    <Card className={cn("p-6 relative", getCardStyles())}>
+      {/* Badge de saldo reservado - simplificado */}
       {temSaldoReservado && (
-        <div className="absolute -top-2 -right-2 flex flex-col items-end">
-          <Badge className="bg-blue-500 text-white mb-1">
+        <div className="absolute -top-2 -right-2">
+          <Badge className="bg-blue-500 text-white">
             <Lock className="w-3 h-3 mr-1" />
-            Reserva
+            Reservado
           </Badge>
-          <div className="text-xs text-blue-300 text-center">
-            R$ {formatToMillions(saldoReservado[auction.id])}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-4 w-4 mt-1 text-red-400 hover:text-red-300 hover:bg-red-500/20"
-            onClick={handleCancelReserva}
-            title="Cancelar reserva"
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
         </div>
       )}
 
@@ -2090,7 +2061,7 @@ const AuctionCard = ({
               </div>
             </div>
             <div className="text-right">
-              {/* Contagem regressiva */}
+              {/* Contagem regressiva sincronizada */}
               {type === 'active' && timeRemaining > 0 && (
                 <div className="flex items-center gap-1 text-red-400 mb-1">
                   <Timer className="w-4 h-4" />
@@ -2116,73 +2087,6 @@ const AuctionCard = ({
           )}
         </div>
       </div>
-
-      {/* Informações de debug */}
-      {showDebugInfo && (
-        <div className="mb-4 p-3 bg-black/30 rounded-lg border border-yellow-500/30">
-          <div className="text-xs font-mono space-y-1">
-            <div className="flex justify-between">
-              <span className="text-yellow-400">ID:</span>
-              <span className="text-white">{auction.id.substring(0, 8)}...</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-yellow-400">Player ID:</span>
-              <span className="text-white">{auction.player_id?.substring(0, 8)}...</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-yellow-400">Status:</span>
-              <span className={cn(
-                "font-bold",
-                auction.status === 'active' ? 'text-green-400' : 
-                auction.status === 'finished' ? 'text-red-400' : 'text-yellow-400'
-              )}>
-                {auction.status}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-yellow-400">Vencedor:</span>
-              <span className="text-white">{auction.current_bidder?.substring(0, 8)}...</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-yellow-400">Time do Jogador:</span>
-              <span className={cn(
-                "font-bold",
-                auction.player?.team_id === auction.current_bidder ? 'text-green-400' : 'text-red-400'
-              )}>
-                {auction.player?.team_id?.substring(0, 8) || 'null'}
-              </span>
-            </div>
-            {auction.end_time && (
-              <div className="flex justify-between">
-                <span className="text-yellow-400">Fim:</span>
-                <span className="text-white">{new Date(auction.end_time).toLocaleTimeString()}</span>
-              </div>
-            )}
-          </div>
-          
-          {/* Botões de debug para admin */}
-          {isAdmin && (
-            <div className="flex gap-2 mt-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onForceFinish(auction.id)}
-                className="text-xs h-6 bg-red-500/20 border-red-500 text-red-400 hover:bg-red-500/30"
-              >
-                Forçar Fim
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onCheckPlayerStatus(auction.id, auction.player_id)}
-                className="text-xs h-6 bg-blue-500/20 border-blue-500 text-blue-400 hover:bg-blue-500/30"
-              >
-                Verificar
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
 
       <div className="space-y-3">
         {type === 'active' && auction.current_bid === auction.start_price ? (
@@ -2379,7 +2283,7 @@ const AuctionCard = ({
           </div>
         )}
 
-        {/* HISTÓRICO DE LANCES COM NOME DOS TIMES E VALORES EM BRANCO */}
+        {/* HISTÓRICO DE LANCES */}
         {bids && bids.length > 0 && type === 'active' && (
           <div className="mt-4">
             <h4 className="text-sm font-semibold text-zinc-400 mb-2">Histórico de Lances</h4>
@@ -2398,7 +2302,6 @@ const AuctionCard = ({
                     {bid.team?.logo_url && (
                       <img src={bid.team.logo_url} alt="" className="w-4 h-4 rounded-full" />
                     )}
-                    {/* NOME DO TIME EM BRANCO */}
                     <span className={cn(
                       "font-medium",
                       index === 0 ? "text-yellow-400" : "text-white"
@@ -2406,7 +2309,6 @@ const AuctionCard = ({
                       {bid.team?.name}
                     </span>
                   </div>
-                  {/* VALOR DO LANCE EM BRANCO */}
                   <span className={cn(
                     "font-bold",
                     index === 0 ? "text-yellow-400" : "text-white"
