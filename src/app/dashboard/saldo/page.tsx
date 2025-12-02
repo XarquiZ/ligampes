@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter, RefreshCw, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,12 +28,28 @@ interface BalanceTransaction {
   id: string
   team_id: string
   amount: number
-  type: 'credit' | 'debit'
+  type: 'credit' | 'debit' | 'exchange_only' | 'exchange_with_money'
   description: string
   created_at: string
   player_name?: string
   transfer_type?: 'buy' | 'sell' | 'exchange'
   related_team?: string
+  exchange_value?: number
+  is_exchange?: boolean
+}
+
+interface PlayerTransfer {
+  id: string
+  player_id: string
+  player_name: string
+  from_team_id: string | null
+  to_team_id: string | null
+  value: number
+  status: string
+  created_at: string
+  transfer_type: string
+  exchange_value: number | null
+  is_exchange: boolean | null
 }
 
 // Função de formatar valor
@@ -55,6 +71,150 @@ function formatDate(dateString: string) {
   })
 }
 
+// Função para buscar transferências de troca
+const fetchExchangeTransfers = async (teamId: string): Promise<BalanceTransaction[]> => {
+  try {
+    console.log('🔄 Buscando transferências de troca para o time:', teamId)
+    
+    // Buscar transferências onde o time está envolvido (como comprador ou vendedor)
+    const { data: exchangeTransfers, error } = await supabase
+      .from('player_transfers')
+      .select('*')
+      .or(`from_team_id.eq.${teamId},to_team_id.eq.${teamId}`)
+      .eq('transfer_type', 'exchange')
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('❌ Erro ao buscar transferências de troca:', error)
+      return []
+    }
+
+    console.log('✅ Transferências de troca encontradas:', exchangeTransfers?.length)
+
+    const exchangeTransactions: BalanceTransaction[] = []
+
+    exchangeTransfers?.forEach(transfer => {
+      const isBuyer = transfer.to_team_id === teamId
+      const isSeller = transfer.from_team_id === teamId
+      
+      // Se for apenas troca (sem dinheiro envolvido)
+      if (transfer.exchange_value === 0 || !transfer.exchange_value) {
+        // Para o vendedor - perde o jogador
+        if (isSeller) {
+          exchangeTransactions.push({
+            id: `${transfer.id}_sell`,
+            team_id: teamId,
+            amount: transfer.value,
+            type: 'exchange_only',
+            description: `Troca - ${transfer.player_name} saiu`,
+            created_at: transfer.created_at,
+            player_name: transfer.player_name,
+            transfer_type: 'exchange',
+            related_team: transfer.to_team_id || undefined,
+            exchange_value: 0,
+            is_exchange: true
+          })
+        }
+        
+        // Para o comprador - ganha o jogador
+        if (isBuyer) {
+          exchangeTransactions.push({
+            id: `${transfer.id}_buy`,
+            team_id: teamId,
+            amount: transfer.value,
+            type: 'exchange_only',
+            description: `Troca - ${transfer.player_name} chegou`,
+            created_at: transfer.created_at,
+            player_name: transfer.player_name,
+            transfer_type: 'exchange',
+            related_team: transfer.from_team_id || undefined,
+            exchange_value: 0,
+            is_exchange: true
+          })
+        }
+      } else {
+        // Se há dinheiro envolvido na troca
+        const exchangeValue = transfer.exchange_value || 0
+        
+        // Para o vendedor - perde jogador, pode receber ou pagar dinheiro
+        if (isSeller) {
+          exchangeTransactions.push({
+            id: `${transfer.id}_sell`,
+            team_id: teamId,
+            amount: transfer.value,
+            type: 'exchange_only',
+            description: `Troca - ${transfer.player_name} saiu`,
+            created_at: transfer.created_at,
+            player_name: transfer.player_name,
+            transfer_type: 'exchange',
+            related_team: transfer.to_team_id || undefined,
+            exchange_value: exchangeValue,
+            is_exchange: true
+          })
+          
+          // Se recebeu dinheiro na troca
+          if (exchangeValue > 0) {
+            exchangeTransactions.push({
+              id: `${transfer.id}_money_in`,
+              team_id: teamId,
+              amount: exchangeValue,
+              type: 'exchange_with_money',
+              description: `Dinheiro recebido na troca por ${transfer.player_name}`,
+              created_at: transfer.created_at,
+              player_name: transfer.player_name,
+              transfer_type: 'exchange',
+              related_team: transfer.to_team_id || undefined,
+              exchange_value: exchangeValue,
+              is_exchange: true
+            })
+          }
+        }
+        
+        // Para o comprador - ganha jogador, pode pagar ou receber dinheiro
+        if (isBuyer) {
+          exchangeTransactions.push({
+            id: `${transfer.id}_buy`,
+            team_id: teamId,
+            amount: transfer.value,
+            type: 'exchange_only',
+            description: `Troca - ${transfer.player_name} chegou`,
+            created_at: transfer.created_at,
+            player_name: transfer.player_name,
+            transfer_type: 'exchange',
+            related_team: transfer.from_team_id || undefined,
+            exchange_value: exchangeValue,
+            is_exchange: true
+          })
+          
+          // Se pagou dinheiro na troca
+          if (exchangeValue > 0) {
+            exchangeTransactions.push({
+              id: `${transfer.id}_money_out`,
+              team_id: teamId,
+              amount: exchangeValue,
+              type: 'exchange_with_money',
+              description: `Dinheiro pago na troca por ${transfer.player_name}`,
+              created_at: transfer.created_at,
+              player_name: transfer.player_name,
+              transfer_type: 'exchange',
+              related_team: transfer.from_team_id || undefined,
+              exchange_value: exchangeValue,
+              is_exchange: true
+            })
+          }
+        }
+      }
+    })
+
+    return exchangeTransactions
+
+  } catch (error) {
+    console.error('❌ Erro ao processar transferências de troca:', error)
+    return []
+  }
+}
+
 export default function PaginaSaldo() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -65,7 +225,7 @@ export default function PaginaSaldo() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [dataLoading, setDataLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'credit' | 'debit'>('all')
+  const [filter, setFilter] = useState<'all' | 'credit' | 'debit' | 'exchange'>('all')
 
   // Estados para o chat
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -198,19 +358,34 @@ export default function PaginaSaldo() {
         console.log('✅ Time carregado:', teamData)
         setTeam(teamData)
 
-        // 3. Carregar transações do time
+        // 3. Carregar transações do time da tabela balance_transactions
         const { data: transactionsData, error: transactionsError } = await supabase
           .from('balance_transactions')
           .select('*')
           .eq('team_id', profile.team_id)
-          .neq('type', 'bid_pending')  // ← FILTRO IMPORTANTE: exclui reservas
+          .neq('type', 'bid_pending')
           .order('created_at', { ascending: false })
 
         if (transactionsError) throw transactionsError
-        setTransactions(transactionsData || [])
+
+        // 4. Carregar transferências de troca
+        const exchangeTransactions = await fetchExchangeTransfers(profile.team_id)
+
+        // 5. Combinar todas as transações
+        const allTransactions = [
+          ...(transactionsData || []),
+          ...exchangeTransactions
+        ].sort((a, b) => 
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+
+        console.log('📊 Total de transações:', allTransactions.length)
+        console.log('🔄 Transações de troca:', exchangeTransactions.length)
+        
+        setTransactions(allTransactions)
       }
 
-      // 4. Carregar todos os times (para admin)
+      // 6. Carregar todos os times (para admin)
       if (profile?.role === 'admin') {
         const { data: teamsData, error: teamsError } = await supabase
           .from('teams')
@@ -250,11 +425,23 @@ export default function PaginaSaldo() {
         .from('balance_transactions')
         .select('*')
         .eq('team_id', teamId)
-        .neq('type', 'bid_pending')  // ← FILTRO IMPORTANTE: exclui reservas
+        .neq('type', 'bid_pending')
         .order('created_at', { ascending: false })
 
       if (transactionsError) throw transactionsError
-      setTransactions(transactionsData || [])
+
+      // Buscar transferências de troca atualizadas
+      const exchangeTransactions = await fetchExchangeTransfers(teamId)
+
+      // Combinar todas as transações
+      const allTransactions = [
+        ...(transactionsData || []),
+        ...exchangeTransactions
+      ].sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+
+      setTransactions(allTransactions)
 
     } catch (error) {
       console.error('❌ Erro ao atualizar dados do time:', error)
@@ -426,17 +613,83 @@ export default function PaginaSaldo() {
     setTransactionAmount(formattedValue)
   }
 
+  // Função para obter cor baseada no tipo de transação
+  const getTransactionColor = (transaction: BalanceTransaction) => {
+    if (transaction.type === 'exchange_only') {
+      return {
+        bg: 'bg-blue-500/20',
+        icon: 'text-blue-400',
+        text: 'text-blue-400',
+        badge: 'bg-blue-500/20 text-blue-300 border-blue-500/50',
+        iconComponent: ArrowRightLeft
+      }
+    } else if (transaction.type === 'exchange_with_money') {
+      // Verificar se é entrada ou saída pelo valor
+      const isMoneyIn = transaction.description.includes('recebido') || transaction.description.includes('recebida')
+      
+      if (isMoneyIn) {
+        return {
+          bg: 'bg-emerald-500/20',
+          icon: 'text-emerald-400',
+          text: 'text-emerald-400',
+          badge: 'bg-emerald-500/20 text-emerald-400',
+          iconComponent: ArrowUpRight
+        }
+      } else {
+        return {
+          bg: 'bg-red-500/20',
+          icon: 'text-red-400',
+          text: 'text-red-400',
+          badge: 'bg-red-500/20 text-red-400',
+          iconComponent: ArrowDownLeft
+        }
+      }
+    } else if (transaction.type === 'credit') {
+      return {
+        bg: 'bg-emerald-500/20',
+        icon: 'text-emerald-400',
+        text: 'text-emerald-400',
+        badge: 'bg-emerald-500/20 text-emerald-400',
+        iconComponent: ArrowUpRight
+      }
+    } else { // debit
+      return {
+        bg: 'bg-red-500/20',
+        icon: 'text-red-400',
+        text: 'text-red-400',
+        badge: 'bg-red-500/20 text-red-400',
+        iconComponent: ArrowDownLeft
+      }
+    }
+  }
+
+  // Função para obter texto do badge
+  const getBadgeText = (transaction: BalanceTransaction) => {
+    if (transaction.type === 'exchange_only') {
+      return 'Troca'
+    } else if (transaction.type === 'exchange_with_money') {
+      const isMoneyIn = transaction.description.includes('recebido') || transaction.description.includes('recebida')
+      return isMoneyIn ? 'Troca - Entrada' : 'Troca - Saída'
+    } else if (transaction.type === 'credit') {
+      return 'Entrada'
+    } else {
+      return 'Saída'
+    }
+  }
+
   // Calcular totais
   const totalCredits = transactions
-    .filter(t => t.type === 'credit')
+    .filter(t => t.type === 'credit' || t.type === 'exchange_with_money')
     .reduce((sum, t) => sum + t.amount, 0)
 
   const totalDebits = transactions
-    .filter(t => t.type === 'debit')
+    .filter(t => t.type === 'debit' || t.type === 'exchange_with_money')
     .reduce((sum, t) => sum + t.amount, 0)
 
   const filteredTransactions = filter === 'all' 
     ? transactions 
+    : filter === 'exchange'
+    ? transactions.filter(t => t.type === 'exchange_only' || t.type === 'exchange_with_money')
     : transactions.filter(t => t.type === filter)
 
   // Criar objetos compatíveis com os componentes de chat
@@ -487,140 +740,151 @@ export default function PaginaSaldo() {
                 </p>
               </div>
 
-              {isAdmin && (
-                <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm lg:text-base">
-                      <DollarSign className="w-4 h-4 mr-2" />
-                      Gerenciar Saldos
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md lg:max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle className="text-xl lg:text-2xl font-bold">
-                        Adicionar/Remover Saldo
-                      </DialogTitle>
-                    </DialogHeader>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => team && refreshTeamData(team.id)}
+                  variant="outline"
+                  className="bg-zinc-800/50 border-zinc-600 hover:bg-zinc-700/50"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Atualizar
+                </Button>
 
-                    <div className="space-y-3 lg:space-y-4 py-3 lg:py-4">
-                      <div>
-                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                          Selecione o Clube
-                        </label>
-                        <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                          <SelectTrigger className="bg-zinc-800/50 border-zinc-600 text-sm">
-                            <SelectValue placeholder="Escolha um clube" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allTeams.map(team => (
-                              <SelectItem key={team.id} value={team.id}>
-                                <div className="flex items-center gap-2">
-                                  {team.logo_url && (
-                                    <img 
-                                      src={team.logo_url} 
-                                      alt={team.name}
-                                      className="w-5 h-5 lg:w-6 lg:h-6 rounded-full object-contain"
-                                    />
-                                  )}
-                                  <span className="text-sm">{team.name}</span>
-                                  <Badge variant="secondary" className="ml-auto text-xs">
-                                    {formatBalance(team.balance)}
-                                  </Badge>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                {isAdmin && (
+                  <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm lg:text-base">
+                        <DollarSign className="w-4 h-4 mr-2" />
+                        Gerenciar Saldos
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md lg:max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl lg:text-2xl font-bold">
+                          Adicionar/Remover Saldo
+                        </DialogTitle>
+                      </DialogHeader>
 
-                      <div>
-                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                          Tipo de Operação
-                        </label>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant={transactionType === 'add' ? 'default' : 'outline'}
-                            onClick={() => setTransactionType('add')}
-                            className={cn(
-                              "flex-1 text-xs lg:text-sm",
-                              transactionType === 'add' 
-                                ? "bg-emerald-600 hover:bg-emerald-700" 
-                                : "bg-zinc-800/50 border-zinc-600"
-                            )}
-                          >
-                            <Plus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                            Adicionar
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={transactionType === 'remove' ? 'default' : 'outline'}
-                            onClick={() => setTransactionType('remove')}
-                            className={cn(
-                              "flex-1 text-xs lg:text-sm",
-                              transactionType === 'remove' 
-                                ? "bg-red-600 hover:bg-red-700" 
-                                : "bg-zinc-800/50 border-zinc-600"
-                            )}
-                          >
-                            <Minus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                            Remover
-                          </Button>
+                      <div className="space-y-3 lg:space-y-4 py-3 lg:py-4">
+                        <div>
+                          <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                            Selecione o Clube
+                          </label>
+                          <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                            <SelectTrigger className="bg-zinc-800/50 border-zinc-600 text-sm">
+                              <SelectValue placeholder="Escolha um clube" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allTeams.map(team => (
+                                <SelectItem key={team.id} value={team.id}>
+                                  <div className="flex items-center gap-2">
+                                    {team.logo_url && (
+                                      <img 
+                                        src={team.logo_url} 
+                                        alt={team.name}
+                                        className="w-5 h-5 lg:w-6 lg:h-6 rounded-full object-contain"
+                                      />
+                                    )}
+                                    <span className="text-sm">{team.name}</span>
+                                    <Badge variant="secondary" className="ml-auto text-xs">
+                                      {formatBalance(team.balance)}
+                                    </Badge>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                      </div>
 
-                      <div>
-                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                          Valor
-                        </label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3 h-3 lg:w-4 lg:h-4" />
+                        <div>
+                          <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                            Tipo de Operação
+                          </label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={transactionType === 'add' ? 'default' : 'outline'}
+                              onClick={() => setTransactionType('add')}
+                              className={cn(
+                                "flex-1 text-xs lg:text-sm",
+                                transactionType === 'add' 
+                                  ? "bg-emerald-600 hover:bg-emerald-700" 
+                                  : "bg-zinc-800/50 border-zinc-600"
+                              )}
+                            >
+                              <Plus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                              Adicionar
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={transactionType === 'remove' ? 'default' : 'outline'}
+                              onClick={() => setTransactionType('remove')}
+                              className={cn(
+                                "flex-1 text-xs lg:text-sm",
+                                transactionType === 'remove' 
+                                  ? "bg-red-600 hover:bg-red-700" 
+                                  : "bg-zinc-800/50 border-zinc-600"
+                              )}
+                            >
+                              <Minus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                              Remover
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                            Valor
+                          </label>
+                          <div className="relative">
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3 h-3 lg:w-4 lg:h-4" />
+                            <Input
+                              placeholder="0,00"
+                              value={transactionAmount}
+                              onChange={handleAmountChange}
+                              className="pl-8 lg:pl-10 bg-zinc-800/50 border-zinc-600 text-sm"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                            Descrição
+                          </label>
                           <Input
-                            placeholder="0,00"
-                            value={transactionAmount}
-                            onChange={handleAmountChange}
-                            className="pl-8 lg:pl-10 bg-zinc-800/50 border-zinc-600 text-sm"
+                            placeholder="Ex: Premiação do campeonato, Multa, etc."
+                            value={transactionDescription}
+                            onChange={(e) => setTransactionDescription(e.target.value)}
+                            className="bg-zinc-800/50 border-zinc-600 text-sm"
                           />
                         </div>
                       </div>
 
-                      <div>
-                        <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                          Descrição
-                        </label>
-                        <Input
-                          placeholder="Ex: Premiação do campeonato, Multa, etc."
-                          value={transactionDescription}
-                          onChange={(e) => setTransactionDescription(e.target.value)}
-                          className="bg-zinc-800/50 border-zinc-600 text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <DialogFooter className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setAdminModalOpen(false)}
-                        className="bg-transparent border-zinc-600 text-sm flex-1"
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        onClick={handleAdminTransaction}
-                        disabled={processing}
-                        className={cn(
-                          "flex-1 text-sm",
-                          transactionType === 'add' 
-                            ? "bg-emerald-600 hover:bg-emerald-700" 
-                            : "bg-red-600 hover:bg-red-700"
-                        )}
-                      >
-                        {processing ? 'Processando...' : transactionType === 'add' ? 'Adicionar' : 'Remover'}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
+                      <DialogFooter className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setAdminModalOpen(false)}
+                          className="bg-transparent border-zinc-600 text-sm flex-1"
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          onClick={handleAdminTransaction}
+                          disabled={processing}
+                          className={cn(
+                            "flex-1 text-sm",
+                            transactionType === 'add' 
+                              ? "bg-emerald-600 hover:bg-emerald-700" 
+                              : "bg-red-600 hover:bg-red-700"
+                          )}
+                        >
+                          {processing ? 'Processando...' : transactionType === 'add' ? 'Adicionar' : 'Remover'}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </div>
 
             {team ? (
@@ -715,6 +979,17 @@ export default function PaginaSaldo() {
                         <TrendingDown className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
                         Saídas
                       </Button>
+                      <Button
+                        variant={filter === 'exchange' ? 'default' : 'outline'}
+                        onClick={() => setFilter('exchange')}
+                        className={cn(
+                          "text-xs lg:text-sm h-8 lg:h-9",
+                          filter === 'exchange' ? "bg-blue-600" : "bg-zinc-800/50 border-zinc-600"
+                        )}
+                      >
+                        <ArrowRightLeft className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                        Trocas
+                      </Button>
                     </div>
                   </div>
 
@@ -726,69 +1001,85 @@ export default function PaginaSaldo() {
                     </div>
                   ) : (
                     <div className="space-y-2 lg:space-y-3">
-                      {filteredTransactions.map((transaction) => (
-                        <div
-                          key={transaction.id}
-                          className="flex items-center justify-between p-3 lg:p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors"
-                        >
-                          <div className="flex items-center gap-3 lg:gap-4">
-                            <div className={cn(
-                              "p-2 lg:p-3 rounded-full",
-                              transaction.type === 'credit' 
-                                ? "bg-emerald-500/20" 
-                                : "bg-red-500/20"
-                            )}>
-                              {transaction.type === 'credit' ? (
-                                <ArrowUpRight className="w-4 h-4 lg:w-6 lg:h-6 text-emerald-400" />
-                              ) : (
-                                <ArrowDownLeft className="w-4 h-4 lg:w-6 lg:h-6 text-red-400" />
-                              )}
-                            </div>
+                      {filteredTransactions.map((transaction) => {
+                        const colors = getTransactionColor(transaction)
+                        const IconComponent = colors.iconComponent
+                        
+                        return (
+                          <div
+                            key={transaction.id}
+                            className="flex items-center justify-between p-3 lg:p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors"
+                          >
+                            <div className="flex items-center gap-3 lg:gap-4">
+                              <div className={cn("p-2 lg:p-3 rounded-full", colors.bg)}>
+                                <IconComponent className="w-4 h-4 lg:w-6 lg:h-6" />
+                              </div>
 
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-white text-sm lg:text-base truncate">
-                                {transaction.description}
-                              </p>
-                              <div className="flex flex-col lg:flex-row lg:items-center gap-1 lg:gap-4 mt-1 text-xs lg:text-sm text-zinc-400">
-                                <div className="flex items-center gap-1">
-                                  <Calendar className="w-3 h-3" />
-                                  {formatDate(transaction.created_at)}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-white text-sm lg:text-base truncate">
+                                    {transaction.description}
+                                  </p>
+                                  {transaction.is_exchange && (
+                                    <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-300 border-blue-500/50">
+                                      Troca
+                                    </Badge>
+                                  )}
                                 </div>
-                                {transaction.player_name && (
+                                <div className="flex flex-col lg:flex-row lg:items-center gap-1 lg:gap-4 mt-1 text-xs lg:text-sm text-zinc-400">
                                   <div className="flex items-center gap-1">
-                                    <User className="w-3 h-3" />
-                                    <span className="truncate">{transaction.player_name}</span>
+                                    <Calendar className="w-3 h-3" />
+                                    {formatDate(transaction.created_at)}
                                   </div>
-                                )}
-                                {transaction.related_team && (
-                                  <div className="flex items-center gap-1">
-                                    <Building2 className="w-3 h-3" />
-                                    <span className="truncate">{transaction.related_team}</span>
-                                  </div>
-                                )}
+                                  {transaction.player_name && (
+                                    <div className="flex items-center gap-1">
+                                      <User className="w-3 h-3" />
+                                      <span className="truncate">{transaction.player_name}</span>
+                                    </div>
+                                  )}
+                                  {transaction.related_team && (
+                                    <div className="flex items-center gap-1">
+                                      <Building2 className="w-3 h-3" />
+                                      <span className="truncate">{transaction.related_team}</span>
+                                    </div>
+                                  )}
+                                  {transaction.exchange_value && transaction.exchange_value > 0 && (
+                                    <Badge variant="outline" className="text-xs bg-purple-500/20 text-purple-300 border-purple-500/50">
+                                      Valor troca: {formatBalance(transaction.exchange_value)}
+                                    </Badge>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="text-right flex-shrink-0 ml-2">
-                            <p className={cn(
-                              "text-base lg:text-xl font-bold",
-                              transaction.type === 'credit' ? "text-emerald-400" : "text-red-400"
-                            )}>
-                              {transaction.type === 'credit' ? '+' : '-'} {formatBalance(transaction.amount)}
-                            </p>
-                            <Badge 
-                              variant="secondary" 
-                              className={cn(
-                                "mt-1 text-xs",
-                                transaction.type === 'credit' ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                            <div className="text-right flex-shrink-0 ml-2">
+                              {transaction.type === 'exchange_only' ? (
+                                <div>
+                                  <p className={cn("text-base lg:text-xl font-bold", colors.text)}>
+                                    {formatBalance(transaction.amount)}
+                                  </p>
+                                  <p className="text-xs text-zinc-400">Valor do jogador</p>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className={cn("text-base lg:text-xl font-bold", colors.text)}>
+                                    {transaction.type === 'credit' || 
+                                     (transaction.type === 'exchange_with_money' && 
+                                      (transaction.description.includes('recebido') || transaction.description.includes('recebida'))) 
+                                      ? '+' : '-'} {formatBalance(transaction.amount)}
+                                  </p>
+                                </div>
                               )}
-                            >
-                              {transaction.type === 'credit' ? 'Entrada' : 'Saída'}
-                            </Badge>
+                              <Badge 
+                                variant="secondary" 
+                                className={cn("mt-1 text-xs", colors.badge)}
+                              >
+                                {getBadgeText(transaction)}
+                              </Badge>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </Card>
