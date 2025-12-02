@@ -1,7 +1,7 @@
 // src/app/dashboard/leilao/page.tsx
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { 
   Gavel, 
@@ -395,6 +395,11 @@ export default function PaginaLeilao() {
   const [winNotification, setWinNotification] = useState<WinNotification | null>(null)
   const [bidCoveredNotification, setBidCoveredNotification] = useState<BidCoveredNotification | null>(null)
 
+  // PARTE 1: Adicionar estados para polling inteligente
+  const [lastUpdateTimes, setLastUpdateTimes] = useState<{[key: string]: number}>({})
+  const [forceRefresh, setForceRefresh] = useState(0)
+  const pollingIntervalRef = useRef<NodeJS.Timeout>()
+
   // Estados para server time - CORRIGIDO: DENTRO do componente
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
   const [isSyncingTime, setIsSyncingTime] = useState<boolean>(false)
@@ -490,6 +495,118 @@ export default function PaginaLeilao() {
     
     return () => clearInterval(interval)
   }, [])
+
+  // PARTE 2: useEffect para polling inteligente
+  useEffect(() => {
+    if (activeTab !== 'active') {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+      return
+    }
+
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        // 1. Atualizar força de refresh para timers
+        setForceRefresh(prev => prev + 1)
+        
+        // 2. Verificar se há leilões ativos
+        const activeAuctions = auctions.filter(a => a.status === 'active')
+        if (activeAuctions.length === 0) return
+        
+        // 3. Buscar atualizações recentes dos leilões ativos
+        const { data: recentUpdates, error } = await supabase
+          .from('auctions')
+          .select('id, updated_at, current_bid, current_bidder, end_time, status')
+          .in('id', activeAuctions.map(a => a.id))
+          .order('updated_at', { ascending: false })
+
+        if (error) {
+          console.error('❌ Erro ao verificar atualizações:', error)
+          return
+        }
+
+        if (!recentUpdates || recentUpdates.length === 0) return
+
+        // 4. Identificar quais leilões mudaram
+        const auctionsToUpdate: string[] = []
+        const updatedTimes: {[key: string]: number} = {}
+        
+        recentUpdates.forEach(auction => {
+          const lastUpdate = lastUpdateTimes[auction.id] || 0
+          const newUpdateTime = new Date(auction.updated_at).getTime()
+          updatedTimes[auction.id] = newUpdateTime
+          
+          // Verificar se algo mudou
+          const currentAuction = activeAuctions.find(a => a.id === auction.id)
+          if (!currentAuction) {
+            auctionsToUpdate.push(auction.id)
+            return
+          }
+          
+          // Verificar mudanças importantes
+          const bidChanged = auction.current_bid !== currentAuction.current_bid
+          const bidderChanged = auction.current_bidder !== currentAuction.current_bidder
+          const endTimeChanged = auction.end_time !== currentAuction.end_time
+          const updatedChanged = newUpdateTime > lastUpdate
+          
+          if (bidChanged || bidderChanged || endTimeChanged || updatedChanged) {
+            auctionsToUpdate.push(auction.id)
+          }
+        })
+
+        // 5. Se houver leilões para atualizar, buscar dados completos
+        if (auctionsToUpdate.length > 0) {
+          console.log('🔄 Polling: Atualizando leilões:', auctionsToUpdate)
+          
+          const { data: updatedAuctions, error: fetchError } = await supabase
+            .from('auctions')
+            .select(`
+              *,
+              player:players(*),
+              current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+            `)
+            .in('id', auctionsToUpdate)
+
+          if (!fetchError && updatedAuctions) {
+            // Atualizar estado dos leilões
+            setAuctions(prev => {
+              const newAuctions = [...prev]
+              
+              updatedAuctions.forEach(updatedAuction => {
+                const index = newAuctions.findIndex(a => a.id === updatedAuction.id)
+                if (index >= 0) {
+                  const synchronizedTime = Date.now() + serverTimeOffset
+                  newAuctions[index] = {
+                    ...updatedAuction,
+                    time_remaining: updatedAuction.end_time && updatedAuction.status === 'active' 
+                      ? Math.max(0, new Date(updatedAuction.end_time).getTime() - synchronizedTime)
+                      : 0
+                  }
+                }
+              })
+              
+              return newAuctions
+            })
+
+            // Atualizar últimos tempos
+            setLastUpdateTimes(prev => ({
+              ...prev,
+              ...updatedTimes
+            }))
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro no polling:', error)
+      }
+    }, 1000) // 1 segundo
+
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+    }
+  }, [activeTab, auctions, serverTimeOffset])
 
   // CONFIGURAR REALTIME SUPABASE
   useEffect(() => {
@@ -1492,6 +1609,7 @@ export default function PaginaLeilao() {
             liberarSaldo={liberarSaldo}
             loadPendingReserves={() => team?.id && loadPendingReserves(team.id)}
             serverTimeOffset={serverTimeOffset}
+            forceRefresh={forceRefresh} // ← PARTE 4: Passe forceRefresh para o AuctionCard
           />
         ))}
       </div>
@@ -1910,6 +2028,7 @@ export default function PaginaLeilao() {
 }
 
 // COMPONENTE AUCTIONCARD
+// PARTE 3: Modifique o AuctionCard para usar forceRefresh
 const AuctionCard = ({ 
   auction, 
   type, 
@@ -1931,7 +2050,8 @@ const AuctionCard = ({
   saldoReservado,
   liberarSaldo,
   loadPendingReserves,
-  serverTimeOffset
+  serverTimeOffset,
+  forceRefresh // ← Adicione esta prop
 }: any) => {
 
   const [bidOptions, setBidOptions] = useState<{ value: number; label: string }[]>([])
@@ -1950,6 +2070,11 @@ const AuctionCard = ({
       setSelectedBidAmount(null)
     }
   }, [biddingAuctionId, auction.id])
+
+  // PARTE 3: Modifique o cálculo do timeRemaining para usar forceRefresh
+  const timeRemaining = useMemo(() => {
+    return calculateTimeRemaining(auction)
+  }, [auction, calculateTimeRemaining, forceRefresh]) // ← Adicione forceRefresh
 
   const handleOpenBidModal = () => {
     setBiddingAuctionId(auction.id)
@@ -2010,7 +2135,6 @@ const AuctionCard = ({
     }
   }
 
-  const timeRemaining = calculateTimeRemaining(auction)
   const isCurrentUserLeader = team && auction.current_bidder === team.id
   const temSaldoReservado = saldoReservado && saldoReservado[auction.id]
 
