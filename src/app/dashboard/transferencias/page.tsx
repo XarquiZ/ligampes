@@ -1336,12 +1336,7 @@ export default function PaginaTransferencias() {
                     </Badge>
                     
                     {/* Tag adicional para leilão */}
-                    {isAuctionTransfer && (
-                      <Badge className="bg-orange-500 text-white text-xs">
-                        <Scale className="w-3 h-3 mr-1" />
-                        Auction
-                      </Badge>
-                    )}
+              
                   </div>
                   
                   {t.status === 'approved' && (
@@ -1705,10 +1700,7 @@ export default function PaginaTransferencias() {
                     {/* Tag laranja "Leilão" para transferências finalizadas que são leilões */}
                     {isAuctionTransfer && activeTab === 'completed' && (
                       <div className="mt-2 pt-2 border-t border-orange-500/20">
-                        <Badge className="bg-orange-600 text-white text-xs w-full justify-center">
-                          <Gavel className="w-3 h-3 mr-1" />
-                          Transação via Leilão
-                        </Badge>
+                  
                       </div>
                     )}
                   </div>
