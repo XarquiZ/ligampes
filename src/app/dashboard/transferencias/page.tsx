@@ -7,7 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { 
   CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
   Calendar, Users, ArrowRightLeft, X, Ban, Tag, ShoppingCart, 
-  Plus, Trash2, Edit, Save, XCircle, Info, FileText, Check, ExternalLink
+  Plus, Trash2, Edit, Save, XCircle, Info, FileText, Check, ExternalLink,
+  Gavel, Scale
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -1222,7 +1223,12 @@ export default function PaginaTransferencias() {
     </div>
   )
 
-  // Componente TransferenciasView - ATUALIZADO para layout grid
+  // Função para determinar se é um leilão (auction)
+  const isAuction = (transferType: string) => {
+    return transferType === 'auction'
+  }
+
+  // Componente TransferenciasView - ATUALIZADO com leilão
   const TransferenciasView = () => (
     <>
       {/* Seletor de Abas */}
@@ -1281,6 +1287,8 @@ export default function PaginaTransferencias() {
           {transfers.map((t) => {
             // Verificar se é uma dispensa (to_team_id é null ou transfer_type é 'dismiss')
             const isDismissal = !t.to_team_id || t.transfer_type === 'dismiss'
+            // Verificar se é um leilão
+            const isAuctionTransfer = isAuction(t.transfer_type)
             
             return (
               <Card
@@ -1291,33 +1299,51 @@ export default function PaginaTransferencias() {
                     ? "border-green-500/20 hover:border-green-500/40 p-4" 
                     : "border-white/10 hover:border-white/20 p-5",
                   t.is_exchange && "border-blue-500/20 hover:border-blue-500/40",
-                  isDismissal && "border-red-500/20 hover:border-red-500/40"
+                  isDismissal && "border-red-500/20 hover:border-red-500/40",
+                  isAuctionTransfer && "border-orange-500/20 hover:border-orange-500/40"
                 )}
               >
                 {/* Badge de tipo de transferência */}
                 <div className="flex justify-between items-start mb-3">
-                  <Badge className={cn(
-                    "text-xs",
-                    t.is_exchange ? "bg-blue-600" : 
-                    isDismissal ? "bg-red-600" : "bg-purple-600"
-                  )}>
-                    {t.is_exchange ? (
-                      <>
-                        <ArrowRightLeft className="w-3 h-3 mr-1" />
-                        Troca
-                      </>
-                    ) : isDismissal ? (
-                      <>
-                        <X className="w-3 h-3 mr-1" />
-                        Dispensa
-                      </>
-                    ) : (
-                      <>
-                        <DollarSign className="w-3 h-3 mr-1" />
-                        Venda
-                      </>
+                  <div className="flex gap-2">
+                    <Badge className={cn(
+                      "text-xs",
+                      isAuctionTransfer ? "bg-orange-600" : 
+                      t.is_exchange ? "bg-blue-600" : 
+                      isDismissal ? "bg-red-600" : "bg-purple-600"
+                    )}>
+                      {isAuctionTransfer ? (
+                        <>
+                          <Gavel className="w-3 h-3 mr-1" />
+                          Leilão
+                        </>
+                      ) : t.is_exchange ? (
+                        <>
+                          <ArrowRightLeft className="w-3 h-3 mr-1" />
+                          Troca
+                        </>
+                      ) : isDismissal ? (
+                        <>
+                          <X className="w-3 h-3 mr-1" />
+                          Dispensa
+                        </>
+                      ) : (
+                        <>
+                          <DollarSign className="w-3 h-3 mr-1" />
+                          Venda
+                        </>
+                      )}
+                    </Badge>
+                    
+                    {/* Tag adicional para leilão */}
+                    {isAuctionTransfer && (
+                      <Badge className="bg-orange-500 text-white text-xs">
+                        <Scale className="w-3 h-3 mr-1" />
+                        Auction
+                      </Badge>
                     )}
-                  </Badge>
+                  </div>
+                  
                   {t.status === 'approved' && (
                     <Badge className="bg-green-600 text-white text-xs">
                       <CheckCircle className="w-3 h-3 mr-1" />
@@ -1331,9 +1357,14 @@ export default function PaginaTransferencias() {
                   <>
                     {/* Times e Valor em linha compacta */}
                     <div className="flex items-center justify-between mb-4">
-                      {/* Time Vendedor */}
+                      {/* Time Vendedor - PARA LEILÃO MOSTRA A LOGO DO LEILÃO */}
                       <div className="flex flex-col items-center text-center flex-1">
-                        {t.from_team?.logo_url ? (
+                        {isAuctionTransfer ? (
+                          // Logo do Leilão
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center mb-1">
+                            <Gavel className="w-5 h-5 text-white" />
+                          </div>
+                        ) : t.from_team?.logo_url ? (
                           <img 
                             src={t.from_team.logo_url} 
                             alt={t.from_team.name}
@@ -1347,9 +1378,11 @@ export default function PaginaTransferencias() {
                           </div>
                         )}
                         <p className="text-white text-sm font-medium truncate w-full">
-                          {t.from_team?.name || 'Vendedor'}
+                          {isAuctionTransfer ? 'Leilão' : t.from_team?.name || 'Vendedor'}
                         </p>
-                        <p className="text-zinc-400 text-xs">Vendedor</p>
+                        <p className="text-zinc-400 text-xs">
+                          {isAuctionTransfer ? 'Sistema de Leilão' : 'Vendedor'}
+                        </p>
                       </div>
 
                       {/* Setas e Valor - Compacto */}
@@ -1360,12 +1393,15 @@ export default function PaginaTransferencias() {
                             <div className="flex items-center gap-1">
                               {t.is_exchange ? (
                                 <ArrowRightLeft className="w-3 h-3 text-blue-400" />
+                              ) : isAuctionTransfer ? (
+                                <Gavel className="w-3 h-3 text-orange-400" />
                               ) : (
                                 <DollarSign className="w-3 h-3 text-emerald-400" />
                               )}
                               <span className={cn(
                                 "font-bold text-sm",
-                                t.is_exchange ? "text-blue-400" : "text-emerald-400"
+                                t.is_exchange ? "text-blue-400" : 
+                                isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
                               )}>
                                 {formatBalance(t.value)}
                               </span>
@@ -1374,7 +1410,7 @@ export default function PaginaTransferencias() {
                           <ArrowRight className="w-4 h-4 text-yellow-400" />
                         </div>
                         <p className="text-zinc-400 text-xs mt-1 text-center">
-                          {t.is_exchange ? 'Troca' : 'Venda'}
+                          {isAuctionTransfer ? 'Leilão' : t.is_exchange ? 'Troca' : 'Venda'}
                         </p>
                       </div>
 
@@ -1443,7 +1479,9 @@ export default function PaginaTransferencias() {
                             t.approved_by_seller ? "text-green-400" : "text-zinc-600"
                           )}
                         />
-                        <p className="text-xs text-zinc-400 mt-1">Vendedor</p>
+                        <p className="text-xs text-zinc-400 mt-1">
+                          {isAuctionTransfer ? 'Sistema' : 'Vendedor'}
+                        </p>
                       </div>
 
                       {/* Comprador */}
@@ -1473,7 +1511,7 @@ export default function PaginaTransferencias() {
                     {(userTeamId === t.from_team_id || userTeamId === t.to_team_id || isAdmin) && (
                       <div className="space-y-2">
                         <div className="flex flex-wrap gap-2 justify-center">
-                          {userTeamId === t.from_team_id && !t.approved_by_seller && (
+                          {userTeamId === t.from_team_id && !t.approved_by_seller && !isAuctionTransfer && (
                             <Button
                               onClick={() => aprovar(t.id, 'seller')}
                               size="sm"
@@ -1530,7 +1568,7 @@ export default function PaginaTransferencias() {
                     )}
                   </>
                 ) : (
-                  // LAYOUT PARA TRANSFERÊNCIAS FINALIZADAS (compacto)
+                  // LAYOUT PARA TRANSFERÊNCIAS FINALIZADAS (compacto) - ATUALIZADO COM LEILÃO
                   <div className="space-y-3">
                     {/* Header com data/hora */}
                     <div className="flex items-center justify-between">
@@ -1544,9 +1582,14 @@ export default function PaginaTransferencias() {
 
                     {/* Conteúdo principal */}
                     <div className="flex items-center justify-between">
-                      {/* Time de Origem */}
+                      {/* Time de Origem - PARA LEILÃO MOSTRA A LOGO DO LEILÃO */}
                       <div className="flex items-center gap-2">
-                        {t.from_team?.logo_url ? (
+                        {isAuctionTransfer ? (
+                          // Logo do Leilão
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
+                            <Gavel className="w-4 h-4 text-white" />
+                          </div>
+                        ) : t.from_team?.logo_url ? (
                           <img 
                             src={t.from_team.logo_url} 
                             alt={t.from_team.name}
@@ -1561,10 +1604,11 @@ export default function PaginaTransferencias() {
                         )}
                         <div className="text-right">
                           <p className="text-white text-xs font-semibold truncate max-w-[60px]">
-                            {t.from_team?.name || 'Vendedor'}
+                            {isAuctionTransfer ? 'Leilão' : t.from_team?.name || 'Vendedor'}
                           </p>
                           <p className="text-zinc-400 text-[10px]">
-                            {isDismissal ? 'Anterior' : 'Vendedor'}
+                            {isAuctionTransfer ? 'Sistema de Leilão' : 
+                             isDismissal ? 'Anterior' : 'Vendedor'}
                           </p>
                         </div>
                       </div>
@@ -1578,13 +1622,16 @@ export default function PaginaTransferencias() {
                               <X className="w-3 h-3 text-red-400" />
                             ) : t.is_exchange ? (
                               <ArrowRightLeft className="w-3 h-3 text-blue-400" />
+                            ) : isAuctionTransfer ? (
+                              <Gavel className="w-3 h-3 text-orange-400" />
                             ) : (
                               <DollarSign className="w-3 h-3 text-emerald-400" />
                             )}
                             <span className={cn(
                               "font-bold text-sm",
                               isDismissal ? "text-red-400" : 
-                              t.is_exchange ? "text-blue-400" : "text-emerald-400"
+                              t.is_exchange ? "text-blue-400" : 
+                              isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
                             )}>
                               {formatBalance(t.value)}
                             </span>
@@ -1592,7 +1639,8 @@ export default function PaginaTransferencias() {
                           <ArrowRight className="w-3 h-3 text-yellow-400" />
                         </div>
                         <p className="text-zinc-400 text-[10px] mt-1">
-                          {isDismissal ? 'Dispensa' : t.is_exchange ? 'Troca' : 'Venda'}
+                          {isAuctionTransfer ? 'Leilão' : 
+                           isDismissal ? 'Dispensa' : t.is_exchange ? 'Troca' : 'Venda'}
                         </p>
                       </div>
 
@@ -1653,6 +1701,16 @@ export default function PaginaTransferencias() {
 
                     {/* Jogadores da Troca (se for troca) */}
                     {t.is_exchange && <ExchangePlayers transfer={t} />}
+                    
+                    {/* Tag laranja "Leilão" para transferências finalizadas que são leilões */}
+                    {isAuctionTransfer && activeTab === 'completed' && (
+                      <div className="mt-2 pt-2 border-t border-orange-500/20">
+                        <Badge className="bg-orange-600 text-white text-xs w-full justify-center">
+                          <Gavel className="w-3 h-3 mr-1" />
+                          Transação via Leilão
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 )}
               </Card>
