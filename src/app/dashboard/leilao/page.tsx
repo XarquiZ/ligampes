@@ -131,7 +131,7 @@ const generateBidOptions = (currentBid: number): { value: number; label: string 
   return options
 }
 
-// Hook para saldo reservado com persistência
+// Hook para saldo reservado - ATUALIZADO
 const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -141,23 +141,23 @@ const useSaldoReservado = (teamId: string | null) => {
     
     setIsLoading(true)
     try {
-      console.log('🔄 Carregando saldos reservados para time:', teamId)
+      console.log('🔄 Carregando saldos reservados do banco:', teamId)
       
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem(`saldoReservado_${teamId}`)
-        if (saved) {
-          const localReserves = JSON.parse(saved)
-          setSaldoReservado(localReserves)
-          console.log('📱 Saldos do localStorage:', localReserves)
-        }
-      }
-      
-      const { data: transactions, error } = await supabase
+      // Buscar APENAS leilões ATIVOS com reservas pendentes
+      const { data: pendingTransactions, error } = await supabase
         .from('balance_transactions')
-        .select('id, auction_id, amount, description, created_at, updated_at')
+        .select(`
+          amount,
+          auction_id,
+          auctions!inner (
+            id,
+            status
+          )
+        `)
         .eq('team_id', teamId)
         .eq('type', 'bid_pending')
         .eq('is_processed', false)
+        .eq('auctions.status', 'active') // SÓ leilões ativos
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -165,10 +165,10 @@ const useSaldoReservado = (teamId: string | null) => {
         return
       }
 
-      console.log('💾 Transações pendentes do banco:', transactions)
+      console.log('💾 Transações pendentes ativas do banco:', pendingTransactions)
 
       const reserves: {[key: string]: number} = {}
-      transactions?.forEach(transaction => {
+      pendingTransactions?.forEach(transaction => {
         if (transaction.auction_id) {
           reserves[transaction.auction_id] = transaction.amount
         }
@@ -176,10 +176,6 @@ const useSaldoReservado = (teamId: string | null) => {
 
       setSaldoReservado(reserves)
       
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`saldoReservado_${teamId}`, JSON.stringify(reserves))
-      }
-
       console.log('💰 Saldos reservados carregados:', reserves)
 
     } catch (error) {
@@ -189,199 +185,44 @@ const useSaldoReservado = (teamId: string | null) => {
     }
   }, [])
 
-  const reservarSaldo = async (auctionId: string, amount: number, teamId: string) => {
-    if (!auctionId || amount <= 0 || !teamId) {
-      toast.error('Dados inválidos para reservar saldo')
-      return
-    }
-    
-    try {
-      console.log(`💸 Reservando saldo: ${amount} para leilão ${auctionId}`)
-      
-      const { data: transactionId, error } = await supabase.rpc(
-        'create_pending_balance_transaction',
-        {
-          p_team_id: teamId,
-          p_amount: amount,
-          p_auction_id: auctionId,
-          p_description: `Lance reservado no leilão`
-        }
-      )
-
-      if (error) {
-        console.error('❌ Erro ao criar transação pendente:', error)
-        throw error
-      }
-
-      setSaldoReservado(prev => ({ ...prev, [auctionId]: amount }))
-      
-      if (typeof window !== 'undefined') {
-        const key = `saldoReservado_${teamId}`
-        const current = JSON.parse(localStorage.getItem(key) || '{}')
-        current[auctionId] = amount
-        localStorage.setItem(key, JSON.stringify(current))
-      }
-      
-      console.log(`✅ Saldo reservado com ID: ${transactionId} para leilão ${auctionId}`)
-      return transactionId
-      
-    } catch (error: any) {
-      console.error('❌ Erro ao reservar saldo:', error)
-      toast.error('Erro ao reservar saldo: ' + (error.message || 'Erro desconhecido'))
-      throw error
-    }
-  }
-
   const liberarSaldo = async (auctionId: string, teamId: string) => {
     if (!auctionId || !teamId) return
     
     try {
-      console.log(`🔄 Liberando saldo do leilão ${auctionId}`)
+      console.log(`🔄 Removendo saldo reservado do estado local: ${auctionId}`)
       
-      const { data: transactions, error: findError } = await supabase
-        .from('balance_transactions')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('auction_id', auctionId)
-        .eq('type', 'bid_pending')
-        .eq('is_processed', false)
-
-      if (findError) {
-        console.error('❌ Erro ao encontrar transações:', findError)
-        return
-      }
-
-      if (transactions && transactions.length > 0) {
-        for (const transaction of transactions) {
-          const { error: updateError } = await supabase.rpc('mark_transaction_processed', {
-            p_transaction_id: transaction.id
-          })
-          
-          if (updateError) {
-            console.error('❌ Erro ao marcar transação como processada:', updateError)
-          }
-        }
-        console.log(`✅ ${transactions.length} transação(ões) liberada(s)`)
-      }
-
+      // Apenas remove do estado local - o banco já liberou
       setSaldoReservado(prev => {
         const novo = { ...prev }
         delete novo[auctionId]
         return novo
       })
 
-      if (typeof window !== 'undefined') {
-        const key = `saldoReservado_${teamId}`
-        const current = JSON.parse(localStorage.getItem(key) || '{}')
-        delete current[auctionId]
-        localStorage.setItem(key, JSON.stringify(current))
-      }
-
-      console.log(`💰 Saldo liberado do leilão ${auctionId}`)
+      console.log(`💰 Saldo liberado do estado local: ${auctionId}`)
       
     } catch (error) {
       console.error('❌ Erro ao liberar saldo:', error)
     }
   }
 
-  // NOVA FUNÇÃO: Processar saldo reservado de leilão finalizado
-  const processarSaldoFinalizado = async (auctionId: string, teamId: string, valor: number) => {
+  // NOVA FUNÇÃO: Remover reserva quando vencedor (já convertida em débito no banco)
+  const debitarSaldoVencedor = async (auctionId: string, teamId: string, valor: number) => {
     if (!auctionId || !teamId || !valor) return
     
     try {
-      console.log(`💰 Processando saldo reservado finalizado: leilão ${auctionId}, time ${teamId}, valor ${valor}`)
+      console.log(`💰 Removendo reserva do estado local (vencedor): ${auctionId}`)
       
-      // 1. Encontrar transações pendentes
-      const { data: transactions, error: findError } = await supabase
-        .from('balance_transactions')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('auction_id', auctionId)
-        .eq('type', 'bid_pending')
-        .eq('is_processed', false)
-
-      if (findError) {
-        console.error('❌ Erro ao encontrar transações:', findError)
-        return
-      }
-
-      if (transactions && transactions.length > 0) {
-        console.log(`🔄 Convertendo ${transactions.length} transação(ões) pendentes em débito real...`)
-        
-        for (const transaction of transactions) {
-          // 2. Marcar transação como processada
-          const { error: updateError } = await supabase.rpc('mark_transaction_processed', {
-            p_transaction_id: transaction.id
-          })
-          
-          if (updateError) {
-            console.error('❌ Erro ao marcar transação como processada:', updateError)
-          }
-        }
-        console.log(`✅ Transações convertidas em débito real`)
-      }
-
-      // 3. Remover do estado local
+      // Apenas remove do estado local - o banco já converteu em débito
       setSaldoReservado(prev => {
         const novo = { ...prev }
         delete novo[auctionId]
         return novo
       })
 
-      // 4. Remover do localStorage
-      if (typeof window !== 'undefined') {
-        const key = `saldoReservado_${teamId}`
-        const current = JSON.parse(localStorage.getItem(key) || '{}')
-        delete current[auctionId]
-        localStorage.setItem(key, JSON.stringify(current))
-      }
-
-      console.log(`🎯 Saldo processado para leilão finalizado ${auctionId}`)
+      console.log(`✅ Reserva removida do estado local (vencedor): ${auctionId}`)
       
     } catch (error) {
-      console.error('❌ Erro ao processar saldo finalizado:', error)
-    }
-  }
-
-  const liberarTodosSaldos = async (teamId: string) => {
-    if (!teamId) return
-    
-    try {
-      console.log('🗑️ Liberando todos os saldos reservados')
-      
-      const { data: transactions, error: findError } = await supabase
-        .from('balance_transactions')
-        .select('id')
-        .eq('team_id', teamId)
-        .eq('type', 'bid_pending')
-        .eq('is_processed', false)
-
-      if (findError) {
-        console.error('❌ Erro ao encontrar transações:', findError)
-        return
-      }
-
-      if (transactions && transactions.length > 0) {
-        for (const transaction of transactions) {
-          await supabase.rpc('mark_transaction_processed', {
-            p_transaction_id: transaction.id
-          })
-        }
-        console.log(`✅ ${transactions.length} transações liberadas`)
-      }
-
-      setSaldoReservado({})
-      
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(`saldoReservado_${teamId}`)
-      }
-      
-      toast.success('Todos os saldos reservados foram liberados!')
-      console.log('💰 Todos os saldos reservados foram liberados')
-      
-    } catch (error) {
-      console.error('❌ Erro ao liberar todos os saldos:', error)
-      toast.error('Erro ao liberar saldos')
+      console.error('❌ Erro ao processar débito do vencedor:', error)
     }
   }
 
@@ -415,10 +256,8 @@ const useSaldoReservado = (teamId: string | null) => {
   return {
     saldoReservado,
     isLoading,
-    reservarSaldo,
-    liberarSaldo,
-    processarSaldoFinalizado, // NOVA FUNÇÃO
-    liberarTodosSaldos,
+    liberarSaldo,           // Apenas remove do estado local
+    debitarSaldoVencedor,   // Remove do estado local quando vence
     getSaldoReservado,
     loadPendingReserves,
     verificarLeiloesAtivos
@@ -468,10 +307,8 @@ export default function PaginaLeilao() {
   const {
     saldoReservado,
     isLoading: isLoadingSaldo,
-    reservarSaldo,
     liberarSaldo,
-    processarSaldoFinalizado, // NOVA FUNÇÃO
-    liberarTodosSaldos,
+    debitarSaldoVencedor, // NOVA FUNÇÃO
     getSaldoReservado,
     loadPendingReserves,
     verificarLeiloesAtivos
@@ -669,7 +506,7 @@ export default function PaginaLeilao() {
     }
   }, [activeTab, auctions, serverTimeOffset])
 
-  // CONFIGURAR REALTIME SUPABASE
+  // CONFIGURAR REALTIME SUPABASE - ATUALIZADO
   useEffect(() => {
     if (!user || !team) return
 
@@ -693,6 +530,7 @@ export default function PaginaLeilao() {
             team_id: team?.id
           })
           
+          // Quando alguém cobre seu lance
           if (team && 
               payload.old?.current_bidder === team.id && 
               payload.new?.current_bidder !== team.id) {
@@ -721,6 +559,7 @@ export default function PaginaLeilao() {
                 icon: '🔄'
               })
               
+              // Atualizar o estado local
               if (team.id) {
                 await liberarSaldo(payload.new?.id, team.id)
               }
@@ -750,7 +589,7 @@ export default function PaginaLeilao() {
                     : 0
                 }
                 
-                // CORREÇÃO: Processar saldo reservado quando o leilão é finalizado
+                // Quando o usuário vence o leilão
                 if (fullAuction.status === 'finished' && 
                     fullAuction.current_bidder === team.id) {
                   
@@ -769,17 +608,17 @@ export default function PaginaLeilao() {
                     show: true
                   })
                   
-                  // CORREÇÃO: Processar o saldo reservado quando vence o leilão
+                  // Atualizar o estado local
                   setTimeout(async () => {
                     try {
-                      await processarSaldoFinalizado(
+                      await debitarSaldoVencedor(
                         fullAuction.id,
                         team.id,
                         fullAuction.current_bid
                       )
-                      console.log(`✅ Saldo reservado processado para leilão ${fullAuction.id}`)
+                      console.log(`✅ Estado local atualizado para leilão vencido ${fullAuction.id}`)
                     } catch (error) {
-                      console.error('❌ Erro ao processar saldo reservado:', error)
+                      console.error('❌ Erro ao atualizar estado local:', error)
                     }
                   }, 1000)
                 }
@@ -900,9 +739,9 @@ export default function PaginaLeilao() {
       supabase.removeChannel(balanceChannel)
       supabase.removeChannel(playersChannel)
     }
-  }, [user, team, serverTimeOffset, saldoReservado, liberarSaldo, processarSaldoFinalizado])
+  }, [user, team, serverTimeOffset, saldoReservado, liberarSaldo, debitarSaldoVencedor])
 
-  // VERIFICAR LEILÕES EXPIRADOS PERIODICAMENTE
+  // VERIFICAR LEILÕES EXPIRADOS PERIODICAMENTE - ATUALIZADO
   useEffect(() => {
     if (!team || auctions.length === 0 || !isTimeSynced) return
     
@@ -997,17 +836,17 @@ export default function PaginaLeilao() {
                     show: true
                   })
                   
-                  // CORREÇÃO: Processar saldo reservado quando vence via expiração
+                  // Atualizar estado local quando vence via expiração
                   setTimeout(async () => {
                     try {
-                      await processarSaldoFinalizado(
+                      await debitarSaldoVencedor(
                         auction.id,
                         team.id,
                         auction.current_bid
                       )
-                      console.log(`✅ Saldo reservado processado para leilão expirado ${auction.id}`)
+                      console.log(`✅ Estado local atualizado para leilão expirado ${auction.id}`)
                     } catch (error) {
-                      console.error('❌ Erro ao processar saldo reservado:', error)
+                      console.error('❌ Erro ao atualizar estado local:', error)
                     }
                   }, 1000)
                 }
@@ -1025,15 +864,15 @@ export default function PaginaLeilao() {
     
     const interval = setInterval(checkExpiredAuctions, 5000)
     return () => clearInterval(interval)
-  }, [team, auctions, serverTimeOffset, isTimeSynced, processarSaldoFinalizado])
+  }, [team, auctions, serverTimeOffset, isTimeSynced, debitarSaldoVencedor])
 
-  // NOVO useEffect: Verificar leilões finalizados e processar saldos
+  // NOVO useEffect: Verificar leilões finalizados e atualizar estado local
   useEffect(() => {
     if (!team?.id || !auctions.length) return
     
     const verificarLeiloesFinalizados = async () => {
       try {
-        console.log('🔍 Verificando leilões finalizados para processar saldos reservados...')
+        console.log('🔍 Verificando leilões finalizados para atualizar estado local...')
         
         const leiloesFinalizados = auctions.filter(a => 
           a.status === 'finished' && 
@@ -1046,20 +885,20 @@ export default function PaginaLeilao() {
           return
         }
         
-        console.log(`🔄 Processando ${leiloesFinalizados.length} leilão(ões) finalizado(s) com saldo reservado:`)
+        console.log(`🔄 Atualizando estado local para ${leiloesFinalizados.length} leilão(ões) finalizado(s):`)
         
         for (const auction of leiloesFinalizados) {
           console.log(`   - Leilão ${auction.id}: R$ ${auction.current_bid}`)
           
           try {
-            await processarSaldoFinalizado(
+            await debitarSaldoVencedor(
               auction.id,
               team.id,
               auction.current_bid
             )
-            console.log(`   ✅ Saldo processado para leilão ${auction.id}`)
+            console.log(`   ✅ Estado local atualizado para leilão ${auction.id}`)
           } catch (error) {
-            console.error(`   ❌ Erro ao processar saldo do leilão ${auction.id}:`, error)
+            console.error(`   ❌ Erro ao atualizar estado local do leilão ${auction.id}:`, error)
           }
         }
         
@@ -1074,7 +913,7 @@ export default function PaginaLeilao() {
     if (!loading && team && auctions.length > 0) {
       verificarLeiloesFinalizados()
     }
-  }, [loading, team, auctions, saldoReservado, processarSaldoFinalizado])
+  }, [loading, team, auctions, saldoReservado, debitarSaldoVencedor])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -1559,6 +1398,7 @@ export default function PaginaLeilao() {
 
       console.log('✅ LANCE BEM-SUCEDIDO:', data)
       
+      // Atualizar reservas do banco
       await loadPendingReserves(team.id)
       
       setSelectedBidAmount(null)
@@ -1599,14 +1439,14 @@ export default function PaginaLeilao() {
         toast.success('Leilão finalizado')
         await loadAuctions()
         
-        // CORREÇÃO: Se o time atual é o vencedor, processar saldo reservado
+        // Atualizar estado local se o time atual é o vencedor
         if (team?.id && data?.winner_team_id === team.id) {
           setTimeout(async () => {
             try {
-              await processarSaldoFinalizado(auctionId, team.id, data?.final_amount || 0)
-              console.log(`✅ Saldo reservado processado para leilão forçado ${auctionId}`)
+              await debitarSaldoVencedor(auctionId, team.id, data?.final_amount || 0)
+              console.log(`✅ Estado local atualizado para leilão forçado ${auctionId}`)
             } catch (error) {
-              console.error('❌ Erro ao processar saldo reservado:', error)
+              console.error('❌ Erro ao atualizar estado local:', error)
             }
           }, 1000)
         }

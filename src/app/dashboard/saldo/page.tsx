@@ -203,6 +203,7 @@ export default function PaginaSaldo() {
           .from('balance_transactions')
           .select('*')
           .eq('team_id', profile.team_id)
+          .neq('type', 'bid_pending')  // ← FILTRO IMPORTANTE: exclui reservas
           .order('created_at', { ascending: false })
 
         if (transactionsError) throw transactionsError
@@ -249,6 +250,7 @@ export default function PaginaSaldo() {
         .from('balance_transactions')
         .select('*')
         .eq('team_id', teamId)
+        .neq('type', 'bid_pending')  // ← FILTRO IMPORTANTE: exclui reservas
         .order('created_at', { ascending: false })
 
       if (transactionsError) throw transactionsError

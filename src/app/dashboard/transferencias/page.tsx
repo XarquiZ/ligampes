@@ -47,7 +47,7 @@ interface UserProfile {
 interface Team {
   id: string
   name: string
-  logo_url: string
+  logo_url: string | null
   balance: number
 }
 
@@ -334,37 +334,44 @@ export default function PaginaTransferencias() {
 
   // Carregar dados do usuário
   const loadUserData = async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-
-    setUser(session.user)
-
-    // Pega perfil do usuário (team_id e se é admin)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*, teams(*)')
-      .eq('id', session.user.id)
-      .single()
-
-    if (profile) {
-      setProfile(profile)
-      setUserTeamId(profile?.team_id || null)
-      setIsAdmin(profile?.role === 'admin')
-      
-      // Definir time diretamente do perfil
-      if (profile.teams) {
-        setTeam(profile.teams)
-      } else {
-        setTeam(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
       }
-    }
 
-    // Carregar dados baseado na view atual
-    if (activeView === 'transferencias') {
-      loadData()
-    } else {
-      loadMarketData()
-      loadMyPlayers()
+      setUser(session.user)
+
+      // Pega perfil do usuário (team_id e se é admin)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*, teams(*)')
+        .eq('id', session.user.id)
+        .single()
+
+      if (profile) {
+        setProfile(profile)
+        setUserTeamId(profile?.team_id || null)
+        setIsAdmin(profile?.role === 'admin')
+        
+        // Definir time diretamente do perfil
+        if (profile.teams) {
+          setTeam(profile.teams)
+        } else {
+          setTeam(null)
+        }
+      }
+
+      // Carregar dados baseado na view atual
+      if (activeView === 'transferencias') {
+        await loadData()
+      } else {
+        await loadMarketData()
+        await loadMyPlayers()
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do usuário:', error)
     }
   }
 
@@ -388,37 +395,53 @@ export default function PaginaTransferencias() {
   const loadData = async () => {
     setLoading(true)
 
-    // Carrega TODAS as negociações (excluindo as rejeitadas)
-    const { data: transferData } = await supabase
-      .from('player_transfers')
-      .select(`
-        *,
-        from_team:teams!from_team_id (id, name, logo_url, balance),
-        to_team:teams!to_team_id (id, name, logo_url, balance),
-        player:players (id, name, photo_url, position)
-      `)
-      .order('created_at', { ascending: false })
+    try {
+      // Carrega TODAS as negociações (excluindo as rejeitadas)
+      const { data: transferData, error } = await supabase
+        .from('player_transfers')
+        .select(`
+          *,
+          from_team:teams!from_team_id (id, name, logo_url, balance),
+          to_team:teams!to_team_id (id, name, logo_url, balance),
+          player:players (id, name, photo_url, position)
+        `)
+        .order('created_at', { ascending: false })
 
-    setAllTransfers(transferData || [])
-    
-    // Carregar detalhes dos jogadores de troca
-    const exchangeDetails: {[key: string]: any[]} = {}
-    if (transferData) {
-      for (const transfer of transferData) {
-        if (transfer.is_exchange && transfer.exchange_players) {
-          exchangeDetails[transfer.id] = await loadExchangePlayersDetails(transfer)
+      if (error) throw error
+
+      const safeTransferData = transferData?.map(transfer => ({
+        ...transfer,
+        from_team: transfer.from_team || { id: '', name: 'Time Desconhecido', logo_url: null, balance: 0 },
+        to_team: transfer.to_team || { id: '', name: 'Time Desconhecido', logo_url: null, balance: 0 },
+        player: transfer.player || { id: '', name: 'Jogador Desconhecido', photo_url: null, position: 'N/A' }
+      })) || []
+
+      setAllTransfers(safeTransferData)
+      
+      // Carregar detalhes dos jogadores de troca
+      const exchangeDetails: {[key: string]: any[]} = {}
+      if (safeTransferData) {
+        for (const transfer of safeTransferData) {
+          if (transfer.is_exchange && transfer.exchange_players) {
+            exchangeDetails[transfer.id] = await loadExchangePlayersDetails(transfer)
+          }
         }
       }
+      setExchangePlayersDetails(exchangeDetails)
+      
+      // Filtra baseado na aba ativa (excluindo rejeitadas)
+      const filtered = activeTab === 'pending' 
+        ? safeTransferData.filter(t => t.status === 'pending')
+        : safeTransferData.filter(t => t.status === 'approved')
+      
+      setTransfers(filtered)
+    } catch (error) {
+      console.error('Erro ao carregar transferências:', error)
+      setAllTransfers([])
+      setTransfers([])
+    } finally {
+      setLoading(false)
     }
-    setExchangePlayersDetails(exchangeDetails)
-    
-    // Filtra baseado na aba ativa (excluindo rejeitadas)
-    const filtered = activeTab === 'pending' 
-      ? (transferData || []).filter(t => t.status === 'pending')
-      : (transferData || []).filter(t => t.status === 'approved')
-    
-    setTransfers(filtered)
-    setLoading(false)
   }
 
   // Recarregar quando mudar a aba
@@ -448,7 +471,7 @@ export default function PaginaTransferencias() {
           // Verifica se todos os jogadores ainda estão no time
           const invalidPlayers = exchangePlayers?.filter(p => p.team_id !== transfer.to_team_id) || []
           if (invalidPlayers.length > 0) {
-            alert('❌ Troca rejeita! Alguns jogadores não estão mais disponíveis no time.')
+            alert('❌ Troca rejeitada! Alguns jogadores não estão mais disponíveis no time.')
             
             const { error: rejectError } = await supabase
               .from('player_transfers')
@@ -518,6 +541,7 @@ export default function PaginaTransferencias() {
         }
       }
     } catch (error) {
+      console.error('Erro inesperado ao processar transferência:', error)
       alert('Erro inesperado ao processar transferência')
     }
   }
@@ -531,7 +555,10 @@ export default function PaginaTransferencias() {
       .update({ [field]: true } as any)
       .eq('id', transferId)
 
-    if (error) return
+    if (error) {
+      console.error('Erro ao aprovar transferência:', error)
+      return
+    }
 
     // Atualiza o estado local pra refletir a aprovação imediatamente
     const updatedTransfers = transfers.map(t =>
@@ -546,7 +573,7 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // Rejeitar transferência (APENAS ADMIN)
+  // Rejeitar transferência (APENAS ADMIN) - CORRIGIDA
   const rejeitarTransferencia = async (transferId: string) => {
     if (!confirm('Tem certeza que deseja cancelar esta transferência? Esta ação não pode ser desfeita.')) {
       return
@@ -568,12 +595,13 @@ export default function PaginaTransferencias() {
         return
       }
 
-      // Remove a transferência da lista local imediatamente
+      // Atualizar estado local de forma segura
       setTransfers(prev => prev.filter(t => t.id !== transferId))
       setAllTransfers(prev => prev.filter(t => t.id !== transferId))
       
       alert('✅ Transferência cancelada com sucesso!')
     } catch (error) {
+      console.error('Erro ao cancelar transferência:', error)
       alert('Erro inesperado ao cancelar transferência')
     }
   }
@@ -609,7 +637,7 @@ export default function PaginaTransferencias() {
                 <Badge className="bg-blue-600 text-[10px] px-1">{player.position}</Badge>
               </div>
               <span className="text-emerald-400 text-[10px]">
-                R$ {player.base_price?.toLocaleString('pt-BR')}
+                R$ {player.base_price?.toLocaleString('pt-BR') || '0'}
               </span>
             </div>
           ))}
@@ -755,7 +783,7 @@ export default function PaginaTransferencias() {
     } catch (error) {
       console.error('Erro ao carregar meus jogadores:', error)
     }
-  }, [team?.id])
+  }, [team?.id, team?.name, team?.logo_url])
 
   // Handler para mudança de preço (seletor)
   const handlePriceChange = (value: string) => {
@@ -832,7 +860,7 @@ export default function PaginaTransferencias() {
       
       alert('✅ Jogador anunciado no mercado com sucesso!')
       
-      // Recarregar dados SEM deixar duplicado
+      // Recarregar dados
       await Promise.all([
         loadMarketData(),
         loadMyPlayers()
@@ -1252,7 +1280,7 @@ export default function PaginaTransferencias() {
         )}>
           {transfers.map((t) => {
             // Verificar se é uma dispensa (to_team_id é null ou transfer_type é 'dismiss')
-            const isDismissal = t.to_team_id === null || t.transfer_type === 'dismiss'
+            const isDismissal = !t.to_team_id || t.transfer_type === 'dismiss'
             
             return (
               <Card
@@ -1305,7 +1333,7 @@ export default function PaginaTransferencias() {
                     <div className="flex items-center justify-between mb-4">
                       {/* Time Vendedor */}
                       <div className="flex flex-col items-center text-center flex-1">
-                        {t.from_team.logo_url ? (
+                        {t.from_team?.logo_url ? (
                           <img 
                             src={t.from_team.logo_url} 
                             alt={t.from_team.name}
@@ -1313,10 +1341,14 @@ export default function PaginaTransferencias() {
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center mb-1">
-                            <span className="text-xs font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
+                            <span className="text-xs font-bold text-white">
+                              {t.from_team?.name?.substring(0, 2) || 'VD'}
+                            </span>
                           </div>
                         )}
-                        <p className="text-white text-sm font-medium truncate w-full">{t.from_team.name}</p>
+                        <p className="text-white text-sm font-medium truncate w-full">
+                          {t.from_team?.name || 'Vendedor'}
+                        </p>
                         <p className="text-zinc-400 text-xs">Vendedor</p>
                       </div>
 
@@ -1348,7 +1380,7 @@ export default function PaginaTransferencias() {
 
                       {/* Time Comprador */}
                       <div className="flex flex-col items-center text-center flex-1">
-                        {t.to_team.logo_url ? (
+                        {t.to_team?.logo_url ? (
                           <img 
                             src={t.to_team.logo_url} 
                             alt={t.to_team.name}
@@ -1356,17 +1388,21 @@ export default function PaginaTransferencias() {
                           />
                         ) : (
                           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center mb-1">
-                            <span className="text-xs font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
+                            <span className="text-xs font-bold text-white">
+                              {t.to_team?.name?.substring(0, 2) || 'CP'}
+                            </span>
                           </div>
                         )}
-                        <p className="text-white text-sm font-medium truncate w-full">{t.to_team.name}</p>
+                        <p className="text-white text-sm font-medium truncate w-full">
+                          {t.to_team?.name || 'Comprador'}
+                        </p>
                         <p className="text-zinc-400 text-xs">Comprador</p>
                       </div>
                     </div>
 
                     {/* Jogador Principal - Compacto */}
                     <div className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg mb-4">
-                      {t.player.photo_url ? (
+                      {t.player?.photo_url ? (
                         <img 
                           src={t.player.photo_url} 
                           alt={t.player.name}
@@ -1374,13 +1410,19 @@ export default function PaginaTransferencias() {
                         />
                       ) : (
                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-sm font-black text-white">{t.player.position}</span>
+                          <span className="text-sm font-black text-white">
+                            {t.player?.position || 'N/A'}
+                          </span>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-bold text-white truncate">{t.player.name}</h3>
+                        <h3 className="text-base font-bold text-white truncate">
+                          {t.player?.name || 'Jogador Desconhecido'}
+                        </h3>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge className="bg-purple-600 text-xs">{t.player.position}</Badge>
+                          <Badge className="bg-purple-600 text-xs">
+                            {t.player?.position || 'N/A'}
+                          </Badge>
                           <span className="text-yellow-400 text-xs font-semibold">
                             ⏳ Aguardando
                           </span>
@@ -1504,7 +1546,7 @@ export default function PaginaTransferencias() {
                     <div className="flex items-center justify-between">
                       {/* Time de Origem */}
                       <div className="flex items-center gap-2">
-                        {t.from_team.logo_url ? (
+                        {t.from_team?.logo_url ? (
                           <img 
                             src={t.from_team.logo_url} 
                             alt={t.from_team.name}
@@ -1512,11 +1554,15 @@ export default function PaginaTransferencias() {
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">{t.from_team.name.substring(0, 2)}</span>
+                            <span className="text-xs font-bold text-white">
+                              {t.from_team?.name?.substring(0, 2) || 'VD'}
+                            </span>
                           </div>
                         )}
                         <div className="text-right">
-                          <p className="text-white text-xs font-semibold truncate max-w-[60px]">{t.from_team.name}</p>
+                          <p className="text-white text-xs font-semibold truncate max-w-[60px]">
+                            {t.from_team?.name || 'Vendedor'}
+                          </p>
                           <p className="text-zinc-400 text-[10px]">
                             {isDismissal ? 'Anterior' : 'Vendedor'}
                           </p>
@@ -1554,7 +1600,7 @@ export default function PaginaTransferencias() {
                       <div className="flex items-center gap-2">
                         <div className="text-left">
                           <p className="text-white text-xs font-semibold truncate max-w-[60px]">
-                            {isDismissal ? 'Sem Clube' : t.to_team.name}
+                            {isDismissal ? 'Sem Clube' : t.to_team?.name || 'Comprador'}
                           </p>
                           <p className="text-zinc-400 text-[10px]">
                             {isDismissal ? 'Destino' : 'Comprador'}
@@ -1564,7 +1610,7 @@ export default function PaginaTransferencias() {
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-400 flex items-center justify-center">
                             <Users className="w-4 h-4 text-gray-300" />
                           </div>
-                        ) : t.to_team.logo_url ? (
+                        ) : t.to_team?.logo_url ? (
                           <img 
                             src={t.to_team.logo_url} 
                             alt={t.to_team.name}
@@ -1572,7 +1618,9 @@ export default function PaginaTransferencias() {
                           />
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">{t.to_team.name.substring(0, 2)}</span>
+                            <span className="text-xs font-bold text-white">
+                              {t.to_team?.name?.substring(0, 2) || 'CP'}
+                            </span>
                           </div>
                         )}
                       </div>
@@ -1580,7 +1628,7 @@ export default function PaginaTransferencias() {
 
                     {/* Jogador Principal */}
                     <div className="flex items-center gap-2 pt-2 border-t border-zinc-700/50">
-                      {t.player.photo_url ? (
+                      {t.player?.photo_url ? (
                         <img 
                           src={t.player.photo_url} 
                           alt={t.player.name}
@@ -1588,12 +1636,18 @@ export default function PaginaTransferencias() {
                         />
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-xs font-black text-white">{t.player.position}</span>
+                          <span className="text-xs font-black text-white">
+                            {t.player?.position || 'N/A'}
+                          </span>
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-semibold truncate">{t.player.name}</p>
-                        <Badge className="bg-purple-600 text-[10px]">{t.player.position}</Badge>
+                        <p className="text-white text-sm font-semibold truncate">
+                          {t.player?.name || 'Jogador Desconhecido'}
+                        </p>
+                        <Badge className="bg-purple-600 text-[10px]">
+                          {t.player?.position || 'N/A'}
+                        </Badge>
                       </div>
                     </div>
 
