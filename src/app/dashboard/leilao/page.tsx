@@ -284,6 +284,65 @@ const useSaldoReservado = (teamId: string | null) => {
     }
   }
 
+  // NOVA FUNÇÃO: Processar saldo reservado de leilão finalizado
+  const processarSaldoFinalizado = async (auctionId: string, teamId: string, valor: number) => {
+    if (!auctionId || !teamId || !valor) return
+    
+    try {
+      console.log(`💰 Processando saldo reservado finalizado: leilão ${auctionId}, time ${teamId}, valor ${valor}`)
+      
+      // 1. Encontrar transações pendentes
+      const { data: transactions, error: findError } = await supabase
+        .from('balance_transactions')
+        .select('id')
+        .eq('team_id', teamId)
+        .eq('auction_id', auctionId)
+        .eq('type', 'bid_pending')
+        .eq('is_processed', false)
+
+      if (findError) {
+        console.error('❌ Erro ao encontrar transações:', findError)
+        return
+      }
+
+      if (transactions && transactions.length > 0) {
+        console.log(`🔄 Convertendo ${transactions.length} transação(ões) pendentes em débito real...`)
+        
+        for (const transaction of transactions) {
+          // 2. Marcar transação como processada
+          const { error: updateError } = await supabase.rpc('mark_transaction_processed', {
+            p_transaction_id: transaction.id
+          })
+          
+          if (updateError) {
+            console.error('❌ Erro ao marcar transação como processada:', updateError)
+          }
+        }
+        console.log(`✅ Transações convertidas em débito real`)
+      }
+
+      // 3. Remover do estado local
+      setSaldoReservado(prev => {
+        const novo = { ...prev }
+        delete novo[auctionId]
+        return novo
+      })
+
+      // 4. Remover do localStorage
+      if (typeof window !== 'undefined') {
+        const key = `saldoReservado_${teamId}`
+        const current = JSON.parse(localStorage.getItem(key) || '{}')
+        delete current[auctionId]
+        localStorage.setItem(key, JSON.stringify(current))
+      }
+
+      console.log(`🎯 Saldo processado para leilão finalizado ${auctionId}`)
+      
+    } catch (error) {
+      console.error('❌ Erro ao processar saldo finalizado:', error)
+    }
+  }
+
   const liberarTodosSaldos = async (teamId: string) => {
     if (!teamId) return
     
@@ -337,7 +396,7 @@ const useSaldoReservado = (teamId: string | null) => {
       for (const auctionId of auctionIds) {
         const { data: auction, error } = await supabase
           .from('auctions')
-          .select('id, status')
+          .select('id, status, current_bidder')
           .eq('id', auctionId)
           .single()
         
@@ -358,6 +417,7 @@ const useSaldoReservado = (teamId: string | null) => {
     isLoading,
     reservarSaldo,
     liberarSaldo,
+    processarSaldoFinalizado, // NOVA FUNÇÃO
     liberarTodosSaldos,
     getSaldoReservado,
     loadPendingReserves,
@@ -410,6 +470,7 @@ export default function PaginaLeilao() {
     isLoading: isLoadingSaldo,
     reservarSaldo,
     liberarSaldo,
+    processarSaldoFinalizado, // NOVA FUNÇÃO
     liberarTodosSaldos,
     getSaldoReservado,
     loadPendingReserves,
@@ -689,6 +750,7 @@ export default function PaginaLeilao() {
                     : 0
                 }
                 
+                // CORREÇÃO: Processar saldo reservado quando o leilão é finalizado
                 if (fullAuction.status === 'finished' && 
                     fullAuction.current_bidder === team.id) {
                   
@@ -706,6 +768,20 @@ export default function PaginaLeilao() {
                     teamName: team.name,
                     show: true
                   })
+                  
+                  // CORREÇÃO: Processar o saldo reservado quando vence o leilão
+                  setTimeout(async () => {
+                    try {
+                      await processarSaldoFinalizado(
+                        fullAuction.id,
+                        team.id,
+                        fullAuction.current_bid
+                      )
+                      console.log(`✅ Saldo reservado processado para leilão ${fullAuction.id}`)
+                    } catch (error) {
+                      console.error('❌ Erro ao processar saldo reservado:', error)
+                    }
+                  }, 1000)
                 }
                 
                 return newAuctions
@@ -824,7 +900,7 @@ export default function PaginaLeilao() {
       supabase.removeChannel(balanceChannel)
       supabase.removeChannel(playersChannel)
     }
-  }, [user, team, serverTimeOffset, saldoReservado, liberarSaldo])
+  }, [user, team, serverTimeOffset, saldoReservado, liberarSaldo, processarSaldoFinalizado])
 
   // VERIFICAR LEILÕES EXPIRADOS PERIODICAMENTE
   useEffect(() => {
@@ -920,6 +996,20 @@ export default function PaginaLeilao() {
                     teamName: team.name,
                     show: true
                   })
+                  
+                  // CORREÇÃO: Processar saldo reservado quando vence via expiração
+                  setTimeout(async () => {
+                    try {
+                      await processarSaldoFinalizado(
+                        auction.id,
+                        team.id,
+                        auction.current_bid
+                      )
+                      console.log(`✅ Saldo reservado processado para leilão expirado ${auction.id}`)
+                    } catch (error) {
+                      console.error('❌ Erro ao processar saldo reservado:', error)
+                    }
+                  }, 1000)
                 }
               }
             } finally {
@@ -935,7 +1025,56 @@ export default function PaginaLeilao() {
     
     const interval = setInterval(checkExpiredAuctions, 5000)
     return () => clearInterval(interval)
-  }, [team, auctions, serverTimeOffset, isTimeSynced])
+  }, [team, auctions, serverTimeOffset, isTimeSynced, processarSaldoFinalizado])
+
+  // NOVO useEffect: Verificar leilões finalizados e processar saldos
+  useEffect(() => {
+    if (!team?.id || !auctions.length) return
+    
+    const verificarLeiloesFinalizados = async () => {
+      try {
+        console.log('🔍 Verificando leilões finalizados para processar saldos reservados...')
+        
+        const leiloesFinalizados = auctions.filter(a => 
+          a.status === 'finished' && 
+          a.current_bidder === team.id &&
+          saldoReservado[a.id]
+        )
+        
+        if (leiloesFinalizados.length === 0) {
+          console.log('✅ Nenhum leilão finalizado com saldo reservado pendente')
+          return
+        }
+        
+        console.log(`🔄 Processando ${leiloesFinalizados.length} leilão(ões) finalizado(s) com saldo reservado:`)
+        
+        for (const auction of leiloesFinalizados) {
+          console.log(`   - Leilão ${auction.id}: R$ ${auction.current_bid}`)
+          
+          try {
+            await processarSaldoFinalizado(
+              auction.id,
+              team.id,
+              auction.current_bid
+            )
+            console.log(`   ✅ Saldo processado para leilão ${auction.id}`)
+          } catch (error) {
+            console.error(`   ❌ Erro ao processar saldo do leilão ${auction.id}:`, error)
+          }
+        }
+        
+        console.log('🎯 Verificação de leilões finalizados concluída')
+        
+      } catch (error) {
+        console.error('❌ Erro ao verificar leilões finalizados:', error)
+      }
+    }
+    
+    // Executar verificação quando os dados forem carregados
+    if (!loading && team && auctions.length > 0) {
+      verificarLeiloesFinalizados()
+    }
+  }, [loading, team, auctions, saldoReservado, processarSaldoFinalizado])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -1459,6 +1598,18 @@ export default function PaginaLeilao() {
         console.log('✅ Leilão forçado a finalizar:', data)
         toast.success('Leilão finalizado')
         await loadAuctions()
+        
+        // CORREÇÃO: Se o time atual é o vencedor, processar saldo reservado
+        if (team?.id && data?.winner_team_id === team.id) {
+          setTimeout(async () => {
+            try {
+              await processarSaldoFinalizado(auctionId, team.id, data?.final_amount || 0)
+              console.log(`✅ Saldo reservado processado para leilão forçado ${auctionId}`)
+            } catch (error) {
+              console.error('❌ Erro ao processar saldo reservado:', error)
+            }
+          }, 1000)
+        }
       }
     } catch (error: any) {
       console.error('❌ Erro:', error)
@@ -1609,7 +1760,7 @@ export default function PaginaLeilao() {
             liberarSaldo={liberarSaldo}
             loadPendingReserves={() => team?.id && loadPendingReserves(team.id)}
             serverTimeOffset={serverTimeOffset}
-            forceRefresh={forceRefresh} // ← PARTE 4: Passe forceRefresh para o AuctionCard
+            forceRefresh={forceRefresh}
           />
         ))}
       </div>
@@ -2028,7 +2179,6 @@ export default function PaginaLeilao() {
 }
 
 // COMPONENTE AUCTIONCARD
-// PARTE 3: Modifique o AuctionCard para usar forceRefresh
 const AuctionCard = ({ 
   auction, 
   type, 
@@ -2051,7 +2201,7 @@ const AuctionCard = ({
   liberarSaldo,
   loadPendingReserves,
   serverTimeOffset,
-  forceRefresh // ← Adicione esta prop
+  forceRefresh
 }: any) => {
 
   const [bidOptions, setBidOptions] = useState<{ value: number; label: string }[]>([])
@@ -2071,10 +2221,9 @@ const AuctionCard = ({
     }
   }, [biddingAuctionId, auction.id])
 
-  // PARTE 3: Modifique o cálculo do timeRemaining para usar forceRefresh
   const timeRemaining = useMemo(() => {
     return calculateTimeRemaining(auction)
-  }, [auction, calculateTimeRemaining, forceRefresh]) // ← Adicione forceRefresh
+  }, [auction, calculateTimeRemaining, forceRefresh])
 
   const handleOpenBidModal = () => {
     setBiddingAuctionId(auction.id)
@@ -2137,10 +2286,13 @@ const AuctionCard = ({
 
   const isCurrentUserLeader = team && auction.current_bidder === team.id
   const temSaldoReservado = saldoReservado && saldoReservado[auction.id]
+  
+  // CORREÇÃO: Não mostrar "Reservado" em leilões finalizados que o usuário venceu
+  const mostrarReservado = type !== 'finished' && temSaldoReservado
 
   return (
     <Card className={cn("p-6 relative", getCardStyles())}>
-      {temSaldoReservado && (
+      {mostrarReservado && (
         <div className="absolute -top-2 -right-2">
           <Badge className="bg-blue-500 text-white">
             <Lock className="w-3 h-3 mr-1" />
@@ -2353,10 +2505,15 @@ const AuctionCard = ({
             <Button
               onClick={handleOpenBidModal}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3"
-              disabled={!team}
+              disabled={!team || type === 'finished'}
             >
               {!team ? (
                 'Sem Time'
+              ) : type === 'finished' ? (
+                <>
+                  <Trophy className="w-5 h-5 mr-2" />
+                  Leilão Finalizado
+                </>
               ) : temSaldoReservado ? (
                 <>
                   <Lock className="w-5 h-5 mr-2" />
