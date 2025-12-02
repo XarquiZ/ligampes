@@ -954,7 +954,7 @@ export default function PaginaTransferencias() {
       return
     }
 
-    if (!confirm(`Deseja comprar ${listing.player_name} por R$ ${listing.price.toLocaleString('pt-BR')}?`)) {
+    if (!confirm(`Deseja comprar ${listing.player_name} por R$ ${listing.price.toLocaleString('pt-BR')}?, essa ação leva a uma proposta de negociação. OBS: Não tem Volta !`)) {
       return
     }
 
