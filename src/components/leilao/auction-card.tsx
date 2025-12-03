@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { User, Timer, Crown, Lock, Trophy, DollarSign, Play, Minus } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 
 interface Player {
   id: string
@@ -78,38 +77,6 @@ const generateBidOptions = (currentBid: number) => {
   return options
 }
 
-// ⚡ FUNÇÃO PARA BUSCAR SERVER TIME
-const fetchServerTime = async (): Promise<number> => {
-  try {
-    // Usando um endpoint público que retorna tempo atual
-    const response = await fetch('https://worldtimeapi.org/api/timezone/America/Sao_Paulo', {
-      cache: 'no-store'
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      // worldtimeapi retorna o tempo em formato ISO com milliseconds
-      const serverTime = new Date(data.utc_datetime).getTime()
-      return serverTime
-    }
-  } catch (error) {
-    console.warn('⚠️ Erro ao buscar server time externo:', error)
-  }
-  
-  // Fallback: usa tempo do servidor Supabase via RPC
-  try {
-    const { data, error } = await supabase.rpc('get_server_time')
-    if (!error && data) {
-      return data
-    }
-  } catch (error) {
-    console.warn('⚠️ Erro ao buscar server time do Supabase:', error)
-  }
-  
-  // Último fallback: tempo local corrigido por offset
-  return Date.now()
-}
-
 export function AuctionCard({
   auction,
   type,
@@ -127,11 +94,9 @@ export function AuctionCard({
   const [bidModalOpen, setBidModalOpen] = useState(false)
   const [selectedBid, setSelectedBid] = useState<number | null>(null)
   const [bidOptions, setBidOptions] = useState<{value: number, label: string}[]>([])
-  const [serverTime, setServerTime] = useState<number>(Date.now())
-  const [timeOffset, setTimeOffset] = useState<number>(0)
-  const [isSyncing, setIsSyncing] = useState<boolean>(false)
+  const [timeRemaining, setTimeRemaining] = useState<number>(auction.time_remaining || 0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
     if (auction && bidModalOpen) {
@@ -139,76 +104,73 @@ export function AuctionCard({
     }
   }, [auction, bidModalOpen])
 
-  // ⚡ **POLLING AUTOMÁTICO PARA SERVER TIME**
+  // ⚡ TIMER SIMPLES E EFETIVO - APENAS USANDO end_time DO BANCO
   useEffect(() => {
+    mountedRef.current = true
+    
     if (type === 'active' && auction.status === 'active' && auction.end_time) {
-      console.log(`⏰ Iniciando polling automático para leilão ${auction.id}`)
+      console.log(`⏰ Iniciando timer para leilão ${auction.id}`)
       
-      // Função para sincronizar com server time
-      const syncWithServer = async () => {
-        if (isSyncing) return
+      // Função que atualiza o timer localmente
+      const updateTimer = () => {
+        if (!mountedRef.current) return
         
-        setIsSyncing(true)
-        try {
-          const fetchedServerTime = await fetchServerTime()
-          const localTime = Date.now()
-          const offset = fetchedServerTime - localTime
-          
-          setServerTime(fetchedServerTime)
-          setTimeOffset(offset)
-          
-          console.log(`⏰ Sincronizado: Server=${fetchedServerTime}, Local=${localTime}, Offset=${offset}ms`)
-        } catch (error) {
-          console.warn('⚠️ Erro na sincronização:', error)
-        } finally {
-          setIsSyncing(false)
+        // ⚡ USA O end_time DO BANCO (igual para todos)
+        const endTime = new Date(auction.end_time!).getTime()
+        const now = Date.now()
+        const remaining = Math.max(0, endTime - now)
+        
+        setTimeRemaining(remaining)
+        
+        // ⚡ SE TEMPO ACABOU, NOTIFICA O PARENT
+        if (remaining <= 0 && onForceFinish) {
+          setTimeout(() => onForceFinish(auction.id), 1000)
         }
       }
       
-      // Primeira sincronização imediata
-      syncWithServer()
+      // Atualiza imediatamente
+      updateTimer()
       
-      // Sincroniza a cada 10 segundos
-      syncIntervalRef.current = setInterval(syncWithServer, 10000)
-      
-      // Atualiza o tempo local com offset a cada segundo
-      const updateLocalTime = () => {
-        setServerTime(prev => Date.now() + timeOffset)
-      }
-      
-      // Atualiza a cada segundo para contagem suave
-      intervalRef.current = setInterval(updateLocalTime, 1000)
-      
-      return () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current)
-        }
-        if (syncIntervalRef.current) {
-          clearInterval(syncIntervalRef.current)
-        }
-      }
-    } else {
-      // Limpa os intervals se não for leilão ativo
+      // ⚡ ATUALIZA A CADA SEGUNDO - SEM WEBSOCKET COMPLEXO
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current)
+      
+      intervalRef.current = setInterval(updateTimer, 1000)
+      
+      return () => {
+        mountedRef.current = false
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+        }
+      }
+    } else {
+      setTimeRemaining(0)
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
       }
     }
-  }, [auction.id, auction.status, type, auction.end_time, timeOffset, isSyncing])
+  }, [auction.end_time, auction.status, type, onForceFinish, auction.id])
 
-  // ⚡ **CALCULA TEMPO RESTANTE USANDO SERVER TIME**
-  const timeRemaining = (() => {
-    if (type !== 'active' || auction.status !== 'active' || !auction.end_time) {
-      return 0
+  // ⚡ ADICIONA UMA SINCRONIZAÇÃO PERIÓDICA SIMPLES
+  useEffect(() => {
+    if (type === 'active' && auction.status === 'active' && auction.end_time) {
+      // Sincroniza o timer a cada 30 segundos para evitar drift
+      const syncInterval = setInterval(() => {
+        const endTime = new Date(auction.end_time!).getTime()
+        const now = Date.now()
+        const remaining = Math.max(0, endTime - now)
+        
+        // Corrige se houver diferença maior que 2 segundos
+        if (Math.abs(remaining - timeRemaining) > 2000) {
+          console.log(`⏰ Corrigindo timer: ${remaining - timeRemaining}ms`)
+          setTimeRemaining(remaining)
+        }
+      }, 30000)
+      
+      return () => clearInterval(syncInterval)
     }
-    
-    const endTime = new Date(auction.end_time).getTime()
-    const remaining = Math.max(0, endTime - serverTime)
-    
-    return remaining
-  })()
+  }, [auction.end_time, auction.status, type, timeRemaining, auction.id])
 
   const formatTime = (ms: number) => {
     if (ms <= 0) return '00:00'
@@ -303,7 +265,7 @@ export function AuctionCard({
             </div>
             <div className="text-right">
               {type === 'active' && timeRemaining > 0 && (
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1">
                   <div className={cn(
                     "flex items-center gap-1 font-mono font-bold",
                     isCritical ? "text-red-500 animate-pulse" :
@@ -318,17 +280,6 @@ export function AuctionCard({
                       isCritical && "animate-pulse"
                     )}>
                       {formatTime(timeRemaining)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className={cn(
-                      "w-2 h-2 rounded-full animate-pulse",
-                      Math.abs(timeOffset) < 100 ? "bg-green-500" : 
-                      Math.abs(timeOffset) < 500 ? "bg-yellow-500" : "bg-red-500"
-                    )} />
-                    <span className="text-xs text-zinc-400">
-                      {Math.abs(timeOffset) < 100 ? "Sincronizado" : 
-                       Math.abs(timeOffset) < 500 ? "Próximo" : "Fora de sinc."}
                     </span>
                   </div>
                 </div>
