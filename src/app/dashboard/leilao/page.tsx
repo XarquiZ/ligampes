@@ -21,7 +21,7 @@ import { AuctionCard } from '@/components/leilao/auction-card'
 import { CreateAuctionModal } from '@/components/leilao/create-auction-modal'
 import { SaldoUpdateIndicator } from '@/components/leilao/saldo-update-indicator'
 import { useSaldoReservado } from '@/hooks/use-saldo-reservado'
-import { auctionFinalizer } from '@/lib/supabase/realtime/auction-finalizer'
+import { auctionFinalizer } from '@/lib/supabase/auction-finalizer'
 
 interface Player {
   id: string
