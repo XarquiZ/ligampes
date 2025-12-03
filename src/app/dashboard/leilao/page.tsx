@@ -1,7 +1,7 @@
 // src/app/dashboard/leilao/page.tsx
 'use client'
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { 
   Gavel, 
@@ -15,9 +15,7 @@ import {
   Crown,
   Calendar,
   RefreshCw,
-  AlertCircle,
   Lock,
-  Trash2,
   PartyPopper,
   Zap
 } from 'lucide-react'
@@ -123,7 +121,7 @@ const formatToMillions = (value: number): string => {
 // Gerar opções de lance
 const generateBidOptions = (currentBid: number): { value: number; label: string }[] => {
   const options = []
-  const minBid = currentBid + 1000000 // Lance mínimo: 1 milhão acima
+  const minBid = currentBid + 1000000
   
   for (let i = 0; i < 20; i++) {
     const bidValue = minBid + (i * 1000000)
@@ -136,14 +134,13 @@ const generateBidOptions = (currentBid: number): { value: number; label: string 
   return options
 }
 
-// Classe para gerenciar sincronização de finalização - ATUALIZADA
+// Classe para gerenciar sincronização de finalização
 class AuctionFinalizer {
   private static instance: AuctionFinalizer
   private processingSet: Set<string> = new Set()
   private notificationQueue: Map<string, WinNotification> = new Map()
   private callbacks: Map<string, Function[]> = new Map()
   private lastSyncTime: number = 0
-  private syncInterval: NodeJS.Timeout | null = null
 
   static getInstance(): AuctionFinalizer {
     if (!AuctionFinalizer.instance) {
@@ -170,7 +167,6 @@ class AuctionFinalizer {
     try {
       console.log(`🔄 FINALIZANDO LEILÃO: ${auctionId}`)
       
-      // PASSO 1: Atualizar o status do leilão para 'finished' - isso disparará o trigger automaticamente
       const { data: auctionData, error: updateError } = await supabase
         .from('auctions')
         .update({ 
@@ -188,7 +184,6 @@ class AuctionFinalizer {
 
       console.log('✅ Status do leilão atualizado para finished. Trigger será executado automaticamente.')
 
-      // PASSO 2: Buscar dados completos do leilão finalizado
       const { data: finalizedAuction, error: fetchError } = await supabase
         .from('auctions')
         .select(`
@@ -203,7 +198,6 @@ class AuctionFinalizer {
         console.error('❌ Erro ao buscar leilão finalizado:', fetchError)
       }
 
-      // PASSO 3: Executar função batch para garantir processamento
       const { data: batchResult, error: batchError } = await supabase
         .rpc('finalize_expired_auctions_simple')
 
@@ -222,7 +216,6 @@ class AuctionFinalizer {
         auction: finalizedAuction
       }
 
-      // Notificar todos os ouvintes
       this.notifyListeners(auctionId, result)
       
       return result
@@ -234,27 +227,9 @@ class AuctionFinalizer {
         error: error.message || 'Erro desconhecido na finalização'
       }
     } finally {
-      // Remover após 5 segundos para evitar conflitos
       setTimeout(() => {
         this.processingSet.delete(auctionId)
       }, 5000)
-    }
-  }
-
-  registerCallback(auctionId: string, callback: Function) {
-    if (!this.callbacks.has(auctionId)) {
-      this.callbacks.set(auctionId, [])
-    }
-    this.callbacks.get(auctionId)!.push(callback)
-  }
-
-  unregisterCallback(auctionId: string, callback: Function) {
-    if (this.callbacks.has(auctionId)) {
-      const callbacks = this.callbacks.get(auctionId)!
-      const index = callbacks.indexOf(callback)
-      if (index > -1) {
-        callbacks.splice(index, 1)
-      }
     }
   }
 
@@ -281,50 +256,17 @@ class AuctionFinalizer {
   clearNotification(auctionId: string) {
     this.notificationQueue.delete(auctionId)
   }
-
-  startSyncService() {
-    if (this.syncInterval) return
-    
-    this.syncInterval = setInterval(async () => {
-      try {
-        this.lastSyncTime = Date.now()
-      } catch (error) {
-        console.error('Erro no serviço de sincronização:', error)
-      }
-    }, 30000)
-  }
-
-  stopSyncService() {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval)
-      this.syncInterval = null
-    }
-  }
 }
 
-// Hook para saldo reservado - ATUALIZADO COM POLLING DE 1 SEGUNDO
+// Hook para saldo reservado SEM POLLING
 const useSaldoReservado = (teamId: string | null) => {
   const [saldoReservado, setSaldoReservado] = useState<{[key: string]: number}>({})
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now())
-  const [isLoading, setIsLoading] = useState(false)
-  const pollingIntervalRef = useRef<NodeJS.Timeout>()
-  const lastFetchedRef = useRef<{[key: string]: number}>({})
 
-  const loadPendingReserves = useCallback(async (teamId: string, force: boolean = false) => {
+  const loadPendingReserves = useCallback(async (teamId: string) => {
     if (!teamId) return
     
-    const now = Date.now()
-    const cacheKey = `saldo_${teamId}`
-    
-    // Cache de 500ms para evitar chamadas excessivas
-    if (!force && lastFetchedRef.current[cacheKey] && 
-        now - lastFetchedRef.current[cacheKey] < 500) {
-      return
-    }
-    
-    setIsLoading(true)
     try {
-      // Buscar APENAS leilões ATIVOS com reservas pendentes
       const { data: pendingTransactions, error } = await supabase
         .from('balance_transactions')
         .select(`
@@ -354,37 +296,11 @@ const useSaldoReservado = (teamId: string | null) => {
       })
 
       setSaldoReservado(reserves)
-      setLastUpdate(now)
-      lastFetchedRef.current[cacheKey] = now
-
+      setLastUpdate(Date.now())
     } catch (error) {
       console.error('❌ Erro ao carregar saldos reservados:', error)
-    } finally {
-      setIsLoading(false)
     }
   }, [])
-
-  // Iniciar polling automático de 1 segundo
-  useEffect(() => {
-    if (!teamId) return
-    
-    console.log('🔄 Iniciando polling de saldo reservado para time:', teamId)
-    
-    // Carregar imediatamente
-    loadPendingReserves(teamId, true)
-    
-    // Configurar polling a cada 1 segundo
-    pollingIntervalRef.current = setInterval(() => {
-      loadPendingReserves(teamId, false)
-    }, 1000)
-    
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = undefined
-      }
-    }
-  }, [teamId, loadPendingReserves])
 
   const liberarSaldo = async (auctionId: string, teamId: string) => {
     if (!auctionId || !teamId) return
@@ -395,9 +311,7 @@ const useSaldoReservado = (teamId: string | null) => {
         delete novo[auctionId]
         return novo
       })
-
       setLastUpdate(Date.now())
-      
     } catch (error) {
       console.error('❌ Erro ao liberar saldo:', error)
     }
@@ -412,9 +326,7 @@ const useSaldoReservado = (teamId: string | null) => {
         delete novo[auctionId]
         return novo
       })
-
       setLastUpdate(Date.now())
-      
     } catch (error) {
       console.error('❌ Erro ao processar débito do vencedor:', error)
     }
@@ -424,38 +336,13 @@ const useSaldoReservado = (teamId: string | null) => {
     return Object.values(saldoReservado).reduce((total, valor) => total + valor, 0)
   }
 
-  const verificarLeiloesAtivos = async (teamId: string, auctionIds: string[]) => {
-    try {
-      const leiloesParaManter: string[] = []
-      
-      for (const auctionId of auctionIds) {
-        const { data: auction, error } = await supabase
-          .from('auctions')
-          .select('id, status, current_bidder')
-          .eq('id', auctionId)
-          .single()
-        
-        if (!error && auction && auction.status === 'active') {
-          leiloesParaManter.push(auctionId)
-        }
-      }
-      
-      return leiloesParaManter
-    } catch (error) {
-      console.error('Erro ao verificar leilões ativos:', error)
-      return auctionIds
-    }
-  }
-
   return {
     saldoReservado,
-    isLoading,
     lastUpdate,
     liberarSaldo,
     debitarSaldoVencedor,
     getSaldoReservado,
-    loadPendingReserves,
-    verificarLeiloesAtivos
+    loadPendingReserves
   }
 }
 
@@ -470,20 +357,11 @@ const SaldoUpdateIndicator = ({ lastUpdate }: { lastUpdate: number }) => {
   
   const secondsAgo = Math.floor((now - lastUpdate) / 1000)
   const isRecent = secondsAgo < 2
-  const isStale = secondsAgo > 5
   
   return (
     <div className="flex items-center gap-1 justify-end">
-      <div className={`w-2 h-2 rounded-full animate-pulse ${
-        isRecent ? 'bg-green-500' : 
-        isStale ? 'bg-red-500' : 
-        'bg-yellow-500'
-      }`} />
-      <span className={`text-xs ${
-        isRecent ? 'text-green-400' : 
-        isStale ? 'text-red-400' : 
-        'text-yellow-400'
-      }`}>
+      <div className={`w-2 h-2 rounded-full animate-pulse ${isRecent ? 'bg-green-500' : 'bg-yellow-500'}`} />
+      <span className={`text-xs ${isRecent ? 'text-green-400' : 'text-yellow-400'}`}>
         {isRecent ? 'Agora' : `${secondsAgo}s atrás`}
       </span>
     </div>
@@ -520,12 +398,6 @@ export default function PaginaLeilao() {
   const [winNotification, setWinNotification] = useState<WinNotification | null>(null)
   const [bidCoveredNotification, setBidCoveredNotification] = useState<BidCoveredNotification | null>(null)
 
-  // Estados para polling
-  const [lastUpdateTimes, setLastUpdateTimes] = useState<{[key: string]: number}>({})
-  const [forceRefresh, setForceRefresh] = useState(0)
-  const pollingIntervalRef = useRef<NodeJS.Timeout>()
-  const bidsPollingIntervalRef = useRef<NodeJS.Timeout>() // NOVO: Intervalo separado para lances
-
   // Estados para server time
   const [serverTimeOffset, setServerTimeOffset] = useState<number>(0)
   const [isSyncingTime, setIsSyncingTime] = useState<boolean>(false)
@@ -538,13 +410,11 @@ export default function PaginaLeilao() {
 
   const {
     saldoReservado,
-    isLoading: isLoadingSaldo,
     lastUpdate: lastSaldoUpdate,
     liberarSaldo,
     debitarSaldoVencedor,
     getSaldoReservado,
-    loadPendingReserves,
-    verificarLeiloesAtivos
+    loadPendingReserves
   } = useSaldoReservado(team?.id || null)
 
   const [currentTime, setCurrentTime] = useState(Date.now())
@@ -554,13 +424,9 @@ export default function PaginaLeilao() {
   const processingAuctionsRef = useRef<Set<string>>(new Set())
   const lastBalanceUpdateRef = useRef<number>(0)
 
-  // PATCH: Guard para evitar processar a mesma finalização duas vezes no front
+  // Guard para evitar processar a mesma finalização duas vezes
   const processedWinsRef = useRef<Set<string>>(new Set())
-
-  // Função utilitária para marcar/checar se já processamos um win localmente
-  const markAsProcessedWin = (auctionId: string) => {
-    processedWinsRef.current.add(auctionId)
-  }
+  const markAsProcessedWin = (auctionId: string) => processedWinsRef.current.add(auctionId)
   const hasProcessedWin = (auctionId: string) => processedWinsRef.current.has(auctionId)
 
   // Atualizar tempo do servidor periodicamente
@@ -629,28 +495,17 @@ export default function PaginaLeilao() {
   useEffect(() => {
     loadInitialData()
     
-    auctionFinalizer.current.startSyncService()
-    
     return () => {
       subscriptionsRef.current.forEach(sub => {
         supabase.removeChannel(sub)
       })
-      auctionFinalizer.current.stopSyncService()
-      
-      // Limpar intervalos de polling
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-      }
-      if (bidsPollingIntervalRef.current) {
-        clearInterval(bidsPollingIntervalRef.current)
-      }
     }
   }, [])
 
   // CARREGAR SALDOS RESERVADOS QUANDO TIME MUDAR
   useEffect(() => {
     if (team?.id) {
-      loadPendingReserves(team.id, true)
+      loadPendingReserves(team.id)
     }
   }, [team?.id, loadPendingReserves])
 
@@ -668,165 +523,7 @@ export default function PaginaLeilao() {
     return () => clearInterval(interval)
   }, [serverTimeOffset])
 
-  // NOVO: POLLING DE LEILÕES ATIVOS - ATUALIZADO PARA 1 SEGUNDO
-  useEffect(() => {
-    if (activeTab !== 'active') {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-      }
-      return
-    }
-
-    pollingIntervalRef.current = setInterval(async () => {
-      try {
-        setForceRefresh(prev => prev + 1)
-        
-        const activeAuctions = auctions.filter(a => a.status === 'active')
-        if (activeAuctions.length === 0) return
-        
-        // Buscar TODOS os leilões ativos sem filtros complexos
-        const { data: recentUpdates, error } = await supabase
-          .from('auctions')
-          .select('id, updated_at, current_bid, current_bidder, end_time, status')
-          .in('status', ['active'])
-          .order('updated_at', { ascending: false })
-
-        if (error) {
-          console.error('❌ Erro ao verificar atualizações de leilões:', error)
-          return
-        }
-
-        if (!recentUpdates || recentUpdates.length === 0) return
-
-        const auctionsToUpdate: string[] = []
-        const updatedTimes: {[key: string]: number} = {}
-        
-        recentUpdates.forEach(auction => {
-          const lastUpdate = lastUpdateTimes[auction.id] || 0
-          const newUpdateTime = new Date(auction.updated_at).getTime()
-          updatedTimes[auction.id] = newUpdateTime
-          
-          // SEMPRE atualizar leilões ativos
-          if (auction.status === 'active') {
-            auctionsToUpdate.push(auction.id)
-          }
-        })
-
-        if (auctionsToUpdate.length > 0) {
-          console.log('🔄 Polling (1s): Atualizando leilões ativos:', auctionsToUpdate)
-          
-          const { data: updatedAuctions, error: fetchError } = await supabase
-            .from('auctions')
-            .select(`
-              *,
-              player:players(*),
-              current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
-            `)
-            .in('id', auctionsToUpdate)
-
-          if (!fetchError && updatedAuctions) {
-            setAuctions(prev => {
-              const newAuctions = [...prev]
-              
-              updatedAuctions.forEach(updatedAuction => {
-                const index = newAuctions.findIndex(a => a.id === updatedAuction.id)
-                if (index >= 0) {
-                  const synchronizedTime = serverTime
-                  newAuctions[index] = {
-                    ...updatedAuction,
-                    time_remaining: updatedAuction.end_time && updatedAuction.status === 'active' 
-                      ? Math.max(0, new Date(updatedAuction.end_time).getTime() - synchronizedTime)
-                      : 0,
-                    synchronized_end_time: updatedAuction.end_time ? 
-                      new Date(updatedAuction.end_time).getTime() : undefined
-                  }
-                }
-              })
-              
-              return newAuctions
-            })
-
-            setLastUpdateTimes(prev => ({
-              ...prev,
-              ...updatedTimes
-            }))
-          }
-        }
-      } catch (error) {
-        console.error('❌ Erro no polling de leilões:', error)
-      }
-    }, 1000) // 1 SEGUNDO
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-      }
-    }
-  }, [activeTab, auctions, serverTime])
-
-  // NOVO: POLLING DE LANCES - ATUALIZADO PARA 1 SEGUNDO
-  useEffect(() => {
-    if (activeTab !== 'active') {
-      if (bidsPollingIntervalRef.current) {
-        clearInterval(bidsPollingIntervalRef.current)
-      }
-      return
-    }
-
-    const loadBidsForActiveAuctions = async () => {
-      try {
-        const activeAuctions = auctions.filter(a => a.status === 'active')
-        if (activeAuctions.length === 0) return
-        
-        console.log('💰 Polling (1s): Carregando lances para', activeAuctions.length, 'leilões ativos')
-        
-        // Carregar lances para todos os leilões ativos
-        for (const auction of activeAuctions) {
-          try {
-            const { data: bidsData, error } = await supabase
-              .from('bids')
-              .select(`
-                *,
-                team:teams(name, logo_url)
-              `)
-              .eq('auction_id', auction.id)
-              .order('created_at', { ascending: false })
-              .limit(10) // Limitar a 10 lances mais recentes
-
-            if (error) {
-              console.error(`❌ Erro ao carregar lances para leilão ${auction.id}:`, error)
-              continue
-            }
-            
-            if (bidsData) {
-              setBids(prev => ({
-                ...prev,
-                [auction.id]: bidsData
-              }))
-            }
-          } catch (error) {
-            console.error(`❌ Erro ao processar lances do leilão ${auction.id}:`, error)
-          }
-        }
-      } catch (error) {
-        console.error('❌ Erro no polling de lances:', error)
-      }
-    }
-
-    // Executar imediatamente
-    loadBidsForActiveAuctions()
-    
-    // Configurar polling a cada 1 segundo
-    bidsPollingIntervalRef.current = setInterval(loadBidsForActiveAuctions, 1000)
-
-    return () => {
-      if (bidsPollingIntervalRef.current) {
-        clearInterval(bidsPollingIntervalRef.current)
-      }
-    }
-  }, [activeTab, auctions])
-
-  // VERIFICAÇÃO SINCRONIZADA DE LEILÕES EXPIRADOS - ATUALIZADA
+  // VERIFICAÇÃO SINCRONIZADA DE LEILÕES EXPIRADOS
   useEffect(() => {
     if (!team || !isTimeSynced) return
     
@@ -889,7 +586,7 @@ export default function PaginaLeilao() {
                   setTimeout(() => {
                     loadAuctions()
                     if (team.id) {
-                      loadPendingReserves(team.id, true)
+                      loadPendingReserves(team.id)
                     }
                   }, 2000)
                 } else {
@@ -915,202 +612,118 @@ export default function PaginaLeilao() {
       }
     }
     
-    const interval = setInterval(checkExpiredAuctions, 1000) // Verificar a cada segundo
+    const interval = setInterval(checkExpiredAuctions, 1000)
     return () => clearInterval(interval)
   }, [team, auctions, isTimeSynced, serverTime, serverTimeOffset, debitarSaldoVencedor, loadPendingReserves])
 
-  // CONFIGURAR REALTIME SUPABASE - ATUALIZADO
+  // CONFIGURAÇÃO REALTIME SUPABASE - COMPLETA E OTIMIZADA
   useEffect(() => {
     if (!user || !team) return
 
-    console.log('🔌 Configurando subscriptions para leilões...')
+    console.log('🔌 Configurando REALTIME SUPABASE (sem polling)...')
+    
+    let mounted = true
 
+    // 1. CANAL DE LEILÕES - TODAS AS ATUALIZAÇÕES
     const auctionsChannel = supabase
-      .channel('auctions_realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'auctions',
-        },
-        async (payload) => {
-          console.log('🔄 Atualização de leilão em tempo real:', {
-            event: payload.eventType,
-            id: payload.new?.id,
-            status: payload.new?.status,
-            old_current_bidder: payload.old?.current_bidder,
-            new_current_bidder: payload.new?.current_bidder,
-            team_id: team?.id
-          })
-          
-          // Quando alguém cobre seu lance
-          if (team && 
-              payload.old?.current_bidder === team.id && 
-              payload.new?.current_bidder !== team.id) {
-            
-            console.log('⚠️ USUÁRIO PERDEU A LIDERANÇA NO LEILÃO:', payload.new?.id)
-            
-            const { data: auctionData } = await supabase
-              .from('auctions')
-              .select(`
-                *,
-                player:players(name)
-              `)
-              .eq('id', payload.new?.id)
-              .single()
-            
-            if (auctionData?.player) {
-              setBidCoveredNotification({
-                auctionId: payload.new?.id,
-                playerName: auctionData.player.name,
-                coveredAmount: payload.old?.current_bid || 0,
-                show: true,
-                timestamp: Date.now()
-              })
-              
-              toast.success('💰 Seu saldo foi liberado! Lance coberto por outro time.', {
-                duration: 5000,
-                icon: '🔄'
-              })
-              
-              if (team.id) {
-                await liberarSaldo(payload.new?.id, team.id)
-              }
-            }
-          }
-          
-          // Quando o leilão é finalizado (trigger executou)
-          if (payload.new?.status === 'finished' && payload.old?.status === 'active') {
-            console.log('🏁 LEILÃO FINALIZADO VIA TRIGGER (realtime):', payload.new?.id)
-            
-            if (payload.new?.current_bidder === team.id) {
-              // PATCH: Aplicar guard para evitar processamento duplo
-              if (!hasProcessedWin(payload.new.id)) {
-                markAsProcessedWin(payload.new.id)
-                setTimeout(() => {
-                  supabase
-                    .from('auctions')
-                    .select(`
-                      *,
-                      player:players(name)
-                    `)
-                    .eq('id', payload.new?.id)
-                    .single()
-                    .then(({ data: auctionData }) => {
-                      if (auctionData) {
-                        setWinNotification({
-                          auctionId: auctionData.id,
-                          playerName: auctionData.player?.name || 'Jogador',
-                          amount: auctionData.current_bid,
-                          teamName: team.name,
-                          show: true,
-                          timestamp: Date.now()
-                        })
-                        
-                        debitarSaldoVencedor(
-                          auctionData.id,
-                          team.id,
-                          auctionData.current_bid
-                        )
-                      }
-                    })
-                }, 1000)
-              } else {
-                console.log('Leilão já processado localmente (realtime):', payload.new.id)
-              }
-            }
-          }
-          
-          // Atualizar dados do leilão
-          const { data: fullAuction } = await supabase
-            .from('auctions')
-            .select(`
-              *,
-              player:players(*),
-              current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
-            `)
-            .eq('id', payload.new?.id)
-            .single()
-          
-          if (fullAuction) {
-            setAuctions(prev => {
-              const index = prev.findIndex(a => a.id === fullAuction.id)
-              const synchronizedTime = serverTime
-              if (index >= 0) {
-                const newAuctions = [...prev]
-                newAuctions[index] = {
-                  ...fullAuction,
-                  time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
-                    ? Math.max(0, new Date(fullAuction.end_time).getTime() - synchronizedTime)
-                    : 0,
-                  synchronized_end_time: fullAuction.end_time ? 
-                    new Date(fullAuction.end_time).getTime() : undefined
-                }
-                return newAuctions
-              } else {
-                return [...prev, {
-                  ...fullAuction,
-                  time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
-                    ? Math.max(0, new Date(fullAuction.end_time).getTime() - synchronizedTime)
-                    : 0,
-                  synchronized_end_time: fullAuction.end_time ? 
-                    new Date(fullAuction.end_time).getTime() : undefined
-                }]
-              }
-            })
-          }
-        }
-      )
-      .subscribe()
-
-    const bidsChannel = supabase
-      .channel('bids_realtime')
+      .channel('auctions_full_realtime')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'bids',
+          table: 'auctions',
         },
         async (payload) => {
-          console.log('💰 Atualização de lance em tempo real:', payload)
+          if (!mounted) return
           
-          const auctionId = payload.new?.auction_id || payload.old?.auction_id
-          
-          if (!auctionId) {
-            console.log('❌ Sem auction_id no payload:', payload)
-            return
+          console.log('📡 Evento de leilão em tempo real:', {
+            event: payload.eventType,
+            id: payload.new?.id || payload.old?.id,
+            status: payload.new?.status
+          })
+
+          // Processar atualização de leilão
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            await handleAuctionUpdate(payload)
           }
           
-          try {
-            // Carregar lances atualizados imediatamente
-            const { data: updatedBids } = await supabase
-              .from('bids')
-              .select(`
-                *,
-                team:teams(name, logo_url)
-              `)
-              .eq('auction_id', auctionId)
-              .order('created_at', { ascending: false })
-              .limit(10)
-            
-            if (updatedBids) {
-              setBids(prev => ({
-                ...prev,
-                [auctionId]: updatedBids
-              }))
-              console.log(`✅ Lances atualizados via realtime para leilão ${auctionId}:`, updatedBids.length)
-            }
-          } catch (error) {
-            console.error('❌ Erro ao carregar lances atualizados:', error)
+          // Processar novo leilão
+          if (payload.eventType === 'INSERT' && payload.new) {
+            await handleNewAuction(payload.new.id)
+          }
+          
+          // Processar exclusão de leilão
+          if (payload.eventType === 'DELETE' && payload.old) {
+            setAuctions(prev => prev.filter(a => a.id !== payload.old.id))
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Canal de leilões conectado')
+        }
+      })
 
+    // 2. CANAL DE LANCES - NOVOS LANCES EM TEMPO REAL
+    const bidsChannel = supabase
+      .channel('bids_realtime_stream')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bids',
+        },
+        async (payload) => {
+          if (!mounted) return
+          
+          const auctionId = payload.new?.auction_id
+          if (!auctionId) return
+
+          console.log('💰 Novo lance detectado:', {
+            auctionId,
+            amount: payload.new.amount,
+            teamId: payload.new.team_id
+          })
+          
+          // Atualizar lances do leilão específico
+          const { data: updatedBids } = await supabase
+            .from('bids')
+            .select(`
+              *,
+              team:teams(name, logo_url)
+            `)
+            .eq('auction_id', auctionId)
+            .order('created_at', { ascending: false })
+            .limit(10)
+          
+          if (updatedBids) {
+            setBids(prev => ({
+              ...prev,
+              [auctionId]: updatedBids
+            }))
+            
+            // Notificação em tempo real para lances de outros times
+            if (payload.new.team_id !== team.id) {
+              const teamName = updatedBids.find(b => b.team_id === payload.new.team_id)?.team?.name || 'Outro time'
+              toast.info(`⚡ ${teamName}: R$ ${formatToMillions(payload.new.amount)}`, {
+                duration: 2000,
+                position: 'bottom-right'
+              })
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Canal de lances conectado')
+        }
+      })
+
+    // 3. CANAL DE SALDO DO TIME
     const balanceChannel = supabase
-      .channel('balance_realtime')
+      .channel(`team_balance_${team.id}`)
       .on(
         'postgres_changes',
         {
@@ -1120,29 +733,53 @@ export default function PaginaLeilao() {
           filter: `id=eq.${team.id}`
         },
         (payload) => {
+          if (!mounted) return
+          
           const now = Date.now()
           if (now - lastBalanceUpdateRef.current < 100) return
           
           lastBalanceUpdateRef.current = now
           
-          console.log('💰 Saldo do time atualizado em tempo real:', {
-            novo: payload.new.balance,
-            anterior: payload.old.balance,
-            diff: payload.new.balance - payload.old.balance
-          })
+          console.log('💰 Saldo atualizado em tempo real:', payload.new.balance)
           
           setTeam(prev => prev ? { 
             ...prev, 
             balance: payload.new.balance,
-            updated_at: new Date().toISOString(),
             last_balance_update: now.toString()
           } : null)
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Canal de saldo conectado')
+        }
+      })
 
+    // 4. CANAL DE TRANSAÇÕES DE SALDO
+    const transactionsChannel = supabase
+      .channel(`transactions_${team.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'balance_transactions',
+          filter: `team_id=eq.${team.id}`
+        },
+        () => {
+          if (!mounted) return
+          loadPendingReserves(team.id)
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Canal de transações conectado')
+        }
+      })
+
+    // 5. CANAL DE JOGADORES (opcional)
     const playersChannel = supabase
-      .channel('players_realtime')
+      .channel('players_updates')
       .on(
         'postgres_changes',
         {
@@ -1151,12 +788,9 @@ export default function PaginaLeilao() {
           table: 'players',
         },
         (payload) => {
-          console.log('👤 Atualização de jogador em tempo real:', {
-            playerId: payload.new?.id,
-            playerName: payload.new?.name,
-            team_id: payload.new?.team_id,
-            old_team_id: payload.old?.team_id
-          })
+          if (!mounted) return
+          
+          console.log('👤 Jogador atualizado:', payload.new?.name)
           
           setAuctions(prev => prev.map(auction => {
             if (auction.player_id === payload.new?.id) {
@@ -1172,36 +806,136 @@ export default function PaginaLeilao() {
           }))
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Canal de jogadores conectado')
+        }
+      })
 
-    const transactionsChannel = supabase
-      .channel('balance_transactions_realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'balance_transactions',
-          filter: `team_id=eq.${team.id}`
-        },
-        () => {
-          if (team.id) {
-            loadPendingReserves(team.id, true)
+    subscriptionsRef.current = [auctionsChannel, bidsChannel, balanceChannel, transactionsChannel, playersChannel]
+
+    // Funções auxiliares
+    const handleAuctionUpdate = async (payload: any) => {
+      try {
+        const auctionId = payload.new?.id
+        
+        // Buscar dados completos do leilão
+        const { data: fullAuction } = await supabase
+          .from('auctions')
+          .select(`
+            *,
+            player:players(*),
+            current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+          `)
+          .eq('id', auctionId)
+          .single()
+
+        if (!fullAuction) return
+
+        const synchronizedTime = Date.now() + serverTimeOffset
+        const updatedAuction = {
+          ...fullAuction,
+          time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
+            ? Math.max(0, new Date(fullAuction.end_time).getTime() - synchronizedTime)
+            : 0,
+          synchronized_end_time: fullAuction.end_time ? 
+            new Date(fullAuction.end_time).getTime() : undefined
+        }
+
+        // Atualizar estado local
+        setAuctions(prev => {
+          const index = prev.findIndex(a => a.id === auctionId)
+          if (index >= 0) {
+            const newAuctions = [...prev]
+            newAuctions[index] = updatedAuction
+            return newAuctions
+          }
+          return prev
+        })
+
+        // Verificar se o usuário perdeu a liderança
+        if (payload.old?.current_bidder === team.id && 
+            payload.new?.current_bidder !== team.id) {
+          
+          console.log('⚠️ Lance coberto:', auctionId)
+          
+          toast.success('💰 Seu saldo foi liberado! Lance coberto por outro time.', {
+            duration: 3000
+          })
+          
+          await liberarSaldo(auctionId, team.id)
+        }
+
+        // Verificar se leilão foi finalizado
+        if (payload.old?.status === 'active' && payload.new?.status === 'finished') {
+          console.log('🏁 Leilão finalizado via realtime:', auctionId)
+          
+          if (payload.new?.current_bidder === team.id && !hasProcessedWin(auctionId)) {
+            markAsProcessedWin(auctionId)
+            
+            setTimeout(() => {
+              setWinNotification({
+                auctionId,
+                playerName: fullAuction.player?.name || 'Jogador',
+                amount: payload.new.current_bid,
+                teamName: team.name,
+                show: true,
+                timestamp: Date.now()
+              })
+              
+              debitarSaldoVencedor(auctionId, team.id, payload.new.current_bid)
+            }, 500)
           }
         }
-      )
-      .subscribe()
 
-    subscriptionsRef.current = [auctionsChannel, bidsChannel, balanceChannel, playersChannel, transactionsChannel]
+      } catch (error) {
+        console.error('❌ Erro ao processar atualização de leilão:', error)
+      }
+    }
+
+    const handleNewAuction = async (auctionId: string) => {
+      try {
+        const { data: fullAuction } = await supabase
+          .from('auctions')
+          .select(`
+            *,
+            player:players(*),
+            current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+          `)
+          .eq('id', auctionId)
+          .single()
+
+        if (fullAuction) {
+          const synchronizedTime = Date.now() + serverTimeOffset
+          const newAuction = {
+            ...fullAuction,
+            time_remaining: fullAuction.end_time && fullAuction.status === 'active' 
+              ? Math.max(0, new Date(fullAuction.end_time).getTime() - synchronizedTime)
+              : 0,
+            synchronized_end_time: fullAuction.end_time ? 
+              new Date(fullAuction.end_time).getTime() : undefined
+          }
+
+          setAuctions(prev => [newAuction, ...prev])
+          
+          // Se for admin, recarregar jogadores livres
+          if (isAdmin) {
+            loadFreePlayers()
+          }
+        }
+      } catch (error) {
+        console.error('❌ Erro ao carregar novo leilão:', error)
+      }
+    }
 
     return () => {
-      supabase.removeChannel(auctionsChannel)
-      supabase.removeChannel(bidsChannel)
-      supabase.removeChannel(balanceChannel)
-      supabase.removeChannel(playersChannel)
-      supabase.removeChannel(transactionsChannel)
+      console.log('🧹 Limpando subscriptions realtime')
+      mounted = false
+      subscriptionsRef.current.forEach(sub => {
+        supabase.removeChannel(sub)
+      })
     }
-  }, [user, team, serverTime, serverTimeOffset, saldoReservado, liberarSaldo, debitarSaldoVencedor, loadPendingReserves])
+  }, [user, team, isAdmin, serverTimeOffset, loadPendingReserves, loadFreePlayers, liberarSaldo, debitarSaldoVencedor])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -1329,20 +1063,6 @@ export default function PaginaLeilao() {
       
       if (profile?.role === 'admin') {
         await loadFreePlayers()
-      }
-
-      if (team?.id) {
-        const activeAuctionIds = auctions
-          .filter(a => a.status === 'active')
-          .map(a => a.id)
-        
-        const leiloesAtivos = await verificarLeiloesAtivos(team.id, Object.keys(saldoReservado))
-        
-        Object.keys(saldoReservado).forEach(async (auctionId) => {
-          if (!leiloesAtivos.includes(auctionId)) {
-            await liberarSaldo(auctionId, team.id)
-          }
-        })
       }
 
       toast.success('Dados carregados com sucesso!')
@@ -1630,7 +1350,7 @@ export default function PaginaLeilao() {
       await loadFreePlayers()
 
       if (team?.id) {
-        await loadPendingReserves(team.id, true)
+        await loadPendingReserves(team.id)
       }
 
     } catch (error: any) {
@@ -1697,13 +1417,10 @@ export default function PaginaLeilao() {
 
       console.log('✅ LANCE BEM-SUCEDIDO:', data)
       
-      // Atualizar reservas do banco
-      await loadPendingReserves(team.id, true)
+      await loadPendingReserves(team.id)
       
       setSelectedBidAmount(null)
       setBiddingAuctionId(null)
-      
-      await loadAuctions()
       
       toast.success(data.message || 'Lance realizado com sucesso!')
       
@@ -1734,7 +1451,6 @@ export default function PaginaLeilao() {
         toast.success('Leilão finalizado para todos os usuários!')
         await loadAuctions()
         
-        // PATCH: Aplicar guard para evitar processamento duplo
         if (team?.id && result.winner_team_id === team.id) {
           if (!hasProcessedWin(auctionId)) {
             markAsProcessedWin(auctionId)
@@ -1898,9 +1614,8 @@ export default function PaginaLeilao() {
             formatTimeRemaining={formatTimeRemaining}
             saldoReservado={saldoReservado}
             liberarSaldo={liberarSaldo}
-            loadPendingReserves={() => team?.id && loadPendingReserves(team.id, true)}
+            loadPendingReserves={() => team?.id && loadPendingReserves(team.id)}
             serverTimeOffset={serverTimeOffset}
-            forceRefresh={forceRefresh}
             finalizingAuctions={finalizingAuctions}
           />
         ))}
@@ -2323,7 +2038,7 @@ export default function PaginaLeilao() {
   )
 }
 
-// COMPONENTE AUCTIONCARD ATUALIZADO
+// COMPONENTE AUCTIONCARD (sem mudanças, exceto remoção de forceRefresh)
 const AuctionCard = ({ 
   auction, 
   type, 
@@ -2346,7 +2061,6 @@ const AuctionCard = ({
   liberarSaldo,
   loadPendingReserves,
   serverTimeOffset,
-  forceRefresh,
   finalizingAuctions
 }: any) => {
 
@@ -2383,7 +2097,7 @@ const AuctionCard = ({
     } else {
       setLocalTimeRemaining(0)
     }
-  }, [auction, type, calculateTimeRemaining, forceRefresh])
+  }, [auction, type, calculateTimeRemaining])
 
   const handleOpenBidModal = () => {
     setBiddingAuctionId(auction.id)
