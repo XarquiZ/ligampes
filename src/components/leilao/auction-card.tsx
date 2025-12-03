@@ -46,6 +46,8 @@ interface AuctionCardProps {
   onBid: (auctionId: string, amount: number) => Promise<void>
   team: Team | null
   saldoReservado: {[key: string]: number}
+  getSaldoReservadoParaLeilao?: (auctionId: string) => number
+  temSaldoReservado?: (auctionId: string) => boolean
   onCancelAuction?: (auctionId: string) => Promise<void>
   onStartAuction?: (auctionId: string) => Promise<void>
   onForceFinish?: (auctionId: string) => Promise<void>
@@ -81,6 +83,8 @@ export function AuctionCard({
   onBid,
   team,
   saldoReservado,
+  getSaldoReservadoParaLeilao,
+  temSaldoReservado,
   onCancelAuction,
   onStartAuction,
   onForceFinish,
@@ -142,9 +146,9 @@ export function AuctionCard({
     }
   }
 
-  const isCurrentUserLeader = team && auction.current_bidder === team.id
-  const hasReservedBalance = team?.id ? temSaldoReservado(auction.id) : false
-
+  // CORREÇÃO AQUI: Verifique se a função existe antes de chamar
+  const hasReservedBalance = team?.id && temSaldoReservado ? temSaldoReservado(auction.id) : false
+  
   const getCardStyles = () => {
     switch (type) {
       case 'active': return "bg-gradient-to-br from-red-600/10 to-orange-600/10 border-red-500/30"
@@ -250,17 +254,17 @@ export function AuctionCard({
             {auction.current_bidder !== null && (
               <div className={cn(
                 "flex justify-between items-center p-3 rounded-lg border",
-                isCurrentUserLeader 
+                auction.current_bidder === team?.id 
                   ? "bg-yellow-500/20 border-yellow-500/50" 
                   : "bg-zinc-800/30 border-yellow-500/30"
               )}>
                 <span className="text-zinc-400 flex items-center gap-2">
                   <Crown className={cn(
                     "w-4 h-4",
-                    isCurrentUserLeader ? "text-yellow-400" : "text-yellow-400"
+                    auction.current_bidder === team?.id ? "text-yellow-400" : "text-yellow-400"
                   )} />
                   {type === 'active' ? 'Líder' : 'Vencedor'}
-                  {isCurrentUserLeader && type === 'active' && (
+                  {auction.current_bidder === team?.id && type === 'active' && (
                     <Badge variant="secondary" className="bg-green-500 text-white text-xs">
                       Você
                     </Badge>
@@ -276,7 +280,7 @@ export function AuctionCard({
                   )}
                   <span className={cn(
                     "font-medium",
-                    isCurrentUserLeader ? "text-yellow-400" : "text-white"
+                    auction.current_bidder === team?.id ? "text-yellow-400" : "text-white"
                   )}>
                     {auction.current_bidder_team?.name || 'Time Desconhecido'}
                   </span>

@@ -604,20 +604,20 @@ export default function PaginaLeilao() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   {tabAuctions.map(auction => (
                     <AuctionCard 
-                      key={auction.id} 
-                      auction={auction} 
-                      type={activeTab}
-                      onBid={handlePlaceBid}
-                      team={team}
-                      saldoReservado={saldoReservado}
-                      getSaldoReservadoParaLeilao={getSaldoReservadoParaLeilao}
-                      temSaldoReservado={temSaldoReservado}
-                      onCancelAuction={handleCancelAuction}
-                      onStartAuction={handleStartAuction}
-                      onForceFinish={handleForceFinish}
-                      isAdmin={isAdmin}
-                      finalizing={finalizingAuctions.has(auction.id)}
-                    />
+                    key={auction.id} 
+                    auction={auction} 
+                    type={activeTab}
+                    onBid={handlePlaceBid}
+                    team={team}
+                    saldoReservado={saldoReservado}
+                    getSaldoReservadoParaLeilao={getSaldoReservadoParaLeilao}
+                    temSaldoReservado={safeTemSaldoReservado} // ← A função segura que criamos
+                    onCancelAuction={handleCancelAuction}
+                    onStartAuction={handleStartAuction}
+                    onForceFinish={handleForceFinish}
+                    isAdmin={isAdmin}
+                    finalizing={finalizingAuctions.has(auction.id)}
+                  />
                   ))}
                 </div>
               )}
