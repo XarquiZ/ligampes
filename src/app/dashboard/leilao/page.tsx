@@ -21,7 +21,7 @@ import { AuctionCard } from '@/components/leilao/auction-card'
 import { CreateAuctionModal } from '@/components/leilao/create-auction-modal'
 import { SaldoUpdateIndicator } from '@/components/leilao/saldo-update-indicator'
 import { useSaldoReservado } from '@/hooks/use-saldo-reservado'
-import { auctionFinalizer } from '@/lib/supabase/auction-finalizer'
+import { auctionFinalizer } from '@/lib/supabase/realtime/auction-finalizer'
 
 interface Player {
   id: string
@@ -78,15 +78,15 @@ export default function PaginaLeilao() {
   // Hooks e refs
   const {
     saldoReservado,
-    saldoReservadoLocal,
     lastUpdate,
+    lastSaldoUpdate,
     reservarSaldo,
     liberarSaldo,
     debitarSaldoVencedor,
     getSaldoReservado,
     getSaldoReservadoParaLeilao,
     loadPendingReserves,
-    temSaldoReservado, // Adicionar esta função
+    temSaldoReservado,
     isLoading: isLoadingSaldo
   } = useSaldoReservado({
     teamId: team?.id,
@@ -107,7 +107,7 @@ export default function PaginaLeilao() {
     }
   }, [])
 
-  // Configurar realtime
+  // Configurar realtime quando team/user mudar
   useEffect(() => {
     if (!user || !team) return
 
@@ -159,6 +159,7 @@ export default function PaginaLeilao() {
       subscriptionsRef.current.forEach(sub => {
         supabase.removeChannel(sub)
       })
+      subscriptionsRef.current = []
     }
   }, [user, team])
 
@@ -189,6 +190,7 @@ export default function PaginaLeilao() {
         setIsAdmin(profile?.role === 'admin')
         if (profile.teams) {
           setTeam(profile.teams)
+          // Carregar saldos reservados
           loadPendingReserves(profile.teams.id)
         }
       }
@@ -215,22 +217,29 @@ export default function PaginaLeilao() {
         `)
         .order('created_at', { ascending: false })
 
-      if (!error && auctionsData) {
-        setAuctions(auctionsData.map(auction => ({
+      if (error) {
+        console.error('❌ Erro ao carregar leilões:', error)
+        throw error
+      }
+
+      if (auctionsData) {
+        const auctionsWithTime = auctionsData.map(auction => ({
           ...auction,
           time_remaining: auction.end_time && auction.status === 'active' 
             ? Math.max(0, new Date(auction.end_time).getTime() - Date.now())
             : 0
-        })))
+        }))
+        setAuctions(auctionsWithTime)
       }
     } catch (error) {
       console.error('❌ Erro ao carregar leilões:', error)
+      toast.error('Erro ao carregar leilões')
     }
   }
 
   const handleAuctionUpdate = async (auctionId: string) => {
     try {
-      const { data: fullAuction } = await supabase
+      const { data: fullAuction, error } = await supabase
         .from('auctions')
         .select(`
           *,
@@ -239,6 +248,11 @@ export default function PaginaLeilao() {
         `)
         .eq('id', auctionId)
         .single()
+
+      if (error) {
+        console.error('❌ Erro ao buscar leilão:', error)
+        return
+      }
 
       if (fullAuction) {
         setAuctions(prev => {
@@ -285,7 +299,9 @@ export default function PaginaLeilao() {
 
       if (data?.success) {
         toast.success(data.message || 'Lance realizado com sucesso!')
-        if (team.id) loadPendingReserves(team.id)
+        if (team.id) {
+          loadPendingReserves(team.id)
+        }
       } else {
         toast.error(data?.error || 'Erro ao processar lance')
       }
@@ -322,15 +338,17 @@ export default function PaginaLeilao() {
     if (!confirm('Tem certeza que deseja cancelar este leilão?')) return
 
     try {
-      await supabase
-        .from('auctions')
-        .delete()
-        .eq('id', auctionId)
-
+      // Primeiro deletar os bids
       await supabase
         .from('bids')
         .delete()
         .eq('auction_id', auctionId)
+
+      // Depois deletar o leilão
+      await supabase
+        .from('auctions')
+        .delete()
+        .eq('id', auctionId)
 
       toast.success('Leilão cancelado!')
       await loadAuctions()
@@ -374,7 +392,8 @@ export default function PaginaLeilao() {
 
   const getSaldoDisponivel = () => {
     if (!team) return 0
-    return team.balance - getSaldoReservado()
+    const saldoReservadoTotal = getSaldoReservado()
+    return team.balance - saldoReservadoTotal
   }
 
   const getAuctionsByTab = () => {
@@ -406,13 +425,13 @@ export default function PaginaLeilao() {
       <Sidebar user={user} team={team} />
       
       <div className="flex-1 lg:ml-0">
-        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-orange-950/20 to-zinc-950 text-white p-8">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-orange-950/20 to-zinc-950 text-white p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
             {/* Cabeçalho */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
               <div className="flex-1">
-                <h1 className="text-5xl font-black text-white mb-2">LEILÃO DE JOGADORES</h1>
-                <p className="text-zinc-400 text-lg">
+                <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white mb-2">LEILÃO DE JOGADORES</h1>
+                <p className="text-zinc-400 text-sm md:text-lg">
                   Adquira os melhores jogadores livres no mercado
                 </p>
               </div>
@@ -426,7 +445,7 @@ export default function PaginaLeilao() {
                         <img 
                           src={team.logo_url} 
                           alt={team.name}
-                          className="w-12 h-12 rounded-full border-2 border-orange-500/50"
+                          className="w-12 h-12 rounded-full border-2 border-orange-500/50 object-cover"
                         />
                       )}
                       <div className="flex-1 min-w-0">
@@ -437,31 +456,40 @@ export default function PaginaLeilao() {
                               <DollarSign className="w-4 h-4 text-green-400" />
                               <span className="text-xs text-green-300 font-medium">Disponível</span>
                             </div>
-                            <p className="text-xl font-bold text-white">
+                            <p className="text-lg md:text-xl font-bold text-white">
                               R$ {formatToMillions(getSaldoDisponivel())}
                             </p>
-                            <SaldoUpdateIndicator lastUpdate={lastSaldoUpdate} />
+                            <SaldoUpdateIndicator 
+                              lastSaldoUpdate={lastSaldoUpdate} 
+                              className="mt-1"
+                            />
                           </div>
                           <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-2">
                             <div className="flex items-center gap-1 mb-1">
                               <Lock className="w-4 h-4 text-yellow-400" />
                               <span className="text-xs text-yellow-300 font-medium">Reservado</span>
                             </div>
-                            <p className="text-xl font-bold text-white">
+                            <p className="text-lg md:text-xl font-bold text-white">
                               R$ {formatToMillions(getSaldoReservado())}
                             </p>
-                            <SaldoUpdateIndicator lastUpdate={lastSaldoUpdate} />
+                            <SaldoUpdateIndicator 
+                              lastSaldoUpdate={lastSaldoUpdate} 
+                              className="mt-1"
+                            />
                           </div>
                         </div>
                         <div className="mt-3 bg-zinc-800/50 rounded-lg p-2">
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-zinc-400">Saldo Total:</span>
-                            <span className="text-lg font-bold text-white">
+                            <span className="text-base md:text-lg font-bold text-white">
                               R$ {formatToMillions(team.balance)}
                             </span>
                           </div>
                           <div className="flex items-center justify-between mt-1">
-                            <SaldoUpdateIndicator lastUpdate={lastSaldoUpdate} />
+                            <SaldoUpdateIndicator 
+                              lastSaldoUpdate={lastSaldoUpdate} 
+                              className="text-xs"
+                            />
                             <div className="flex items-center gap-1">
                               <Zap className="w-3 h-3 text-green-400" />
                               <span className="text-xs text-green-400">Auto-atualizando</span>
@@ -478,7 +506,7 @@ export default function PaginaLeilao() {
               {isAdmin && (
                 <Button 
                   onClick={() => setCreateModalOpen(true)}
-                  className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg"
+                  className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg w-full lg:w-auto mt-4 lg:mt-0"
                 >
                   <Gavel className="w-4 h-4 mr-2" />
                   Criar Leilão
@@ -488,7 +516,7 @@ export default function PaginaLeilao() {
 
             {/* Abas */}
             <div className="mb-8">
-              <div className="flex space-x-1 bg-zinc-800/50 rounded-lg p-1">
+              <div className="flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-1 bg-zinc-800/50 rounded-lg p-1">
                 <Button
                   variant={activeTab === 'active' ? 'default' : 'ghost'}
                   onClick={() => setActiveTab('active')}
@@ -551,16 +579,16 @@ export default function PaginaLeilao() {
             {/* Lista de leilões */}
             <div className="min-h-[400px]">
               {tabAuctions.length === 0 ? (
-                <div className="p-16 text-center bg-white/5 border-white/10 rounded-lg">
-                  {activeTab === 'active' && <Gavel className="w-16 h-16 text-zinc-600 mx-auto mb-4" />}
-                  {activeTab === 'pending' && <Clock className="w-16 h-16 text-zinc-600 mx-auto mb-4" />}
-                  {activeTab === 'finished' && <Trophy className="w-16 h-16 text-zinc-600 mx-auto mb-4" />}
-                  <h3 className="text-2xl font-bold text-white mb-2">
+                <div className="p-8 md:p-16 text-center bg-white/5 border-white/10 rounded-lg">
+                  {activeTab === 'active' && <Gavel className="w-12 h-12 md:w-16 md:h-16 text-zinc-600 mx-auto mb-4" />}
+                  {activeTab === 'pending' && <Clock className="w-12 h-12 md:w-16 md:h-16 text-zinc-600 mx-auto mb-4" />}
+                  {activeTab === 'finished' && <Trophy className="w-12 h-12 md:w-16 md:h-16 text-zinc-600 mx-auto mb-4" />}
+                  <h3 className="text-xl md:text-2xl font-bold text-white mb-2">
                     {activeTab === 'active' && 'Nenhum leilão ativo'}
                     {activeTab === 'pending' && 'Nenhum leilão agendado'}
                     {activeTab === 'finished' && 'Nenhum leilão finalizado'}
                   </h3>
-                  <p className="text-zinc-400">
+                  <p className="text-zinc-400 text-sm md:text-base">
                     {activeTab === 'active' && (isAdmin 
                       ? 'Crie um leilão ou inicie um leilão agendado!' 
                       : 'Aguarde o administrador iniciar um leilão.'
@@ -573,7 +601,7 @@ export default function PaginaLeilao() {
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   {tabAuctions.map(auction => (
                     <AuctionCard 
                       key={auction.id} 
@@ -582,6 +610,8 @@ export default function PaginaLeilao() {
                       onBid={handlePlaceBid}
                       team={team}
                       saldoReservado={saldoReservado}
+                      getSaldoReservadoParaLeilao={getSaldoReservadoParaLeilao}
+                      temSaldoReservado={temSaldoReservado}
                       onCancelAuction={handleCancelAuction}
                       onStartAuction={handleStartAuction}
                       onForceFinish={handleForceFinish}
