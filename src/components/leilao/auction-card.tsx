@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { User, Timer, Crown, Lock, Trophy, DollarSign, Play, Minus } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface Player {
   id: string
@@ -94,7 +95,9 @@ export function AuctionCard({
   const [bidModalOpen, setBidModalOpen] = useState(false)
   const [selectedBid, setSelectedBid] = useState<number | null>(null)
   const [bidOptions, setBidOptions] = useState<{value: number, label: string}[]>([])
-  const [timeRemaining, setTimeRemaining] = useState<number>(auction.time_remaining || 0)
+  const [serverTime, setServerTime] = useState<number>(Date.now())
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const channelRef = useRef<any>(null)
 
   useEffect(() => {
     if (auction && bidModalOpen) {
@@ -102,34 +105,74 @@ export function AuctionCard({
     }
   }, [auction, bidModalOpen])
 
-  // ⚡ TIMER LOCAL BASEADO NO end_time DO BANCO (igual para todos)
+  // ⚡ SERVER TIME MANAGED TIMER
   useEffect(() => {
     if (type === 'active' && auction.status === 'active' && auction.end_time) {
-      // ⚡ FUNÇÃO QUE ATUALIZA O TIMER
-      const updateTimer = () => {
-        // ⚡ USA O end_time DO BANCO (igual para todos)
-        const endTime = new Date(auction.end_time!).getTime()
-        const now = Date.now()
-        const remaining = Math.max(0, endTime - now)
-        setTimeRemaining(remaining)
-        
-        // ⚡ SE TEMPO ACABOU, NOTIFICA O PARENT
-        if (remaining <= 0 && onForceFinish) {
-          setTimeout(() => onForceFinish(auction.id), 1000)
+      console.log(`⏰ Iniciando cronômetro server-side para leilão ${auction.id}`)
+      
+      // Canal para receber server time
+      const channel = supabase.channel(`server-time-${auction.id}`)
+        .on('broadcast', { event: 'server-time' }, (payload) => {
+          // ⚡ RECEBE TEMPO DO SERVIDOR
+          const { serverTimestamp } = payload.payload
+          setServerTime(serverTimestamp)
+        })
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log(`✅ Canal server-time ativo para ${auction.id}`)
+          }
+        })
+      
+      channelRef.current = channel
+      
+      // Solicita server time a cada 2 segundos
+      const requestServerTime = () => {
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'request-time',
+            payload: { auctionId: auction.id, clientTime: Date.now() }
+          })
         }
       }
       
-      // Atualiza imediatamente
-      updateTimer()
+      // Primeira solicitação após 1 segundo
+      const initialTimeout = setTimeout(requestServerTime, 1000)
       
-      // Atualiza a cada segundo
-      const interval = setInterval(updateTimer, 1000)
+      // Solicita a cada 2 segundos
+      intervalRef.current = setInterval(requestServerTime, 2000)
       
-      return () => clearInterval(interval)
+      return () => {
+        clearTimeout(initialTimeout)
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current)
+        }
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current)
+        }
+      }
     } else {
-      setTimeRemaining(0)
+      // Limpa tudo se não for leilão ativo
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+      }
     }
-  }, [auction.end_time, auction.status, type, onForceFinish, auction.id]) // ⚡ Chave: end_time do banco
+  }, [auction.id, auction.status, type, auction.end_time])
+
+  // ⚡ CALCULA TEMPO RESTANTE BASEADO NO SERVER TIME
+  const timeRemaining = (() => {
+    if (type !== 'active' || auction.status !== 'active' || !auction.end_time) {
+      return 0
+    }
+    
+    const endTime = new Date(auction.end_time).getTime()
+    const remaining = Math.max(0, endTime - serverTime)
+    
+    return remaining
+  })()
 
   const formatTime = (ms: number) => {
     if (ms <= 0) return '00:00'
@@ -224,7 +267,7 @@ export function AuctionCard({
             </div>
             <div className="text-right">
               {type === 'active' && timeRemaining > 0 && (
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-1">
                   <div className={cn(
                     "flex items-center gap-1 font-mono font-bold",
                     isCritical ? "text-red-500 animate-pulse" :
@@ -241,20 +284,12 @@ export function AuctionCard({
                       {formatTime(timeRemaining)}
                     </span>
                   </div>
-                  <Badge variant="outline" className={cn(
-                    "text-xs",
-                    isCritical ? "bg-red-500/20 text-red-400" :
-                    isAlmostFinished ? "bg-orange-500/20 text-orange-400" :
-                    "bg-green-500/20 text-green-400"
-                  )}>
-                    ⚡ Tempo sincronizado
-                  </Badge>
                 </div>
               )}
               <Badge variant={
                 type === 'active' ? 'destructive' : 
                 type === 'pending' ? 'secondary' : 'outline'
-              }>
+              } className="mt-1">
                 {type === 'active' ? 'ATIVO' : 
                  type === 'pending' ? 'AGENDADO' : 'FINALIZADO'}
               </Badge>
