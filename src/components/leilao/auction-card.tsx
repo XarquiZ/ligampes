@@ -225,7 +225,7 @@ export function AuctionCard({
           </div>
           {type === 'pending' && (
             <div className="mt-2 text-sm text-zinc-400">
-              <Clock className="w-3 h-3 inline mr-1" />
+              <Timer className="w-3 h-3 inline mr-1" />
               Início: {new Date(auction.start_time).toLocaleString('pt-BR')}
             </div>
           )}
