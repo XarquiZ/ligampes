@@ -120,6 +120,47 @@ const formatToMillions = (value: number): string => {
   return value.toLocaleString('pt-BR')
 }
 
+
+const refreshSingleAuction = async (auctionId: string) => {
+  try {
+    const { data: updatedAuction, error } = await supabase
+      .from('auctions')
+      .select(`
+        *,
+        player:players(*),
+        current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+      `)
+      .eq('id', auctionId)
+      .single();
+    
+    if (error) {
+      console.error('Erro ao atualizar leilão:', error);
+      return;
+    }
+    
+    if (updatedAuction) {
+      setAuctions(prev => {
+        const index = prev.findIndex(a => a.id === auctionId);
+        if (index >= 0) {
+          const newAuctions = [...prev];
+          newAuctions[index] = {
+            ...updatedAuction,
+            time_remaining: updatedAuction.end_time && updatedAuction.status === 'active' 
+              ? Math.max(0, new Date(updatedAuction.end_time).getTime() - serverTime)
+              : 0,
+            synchronized_end_time: updatedAuction.end_time ? 
+              new Date(updatedAuction.end_time).getTime() : undefined
+          };
+          return newAuctions;
+        }
+        return prev;
+      });
+    }
+  } catch (error) {
+    console.error('Erro ao atualizar leilão individual:', error);
+  }
+};
+
 // Gerar opções de lance
 const generateBidOptions = (currentBid: number): { value: number; label: string }[] => {
   const options = []
