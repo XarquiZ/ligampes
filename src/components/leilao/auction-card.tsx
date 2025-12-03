@@ -78,6 +78,38 @@ const generateBidOptions = (currentBid: number) => {
   return options
 }
 
+// ⚡ FUNÇÃO PARA BUSCAR SERVER TIME
+const fetchServerTime = async (): Promise<number> => {
+  try {
+    // Usando um endpoint público que retorna tempo atual
+    const response = await fetch('https://worldtimeapi.org/api/timezone/America/Sao_Paulo', {
+      cache: 'no-store'
+    })
+    
+    if (response.ok) {
+      const data = await response.json()
+      // worldtimeapi retorna o tempo em formato ISO com milliseconds
+      const serverTime = new Date(data.utc_datetime).getTime()
+      return serverTime
+    }
+  } catch (error) {
+    console.warn('⚠️ Erro ao buscar server time externo:', error)
+  }
+  
+  // Fallback: usa tempo do servidor Supabase via RPC
+  try {
+    const { data, error } = await supabase.rpc('get_server_time')
+    if (!error && data) {
+      return data
+    }
+  } catch (error) {
+    console.warn('⚠️ Erro ao buscar server time do Supabase:', error)
+  }
+  
+  // Último fallback: tempo local corrigido por offset
+  return Date.now()
+}
+
 export function AuctionCard({
   auction,
   type,
@@ -96,8 +128,10 @@ export function AuctionCard({
   const [selectedBid, setSelectedBid] = useState<number | null>(null)
   const [bidOptions, setBidOptions] = useState<{value: number, label: string}[]>([])
   const [serverTime, setServerTime] = useState<number>(Date.now())
+  const [timeOffset, setTimeOffset] = useState<number>(0)
+  const [isSyncing, setIsSyncing] = useState<boolean>(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const channelRef = useRef<any>(null)
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (auction && bidModalOpen) {
@@ -105,64 +139,66 @@ export function AuctionCard({
     }
   }, [auction, bidModalOpen])
 
-  // ⚡ SERVER TIME MANAGED TIMER
+  // ⚡ **POLLING AUTOMÁTICO PARA SERVER TIME**
   useEffect(() => {
     if (type === 'active' && auction.status === 'active' && auction.end_time) {
-      console.log(`⏰ Iniciando cronômetro server-side para leilão ${auction.id}`)
+      console.log(`⏰ Iniciando polling automático para leilão ${auction.id}`)
       
-      // Canal para receber server time
-      const channel = supabase.channel(`server-time-${auction.id}`)
-        .on('broadcast', { event: 'server-time' }, (payload) => {
-          // ⚡ RECEBE TEMPO DO SERVIDOR
-          const { serverTimestamp } = payload.payload
-          setServerTime(serverTimestamp)
-        })
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            console.log(`✅ Canal server-time ativo para ${auction.id}`)
-          }
-        })
-      
-      channelRef.current = channel
-      
-      // Solicita server time a cada 2 segundos
-      const requestServerTime = () => {
-        if (channelRef.current) {
-          channelRef.current.send({
-            type: 'broadcast',
-            event: 'request-time',
-            payload: { auctionId: auction.id, clientTime: Date.now() }
-          })
+      // Função para sincronizar com server time
+      const syncWithServer = async () => {
+        if (isSyncing) return
+        
+        setIsSyncing(true)
+        try {
+          const fetchedServerTime = await fetchServerTime()
+          const localTime = Date.now()
+          const offset = fetchedServerTime - localTime
+          
+          setServerTime(fetchedServerTime)
+          setTimeOffset(offset)
+          
+          console.log(`⏰ Sincronizado: Server=${fetchedServerTime}, Local=${localTime}, Offset=${offset}ms`)
+        } catch (error) {
+          console.warn('⚠️ Erro na sincronização:', error)
+        } finally {
+          setIsSyncing(false)
         }
       }
       
-      // Primeira solicitação após 1 segundo
-      const initialTimeout = setTimeout(requestServerTime, 1000)
+      // Primeira sincronização imediata
+      syncWithServer()
       
-      // Solicita a cada 2 segundos
-      intervalRef.current = setInterval(requestServerTime, 2000)
+      // Sincroniza a cada 10 segundos
+      syncIntervalRef.current = setInterval(syncWithServer, 10000)
+      
+      // Atualiza o tempo local com offset a cada segundo
+      const updateLocalTime = () => {
+        setServerTime(prev => Date.now() + timeOffset)
+      }
+      
+      // Atualiza a cada segundo para contagem suave
+      intervalRef.current = setInterval(updateLocalTime, 1000)
       
       return () => {
-        clearTimeout(initialTimeout)
         if (intervalRef.current) {
           clearInterval(intervalRef.current)
         }
-        if (channelRef.current) {
-          supabase.removeChannel(channelRef.current)
+        if (syncIntervalRef.current) {
+          clearInterval(syncIntervalRef.current)
         }
       }
     } else {
-      // Limpa tudo se não for leilão ativo
+      // Limpa os intervals se não for leilão ativo
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
+      if (syncIntervalRef.current) {
+        clearInterval(syncIntervalRef.current)
       }
     }
-  }, [auction.id, auction.status, type, auction.end_time])
+  }, [auction.id, auction.status, type, auction.end_time, timeOffset, isSyncing])
 
-  // ⚡ CALCULA TEMPO RESTANTE BASEADO NO SERVER TIME
+  // ⚡ **CALCULA TEMPO RESTANTE USANDO SERVER TIME**
   const timeRemaining = (() => {
     if (type !== 'active' || auction.status !== 'active' || !auction.end_time) {
       return 0
@@ -267,7 +303,7 @@ export function AuctionCard({
             </div>
             <div className="text-right">
               {type === 'active' && timeRemaining > 0 && (
-                <div className="flex items-center gap-1">
+                <div className="flex flex-col items-end gap-1">
                   <div className={cn(
                     "flex items-center gap-1 font-mono font-bold",
                     isCritical ? "text-red-500 animate-pulse" :
@@ -282,6 +318,17 @@ export function AuctionCard({
                       isCritical && "animate-pulse"
                     )}>
                       {formatTime(timeRemaining)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className={cn(
+                      "w-2 h-2 rounded-full animate-pulse",
+                      Math.abs(timeOffset) < 100 ? "bg-green-500" : 
+                      Math.abs(timeOffset) < 500 ? "bg-yellow-500" : "bg-red-500"
+                    )} />
+                    <span className="text-xs text-zinc-400">
+                      {Math.abs(timeOffset) < 100 ? "Sincronizado" : 
+                       Math.abs(timeOffset) < 500 ? "Próximo" : "Fora de sinc."}
                     </span>
                   </div>
                 </div>
