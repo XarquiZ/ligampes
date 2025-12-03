@@ -96,6 +96,17 @@ export default function PaginaLeilao() {
   const subscriptionsRef = useRef<any[]>([])
   const processedWinsRef = useRef<Set<string>>(new Set())
 
+  // Função segura para evitar erros - ADICIONE ESTA FUNÇÃO
+  const safeTemSaldoReservado = useCallback((auctionId: string) => {
+    if (!temSaldoReservado) return false
+    try {
+      return temSaldoReservado(auctionId)
+    } catch (error) {
+      console.error('Erro em temSaldoReservado:', error)
+      return false
+    }
+  }, [temSaldoReservado])
+
   // Carregamento inicial
   useEffect(() => {
     loadInitialData()
