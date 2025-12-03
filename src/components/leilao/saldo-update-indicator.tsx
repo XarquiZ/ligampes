@@ -4,11 +4,16 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 interface SaldoUpdateIndicatorProps {
-  lastUpdate: number
+  lastUpdate?: number
+  lastSaldoUpdate?: Date | number | null
   className?: string
 }
 
-export function SaldoUpdateIndicator({ lastUpdate, className }: SaldoUpdateIndicatorProps) {
+export function SaldoUpdateIndicator({ 
+  lastUpdate, 
+  lastSaldoUpdate,
+  className 
+}: SaldoUpdateIndicatorProps) {
   const [now, setNow] = useState(Date.now())
   
   useEffect(() => {
@@ -16,7 +21,12 @@ export function SaldoUpdateIndicator({ lastUpdate, className }: SaldoUpdateIndic
     return () => clearInterval(interval)
   }, [])
   
-  const secondsAgo = Math.floor((now - lastUpdate) / 1000)
+  // Usar lastSaldoUpdate se disponível, senão usar lastUpdate
+  const updateTime = lastSaldoUpdate 
+    ? (typeof lastSaldoUpdate === 'number' ? lastSaldoUpdate : lastSaldoUpdate.getTime())
+    : lastUpdate || Date.now()
+  
+  const secondsAgo = Math.floor((now - updateTime) / 1000)
   const isRecent = secondsAgo < 2
   const isStale = secondsAgo > 10
   

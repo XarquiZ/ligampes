@@ -15,6 +15,7 @@ export const useSaldoReservado = ({ teamId, enableRealtime = true }: UseSaldoRes
   // Estado do banco de dados
   const [saldoReservadoDB, setSaldoReservadoDB] = useState<{[key: string]: number}>({})
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now())
+  const [lastSaldoUpdate, setLastSaldoUpdate] = useState<Date | null>(new Date()) // ← ADICIONADO
   const [isLoading, setIsLoading] = useState(false)
 
   // 1. Carregar do localStorage
@@ -78,6 +79,7 @@ export const useSaldoReservado = ({ teamId, enableRealtime = true }: UseSaldoRes
 
       setSaldoReservadoDB(reserves)
       setLastUpdate(Date.now())
+      setLastSaldoUpdate(new Date()) // ← ATUALIZAR
       console.log('💰 Saldo reservado (DB) atualizado:', reserves)
 
     } catch (error) {
@@ -103,6 +105,7 @@ export const useSaldoReservado = ({ teamId, enableRealtime = true }: UseSaldoRes
         },
         () => {
           console.log('🔄 Transação detectada, atualizando saldo reservado...')
+          setLastSaldoUpdate(new Date()) // ← ATUALIZAR
           loadPendingReserves(teamId)
         }
       )
@@ -130,6 +133,7 @@ export const useSaldoReservado = ({ teamId, enableRealtime = true }: UseSaldoRes
       console.log(`💰 Saldo reservado localmente: ${auctionId} = R$ ${amount}`)
       return novo
     })
+    setLastSaldoUpdate(new Date()) // ← ATUALIZAR
 
     // O banco será atualizado pela RPC place_bid_atomic
   }
@@ -145,6 +149,7 @@ export const useSaldoReservado = ({ teamId, enableRealtime = true }: UseSaldoRes
       }
       return novo
     })
+    setLastSaldoUpdate(new Date()) // ← ATUALIZAR
 
     // Se tiver teamId, atualizar DB também
     if (teamId) {
@@ -165,6 +170,7 @@ export const useSaldoReservado = ({ teamId, enableRealtime = true }: UseSaldoRes
       }
       return novo
     })
+    setLastSaldoUpdate(new Date()) // ← ATUALIZAR
 
     // Atualizar DB
     if (teamId) {
@@ -227,6 +233,7 @@ export const useSaldoReservado = ({ teamId, enableRealtime = true }: UseSaldoRes
     saldoReservado: saldoReservadoDB, // Usar DB como fonte principal
     saldoReservadoLocal,
     lastUpdate,
+    lastSaldoUpdate, // ← ADICIONADO AO RETORNO
     isLoading,
     
     // Funções principais
