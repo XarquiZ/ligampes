@@ -120,47 +120,6 @@ const formatToMillions = (value: number): string => {
   return value.toLocaleString('pt-BR')
 }
 
-
-const refreshSingleAuction = async (auctionId: string) => {
-  try {
-    const { data: updatedAuction, error } = await supabase
-      .from('auctions')
-      .select(`
-        *,
-        player:players(*),
-        current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
-      `)
-      .eq('id', auctionId)
-      .single();
-    
-    if (error) {
-      console.error('Erro ao atualizar leilão:', error);
-      return;
-    }
-    
-    if (updatedAuction) {
-      setAuctions(prev => {
-        const index = prev.findIndex(a => a.id === auctionId);
-        if (index >= 0) {
-          const newAuctions = [...prev];
-          newAuctions[index] = {
-            ...updatedAuction,
-            time_remaining: updatedAuction.end_time && updatedAuction.status === 'active' 
-              ? Math.max(0, new Date(updatedAuction.end_time).getTime() - serverTime)
-              : 0,
-            synchronized_end_time: updatedAuction.end_time ? 
-              new Date(updatedAuction.end_time).getTime() : undefined
-          };
-          return newAuctions;
-        }
-        return prev;
-      });
-    }
-  } catch (error) {
-    console.error('Erro ao atualizar leilão individual:', error);
-  }
-};
-
 // Gerar opções de lance
 const generateBidOptions = (currentBid: number): { value: number; label: string }[] => {
   const options = []
@@ -177,7 +136,7 @@ const generateBidOptions = (currentBid: number): { value: number; label: string 
   return options
 }
 
-// Classe para gerenciar sincronização de finalização
+// Classe para gerenciar sincronização de finalização - ATUALIZADA
 class AuctionFinalizer {
   private static instance: AuctionFinalizer
   private processingSet: Set<string> = new Set()
@@ -209,14 +168,71 @@ class AuctionFinalizer {
     this.processingSet.add(auctionId)
     
     try {
-      console.log(`🔄 FINALIZANDO LEILÃO PARA TODOS: ${auctionId}`)
-    
+      console.log(`🔄 FINALIZANDO LEILÃO: ${auctionId}`)
+      
+      // PASSO 1: Atualizar o status do leilão para 'finished' - isso disparará o trigger automaticamente
+      const { data: auctionData, error: updateError } = await supabase
+        .from('auctions')
+        .update({ 
+          status: 'finished',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', auctionId)
+        .select('current_bid, current_bidder, player_id')
+        .single()
+
+      if (updateError) {
+        console.error('❌ Erro ao atualizar status do leilão:', updateError)
+        throw new Error(`Falha ao finalizar leilão: ${updateError.message}`)
+      }
+
+      console.log('✅ Status do leilão atualizado para finished. Trigger será executado automaticamente.')
+
+      // PASSO 2: Buscar dados completos do leilão finalizado
+      const { data: finalizedAuction, error: fetchError } = await supabase
+        .from('auctions')
+        .select(`
+          *,
+          player:players(*),
+          current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+        `)
+        .eq('id', auctionId)
+        .single()
+
+      if (fetchError) {
+        console.error('❌ Erro ao buscar leilão finalizado:', fetchError)
+      }
+
+      // PASSO 3: Executar função batch para garantir processamento
+      const { data: batchResult, error: batchError } = await supabase
+        .rpc('finalize_expired_auctions_simple')
+
+      if (batchError) {
+        console.warn('⚠️ Aviso na função batch:', batchError)
+      } else {
+        console.log(`✅ Função batch executada: ${batchResult} leilões processados`)
+      }
+
+      const result = {
+        success: true,
+        auctionId,
+        final_amount: auctionData?.current_bid || 0,
+        winner_team_id: auctionData?.current_bidder || null,
+        message: 'Leilão finalizado com sucesso. Trigger executado.',
+        auction: finalizedAuction
+      }
 
       // Notificar todos os ouvintes
-      this.notifyListeners(auctionId, data)
+      this.notifyListeners(auctionId, result)
       
-      return data
+      return result
 
+    } catch (error: any) {
+      console.error('❌ Erro na finalização do leilão:', error)
+      return {
+        success: false,
+        error: error.message || 'Erro desconhecido na finalização'
+      }
     } finally {
       // Remover após 5 segundos para evitar conflitos
       setTimeout(() => {
@@ -810,7 +826,7 @@ export default function PaginaLeilao() {
     }
   }, [activeTab, auctions])
 
-  // VERIFICAÇÃO SINCRONIZADA DE LEILÕES EXPIRADOS
+  // VERIFICAÇÃO SINCRONIZADA DE LEILÕES EXPIRADOS - ATUALIZADA
   useEffect(() => {
     if (!team || !isTimeSynced) return
     
@@ -829,7 +845,8 @@ export default function PaginaLeilao() {
             const endTime = new Date(auction.end_time).getTime()
             const timeRemaining = endTime - now
             
-            if (timeRemaining <= 1000) {
+            // Se o leilão expirou (tempo <= 0)
+            if (timeRemaining <= 0) {
               console.log(`⏰ LEILÃO EXPIRADO (sincronizado): ${auction.id}`)
               
               setFinalizingAuctions(prev => new Set(prev).add(auction.id))
@@ -842,7 +859,7 @@ export default function PaginaLeilao() {
                 )
                 
                 if (result && result.success) {
-                  console.log(`✅ Leilão ${auction.id} finalizado para todos os usuários`)
+                  console.log(`✅ Leilão ${auction.id} finalizado com sucesso`)
                   
                   // PATCH: Aplicar guard para evitar processamento duplo
                   if (team?.id && result.winner_team_id === team.id) {
@@ -875,6 +892,8 @@ export default function PaginaLeilao() {
                       loadPendingReserves(team.id, true)
                     }
                   }, 2000)
+                } else {
+                  console.error(`❌ Falha ao finalizar leilão ${auction.id}:`, result?.error)
                 }
               } catch (error) {
                 console.error(`❌ Erro ao finalizar leilão ${auction.id}:`, error)
@@ -896,7 +915,7 @@ export default function PaginaLeilao() {
       }
     }
     
-    const interval = setInterval(checkExpiredAuctions, 500)
+    const interval = setInterval(checkExpiredAuctions, 1000) // Verificar a cada segundo
     return () => clearInterval(interval)
   }, [team, auctions, isTimeSynced, serverTime, serverTimeOffset, debitarSaldoVencedor, loadPendingReserves])
 
@@ -961,9 +980,9 @@ export default function PaginaLeilao() {
             }
           }
           
-          // Quando o leilão é finalizado
+          // Quando o leilão é finalizado (trigger executou)
           if (payload.new?.status === 'finished' && payload.old?.status === 'active') {
-            console.log('🏁 LEILÃO FINALIZADO VIA REALTIME:', payload.new?.id)
+            console.log('🏁 LEILÃO FINALIZADO VIA TRIGGER (realtime):', payload.new?.id)
             
             if (payload.new?.current_bidder === team.id) {
               // PATCH: Aplicar guard para evitar processamento duplo
