@@ -508,6 +508,15 @@ export default function PaginaLeilao() {
   const processingAuctionsRef = useRef<Set<string>>(new Set())
   const lastBalanceUpdateRef = useRef<number>(0)
 
+  // PATCH: Guard para evitar processar a mesma finalização duas vezes no front
+  const processedWinsRef = useRef<Set<string>>(new Set())
+
+  // Função utilitária para marcar/checar se já processamos um win localmente
+  const markAsProcessedWin = (auctionId: string) => {
+    processedWinsRef.current.add(auctionId)
+  }
+  const hasProcessedWin = (auctionId: string) => processedWinsRef.current.has(auctionId)
+
   // Atualizar tempo do servidor periodicamente
   useEffect(() => {
     const updateServerTime = async () => {
@@ -805,23 +814,29 @@ export default function PaginaLeilao() {
                 if (result && result.success) {
                   console.log(`✅ Leilão ${auction.id} finalizado para todos os usuários`)
                   
+                  // PATCH: Aplicar guard para evitar processamento duplo
                   if (team?.id && result.winner_team_id === team.id) {
-                    setTimeout(() => {
-                      setWinNotification({
-                        auctionId: auction.id,
-                        playerName: auction.player?.name || 'Jogador',
-                        amount: result.final_amount || auction.current_bid,
-                        teamName: team.name,
-                        show: true,
-                        timestamp: Date.now()
-                      })
-                      
-                      debitarSaldoVencedor(
-                        auction.id,
-                        team.id,
-                        result.final_amount || auction.current_bid
-                      )
-                    }, 1000)
+                    if (!hasProcessedWin(auction.id)) {
+                      markAsProcessedWin(auction.id)
+                      setTimeout(() => {
+                        setWinNotification({
+                          auctionId: auction.id,
+                          playerName: auction.player?.name || 'Jogador',
+                          amount: result.final_amount || auction.current_bid,
+                          teamName: team.name,
+                          show: true,
+                          timestamp: Date.now()
+                        })
+                        
+                        debitarSaldoVencedor(
+                          auction.id,
+                          team.id,
+                          result.final_amount || auction.current_bid
+                        )
+                      }, 1000)
+                    } else {
+                      console.log('Leilão já processado localmente (checkExpiredAuctions):', auction.id)
+                    }
                   }
                   
                   setTimeout(() => {
@@ -921,34 +936,40 @@ export default function PaginaLeilao() {
             console.log('🏁 LEILÃO FINALIZADO VIA REALTIME:', payload.new?.id)
             
             if (payload.new?.current_bidder === team.id) {
-              setTimeout(() => {
-                supabase
-                  .from('auctions')
-                  .select(`
-                    *,
-                    player:players(name)
-                  `)
-                  .eq('id', payload.new?.id)
-                  .single()
-                  .then(({ data: auctionData }) => {
-                    if (auctionData) {
-                      setWinNotification({
-                        auctionId: auctionData.id,
-                        playerName: auctionData.player?.name || 'Jogador',
-                        amount: auctionData.current_bid,
-                        teamName: team.name,
-                        show: true,
-                        timestamp: Date.now()
-                      })
-                      
-                      debitarSaldoVencedor(
-                        auctionData.id,
-                        team.id,
-                        auctionData.current_bid
-                      )
-                    }
-                  })
-              }, 1000)
+              // PATCH: Aplicar guard para evitar processamento duplo
+              if (!hasProcessedWin(payload.new.id)) {
+                markAsProcessedWin(payload.new.id)
+                setTimeout(() => {
+                  supabase
+                    .from('auctions')
+                    .select(`
+                      *,
+                      player:players(name)
+                    `)
+                    .eq('id', payload.new?.id)
+                    .single()
+                    .then(({ data: auctionData }) => {
+                      if (auctionData) {
+                        setWinNotification({
+                          auctionId: auctionData.id,
+                          playerName: auctionData.player?.name || 'Jogador',
+                          amount: auctionData.current_bid,
+                          teamName: team.name,
+                          show: true,
+                          timestamp: Date.now()
+                        })
+                        
+                        debitarSaldoVencedor(
+                          auctionData.id,
+                          team.id,
+                          auctionData.current_bid
+                        )
+                      }
+                    })
+                }, 1000)
+              } else {
+                console.log('Leilão já processado localmente (realtime):', payload.new.id)
+              }
             }
           }
           
@@ -1664,15 +1685,21 @@ export default function PaginaLeilao() {
         toast.success('Leilão finalizado para todos os usuários!')
         await loadAuctions()
         
+        // PATCH: Aplicar guard para evitar processamento duplo
         if (team?.id && result.winner_team_id === team.id) {
-          setTimeout(async () => {
-            try {
-              await debitarSaldoVencedor(auctionId, team.id, result.final_amount || 0)
-              console.log(`✅ Estado local atualizado para leilão forçado ${auctionId}`)
-            } catch (error) {
-              console.error('❌ Erro ao atualizar estado local:', error)
-            }
-          }, 1000)
+          if (!hasProcessedWin(auctionId)) {
+            markAsProcessedWin(auctionId)
+            setTimeout(async () => {
+              try {
+                await debitarSaldoVencedor(auctionId, team.id, result.final_amount || 0)
+                console.log(`✅ Estado local atualizado para leilão forçado ${auctionId}`)
+              } catch (error) {
+                console.error('❌ Erro ao atualizar estado local:', error)
+              }
+            }, 1000)
+          } else {
+            console.log('Leilão já processado localmente (forceFinish):', auctionId)
+          }
         }
       }
     } catch (error: any) {
