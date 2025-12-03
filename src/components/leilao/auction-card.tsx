@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { User, Timer, Crown, Lock, Trophy, DollarSign, Play, Minus } from 'lucide-react'
+import { User, Timer, Crown, Lock, Trophy, DollarSign, Play, Minus, ChevronRight, History } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 interface Player {
   id: string
@@ -15,6 +16,20 @@ interface Player {
   position: string
   overall: number
   photo_url: string | null
+}
+
+interface Team {
+  id: string
+  name: string
+  logo_url: string
+}
+
+interface Bid {
+  id: string
+  amount: number
+  created_at: string
+  team_id: string
+  team?: Team
 }
 
 interface Auction {
@@ -32,12 +47,6 @@ interface Auction {
     logo_url: string
   }
   time_remaining?: number
-}
-
-interface Team {
-  id: string
-  name: string
-  logo_url: string
 }
 
 interface AuctionCardProps {
@@ -95,6 +104,9 @@ export function AuctionCard({
   const [selectedBid, setSelectedBid] = useState<number | null>(null)
   const [bidOptions, setBidOptions] = useState<{value: number, label: string}[]>([])
   const [timeRemaining, setTimeRemaining] = useState<number>(auction.time_remaining || 0)
+  const [bids, setBids] = useState<Bid[]>([])
+  const [showBidHistory, setShowBidHistory] = useState(false)
+  const [loadingBids, setLoadingBids] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const mountedRef = useRef(true)
 
@@ -103,6 +115,44 @@ export function AuctionCard({
       setBidOptions(generateBidOptions(auction.current_bid))
     }
   }, [auction, bidModalOpen])
+
+  // Carregar histórico de lances
+  useEffect(() => {
+    if (auction.id && (type === 'active' || type === 'finished')) {
+      loadBidHistory()
+    }
+  }, [auction.id, type])
+
+  const loadBidHistory = async () => {
+    try {
+      setLoadingBids(true)
+      const { data, error } = await supabase
+        .from('bids')
+        .select(`
+          id,
+          amount,
+          created_at,
+          team_id,
+          team:teams!bids_team_id_fkey (
+            name,
+            logo_url
+          )
+        `)
+        .eq('auction_id', auction.id)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (error) throw error
+
+      if (data) {
+        setBids(data as Bid[])
+      }
+    } catch (error) {
+      console.error('❌ Erro ao carregar histórico de lances:', error)
+    } finally {
+      setLoadingBids(false)
+    }
+  }
 
   // ⚡ TIMER SIMPLES E EFETIVO - APENAS USANDO end_time DO BANCO
   useEffect(() => {
@@ -131,7 +181,7 @@ export function AuctionCard({
       // Atualiza imediatamente
       updateTimer()
       
-      // ⚡ ATUALIZA A CADA SEGUNDO - SEM WEBSOCKET COMPLEXO
+      // ⚡ ATUALIZA A CADA SEGUNDO
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
@@ -179,6 +229,15 @@ export function AuctionCard({
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
 
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
+
   const handleBidSelect = (value: string) => {
     const numericValue = parseInt(value)
     if (!isNaN(numericValue)) {
@@ -195,6 +254,8 @@ export function AuctionCard({
       await onBid(auction.id, selectedBid)
       setBidModalOpen(false)
       setSelectedBid(null)
+      // Recarrega histórico após dar lance
+      setTimeout(() => loadBidHistory(), 500)
     } catch (error) {
       console.error('Erro ao dar lance:', error)
     }
@@ -355,6 +416,89 @@ export function AuctionCard({
                     {auction.current_bidder_team?.name || 'Time Desconhecido'}
                   </span>
                 </div>
+              </div>
+            )}
+
+            {/* HISTÓRICO DE LANCES */}
+            {(type === 'active' || type === 'finished') && bids.length > 0 && (
+              <div className="space-y-2">
+                <button
+                  onClick={() => setShowBidHistory(!showBidHistory)}
+                  className="flex items-center justify-between w-full p-2 bg-zinc-800/30 rounded-lg hover:bg-zinc-700/30 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <History className="w-4 h-4 text-zinc-400" />
+                    <span className="text-sm font-medium text-zinc-300">
+                      Histórico de Lances ({bids.length})
+                    </span>
+                  </div>
+                  <ChevronRight className={cn(
+                    "w-4 h-4 text-zinc-400 transition-transform",
+                    showBidHistory && "rotate-90"
+                  )} />
+                </button>
+
+                {showBidHistory && (
+                  <div className="max-h-60 overflow-y-auto space-y-2 p-2 bg-zinc-800/20 rounded-lg border border-zinc-700/30">
+                    {loadingBids ? (
+                      <div className="flex justify-center p-4">
+                        <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    ) : (
+                      bids.map((bid, index) => (
+                        <div 
+                          key={bid.id} 
+                          className={cn(
+                            "flex items-center justify-between p-2 rounded-lg",
+                            index === 0 ? "bg-yellow-500/10 border border-yellow-500/20" :
+                            index < 3 ? "bg-blue-500/5" :
+                            "bg-zinc-800/20"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {bid.team?.logo_url ? (
+                                <img 
+                                  src={bid.team.logo_url} 
+                                  alt={bid.team.name}
+                                  className="w-6 h-6 rounded-full border border-zinc-600"
+                                />
+                              ) : (
+                                <div className="w-6 h-6 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center">
+                                  <User className="w-3 h-3 text-zinc-400" />
+                                </div>
+                              )}
+                              <span className="text-sm font-medium text-white truncate max-w-[120px]">
+                                {bid.team?.name || 'Time Desconhecido'}
+                              </span>
+                            </div>
+                            {index === 0 && (
+                              <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 text-xs py-0 px-1">
+                                <Crown className="w-3 h-3 mr-1" />
+                                Líder
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-bold text-white">
+                              R$ {formatToMillions(bid.amount)}
+                            </span>
+                            <span className="text-xs text-zinc-400 hidden sm:inline">
+                              {formatDateTime(bid.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    
+                    {bids.length === 0 && !loadingBids && (
+                      <div className="text-center p-4 text-zinc-400 text-sm">
+                        Nenhum lance registrado ainda
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </>
