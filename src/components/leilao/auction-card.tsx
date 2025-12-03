@@ -53,7 +53,6 @@ interface AuctionCardProps {
   onForceFinish?: (auctionId: string) => Promise<void>
   isAdmin?: boolean
   finalizing?: boolean
-  synchronizedTime?: number // 🔥 NOVA PROP: Tempo sincronizado do servidor
 }
 
 const formatToMillions = (value: number): string => {
@@ -91,14 +90,11 @@ export function AuctionCard({
   onForceFinish,
   isAdmin = false,
   finalizing = false,
-  synchronizedTime // 🔥 Recebe tempo sincronizado
 }: AuctionCardProps) {
   const [bidModalOpen, setBidModalOpen] = useState(false)
   const [selectedBid, setSelectedBid] = useState<number | null>(null)
   const [bidOptions, setBidOptions] = useState<{value: number, label: string}[]>([])
-  const [timeRemaining, setTimeRemaining] = useState<number>(
-    synchronizedTime !== undefined ? synchronizedTime : (auction.time_remaining || 0)
-  )
+  const [timeRemaining, setTimeRemaining] = useState<number>(auction.time_remaining || 0)
 
   useEffect(() => {
     if (auction && bidModalOpen) {
@@ -106,27 +102,34 @@ export function AuctionCard({
     }
   }, [auction, bidModalOpen])
 
-  // 🔥 USA TEMPO SINCRONIZADO DO PARENT
+  // ⚡ TIMER LOCAL BASEADO NO end_time DO BANCO (igual para todos)
   useEffect(() => {
-    if (synchronizedTime !== undefined) {
-      // Atualiza com o tempo sincronizado vindo do page.tsx
-      setTimeRemaining(synchronizedTime)
-    } else if (type === 'active' && auction.status === 'active' && auction.end_time) {
-      // Fallback: calcula localmente se não houver tempo sincronizado
+    if (type === 'active' && auction.status === 'active' && auction.end_time) {
+      // ⚡ FUNÇÃO QUE ATUALIZA O TIMER
       const updateTimer = () => {
+        // ⚡ USA O end_time DO BANCO (igual para todos)
         const endTime = new Date(auction.end_time!).getTime()
         const now = Date.now()
-        setTimeRemaining(Math.max(0, endTime - now))
+        const remaining = Math.max(0, endTime - now)
+        setTimeRemaining(remaining)
+        
+        // ⚡ SE TEMPO ACABOU, NOTIFICA O PARENT
+        if (remaining <= 0 && onForceFinish) {
+          setTimeout(() => onForceFinish(auction.id), 1000)
+        }
       }
       
+      // Atualiza imediatamente
       updateTimer()
+      
+      // Atualiza a cada segundo
       const interval = setInterval(updateTimer, 1000)
       
       return () => clearInterval(interval)
     } else {
       setTimeRemaining(0)
     }
-  }, [auction, type, synchronizedTime]) // 🔥 synchronizedTime é dependência
+  }, [auction.end_time, auction.status, type, onForceFinish, auction.id]) // ⚡ Chave: end_time do banco
 
   const formatTime = (ms: number) => {
     if (ms <= 0) return '00:00'
@@ -156,7 +159,7 @@ export function AuctionCard({
     }
   }
 
-  // CORREÇÃO AQUI: Verifique se a função existe antes de chamar
+  // Verifica se tem saldo reservado
   const hasReservedBalance = team?.id && temSaldoReservado ? temSaldoReservado(auction.id) : false
   
   const getCardStyles = () => {
@@ -168,9 +171,9 @@ export function AuctionCard({
     }
   }
 
-  // 🔥 INDICADOR DE SINCRONIZAÇÃO
-  const isSynchronized = synchronizedTime !== undefined
+  // Indicadores visuais
   const isAlmostFinished = timeRemaining > 0 && timeRemaining < 30000 // menos de 30 segundos
+  const isCritical = timeRemaining > 0 && timeRemaining < 10000 // menos de 10 segundos
 
   if (finalizing) {
     return (
@@ -222,23 +225,30 @@ export function AuctionCard({
             <div className="text-right">
               {type === 'active' && timeRemaining > 0 && (
                 <div className="flex flex-col items-end gap-1">
-                  <div className="flex items-center gap-1 text-red-400">
+                  <div className={cn(
+                    "flex items-center gap-1 font-mono font-bold",
+                    isCritical ? "text-red-500 animate-pulse" :
+                    isAlmostFinished ? "text-red-400" :
+                    "text-yellow-400"
+                  )}>
                     <Timer className={cn(
                       "w-4 h-4",
-                      isAlmostFinished && "animate-pulse"
+                      isCritical && "animate-pulse"
                     )} />
                     <span className={cn(
-                      "font-mono font-bold",
-                      isAlmostFinished && "animate-pulse"
+                      isCritical && "animate-pulse"
                     )}>
                       {formatTime(timeRemaining)}
                     </span>
                   </div>
-                  {isSynchronized && (
-                    <Badge variant="outline" className="bg-green-500/20 text-green-400 text-xs">
-                      ⚡ Sincronizado
-                    </Badge>
-                  )}
+                  <Badge variant="outline" className={cn(
+                    "text-xs",
+                    isCritical ? "bg-red-500/20 text-red-400" :
+                    isAlmostFinished ? "bg-orange-500/20 text-orange-400" :
+                    "bg-green-500/20 text-green-400"
+                  )}>
+                    ⚡ Tempo sincronizado
+                  </Badge>
                 </div>
               )}
               <Badge variant={

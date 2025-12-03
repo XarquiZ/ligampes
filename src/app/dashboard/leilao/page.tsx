@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { 
   Gavel, 
@@ -21,7 +21,6 @@ import { AuctionCard } from '@/components/leilao/auction-card'
 import { CreateAuctionModal } from '@/components/leilao/create-auction-modal'
 import { SaldoUpdateIndicator } from '@/components/leilao/saldo-update-indicator'
 import { useSaldoReservado } from '@/hooks/use-saldo-reservado'
-import { auctionFinalizer } from '@/lib/supabase/realtime/auction-finalizer'
 
 interface Player {
   id: string
@@ -74,9 +73,8 @@ export default function PaginaLeilao() {
   const [activeTab, setActiveTab] = useState<TabType>('active')
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [finalizingAuctions, setFinalizingAuctions] = useState<Set<string>>(new Set())
-  const [auctionTimers, setAuctionTimers] = useState<{[key: string]: number}>({}) // 🔥 NOVO ESTADO
 
-  // Hooks e refs
+  // Hooks
   const {
     saldoReservado,
     lastUpdate,
@@ -94,9 +92,6 @@ export default function PaginaLeilao() {
     enableRealtime: true
   })
 
-  const subscriptionsRef = useRef<any[]>([])
-  const processedWinsRef = useRef<Set<string>>(new Set())
-
   // Função segura para evitar erros
   const safeTemSaldoReservado = useCallback((auctionId: string) => {
     if (!temSaldoReservado) return false
@@ -113,206 +108,70 @@ export default function PaginaLeilao() {
     loadInitialData()
     
     return () => {
-      subscriptionsRef.current.forEach(sub => {
-        supabase.removeChannel(sub)
-      })
+      // Limpeza será feita no useEffect do WebSocket
     }
   }, [])
 
-  // 🔧 CONFIGURAÇÃO REALTIME OTIMIZADA (SOLUÇÃO 2)
+  // ⚡ WEB SOCKET SIMPLIFICADO - APENAS LANCES EM TEMPO REAL
   useEffect(() => {
     if (!user || !team) return
 
-    console.log('🚀 Configurando REALTIME otimizado...')
+    console.log('🔌 Configurando WebSocket para lances em tempo real...')
     
-    let isConnected = true
-    let reconnectAttempts = 0
-    const MAX_RECONNECT_ATTEMPTS = 5
-    let auctionsChannel: any = null
-    let balanceChannel: any = null
-
-    const setupChannels = () => {
-      // CANAL 1: LEILÕES (prioritário)
-      auctionsChannel = supabase
-        .channel('auctions_updates_fast', {
-          config: {
-            broadcast: { self: false },
-            presence: { key: 'auctions' }
-          }
-        })
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'auctions',
-          },
-          async (payload) => {
-            console.log('⚡ Atualização RÁPIDA de leilão:', payload.eventType)
-            if (payload.new) {
-              await handleAuctionUpdate(payload.new.id)
-            }
-          }
-        )
-        .on('system', { event: 'disconnect' }, () => {
-          console.warn('⚠️ WebSocket desconectado - Tentando reconectar...')
-          isConnected = false
+    // CANAL ÚNICO para todos os leilões
+    const channel = supabase.channel('auctions-essential')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auctions',
+        },
+        async (payload) => {
+          console.log('📡 Update de leilão:', payload.eventType, payload.new?.id)
           
-          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            const delay = 1000 * Math.pow(2, reconnectAttempts) // 1s, 2s, 4s, 8s, 16s
-            console.log(`🔄 Tentativa ${reconnectAttempts + 1} em ${delay}ms`)
-            
-            setTimeout(() => {
-              reconnectAttempts++
-              if (auctionsChannel) supabase.removeChannel(auctionsChannel)
-              if (balanceChannel) supabase.removeChannel(balanceChannel)
-              setupChannels()
-            }, delay)
-          } else {
-            console.error('❌ Máximo de tentativas de reconexão atingido')
-            // Fallback: recarrega dados uma vez
-            loadAuctions()
-            loadPendingReserves(team.id)
+          // ⚡ ATUALIZAÇÃO DE LANCE
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            // Atualiza APENAS o leilão específico
+            await updateSingleAuction(payload.new.id)
           }
-        })
-        .on('system', { event: 'reconnect' }, () => {
-          console.log('✅ WebSocket reconectado com sucesso!')
-          isConnected = true
-          reconnectAttempts = 0
-        })
-        .subscribe((status) => {
-          console.log('📡 Status do canal de leilões:', status)
-          if (status === 'SUBSCRIBED') {
-            console.log('✅ Canal de leilões ATIVO')
+          
+          // ⚡ NOVO LEILÃO CRIADO
+          if (payload.eventType === 'INSERT' && payload.new) {
+            // Recarrega a lista completa
+            await loadAuctions()
           }
-        })
+          
+          // ⚡ LEILÃO DELETADO/CANCELADO
+          if (payload.eventType === 'DELETE' && payload.old) {
+            // Remove da lista local
+            setAuctions(prev => prev.filter(a => a.id !== payload.old.id))
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('📡 Status do WebSocket:', status)
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ WebSocket ativo para lances em tempo real')
+        }
+      })
 
-      // CANAL 2: SALDO (separado)
-      balanceChannel = supabase
-        .channel(`team_balance_${team.id}_fast`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'teams',
-            filter: `id=eq.${team.id}`
-          },
-          (payload) => {
-            console.log('⚡ Saldo atualizado RÁPIDO:', payload.new.balance)
-            setTeam(prev => prev ? { 
-              ...prev, 
-              balance: payload.new.balance
-            } : null)
-          }
-        )
-        .subscribe((status) => {
-          console.log('💰 Status do canal de saldo:', status)
-        })
-
-      subscriptionsRef.current = [auctionsChannel, balanceChannel]
+    // Monitoramento de desconexão
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 Página visível, verificando conexão...')
+        loadAuctions()
+      }
     }
 
-    setupChannels()
-
-    // MONITORAMENTO DE CONEXÃO
-    const checkConnectionInterval = setInterval(() => {
-      if (!isConnected) {
-        console.log('🔍 Verificando conexão...')
-        // Força recarga se desconectado por mais de 30s
-        loadAuctions()
-        if (team.id) loadPendingReserves(team.id)
-      }
-    }, 30000)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
-      console.log('🧹 Limpando canais realtime...')
-      isConnected = false
-      clearInterval(checkConnectionInterval)
-      
-      if (auctionsChannel) supabase.removeChannel(auctionsChannel)
-      if (balanceChannel) supabase.removeChannel(balanceChannel)
-      
-      subscriptionsRef.current = []
+      console.log('🧹 Limpando WebSocket...')
+      supabase.removeChannel(channel)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
   }, [user, team])
-
-  // 🔥 NOVO: Sincroniza timers a cada 3 segundos
-  useEffect(() => {
-    if (auctions.length === 0) return
-
-    const syncTimers = async () => {
-      const activeAuctions = auctions.filter(a => a.status === 'active')
-      
-      for (const auction of activeAuctions) {
-        try {
-          const syncTime = await auctionFinalizer.getSynchronizedRemainingTime(auction.id)
-          
-          setAuctionTimers(prev => ({
-            ...prev,
-            [auction.id]: syncTime
-          }))
-          
-          // Se tempo acabou, finaliza
-          if (syncTime <= 0 && !finalizingAuctions.has(auction.id)) {
-            console.log(`⏰ TEMPO ESGOTADO (sincronizado): ${auction.id}`)
-            handleForceFinish(auction.id)
-          }
-        } catch (error) {
-          console.warn(`⚠️ Erro ao sincronizar timer ${auction.id}:`, error)
-        }
-      }
-    }
-
-    // Sincroniza imediatamente
-    syncTimers()
-    
-    // Sincroniza a cada 3 segundos
-    const syncInterval = setInterval(syncTimers, 3000)
-    
-    return () => clearInterval(syncInterval)
-  }, [auctions, finalizingAuctions])
-
-  // 🔥 NOVO: Timer local como fallback (atualização suave a cada segundo)
-  useEffect(() => {
-    if (auctions.length === 0) return
-
-    const interval = setInterval(() => {
-      const now = Date.now()
-      
-      setAuctionTimers(prev => {
-        const newTimers = { ...prev }
-        
-        auctions.forEach(auction => {
-          if (auction.status === 'active' && auction.end_time) {
-            const endTime = new Date(auction.end_time).getTime()
-            const localRemaining = Math.max(0, endTime - now)
-            
-            // Mantém o valor atual se não houver sincronização recente
-            if (!newTimers[auction.id] || Math.abs(newTimers[auction.id] - localRemaining) > 5000) {
-              newTimers[auction.id] = localRemaining
-            }
-          } else {
-            newTimers[auction.id] = 0
-          }
-        })
-        
-        return newTimers
-      })
-      
-    }, 1000) // Atualiza a cada segundo para contagem suave
-
-    return () => clearInterval(interval)
-  }, [auctions])
-
-  // 🔥 NOVO: Verifica leilões expirados a cada 30 segundos
-  useEffect(() => {
-    const checkExpiredInterval = setInterval(() => {
-      auctionFinalizer.checkAndFinalizeExpiredAuctions()
-    }, 30000)
-
-    return () => clearInterval(checkExpiredInterval)
-  }, [])
 
   // Funções principais
   const loadInitialData = async () => {
@@ -374,17 +233,14 @@ export default function PaginaLeilao() {
       }
 
       if (auctionsData) {
+        // ⚡ TODOS CALCULAM COM O MESMO end_time DO BANCO
         const auctionsWithTime = auctionsData.map(auction => {
-          // Calcula tempo local inicial
-          const timeRemaining = auction.end_time && auction.status === 'active' 
-            ? Math.max(0, new Date(auction.end_time).getTime() - Date.now())
-            : 0
-          
-          // Armazena no estado de timers
-          setAuctionTimers(prev => ({
-            ...prev,
-            [auction.id]: timeRemaining
-          }))
+          let timeRemaining = 0
+          if (auction.end_time && auction.status === 'active') {
+            const endTime = new Date(auction.end_time).getTime()
+            const now = Date.now()
+            timeRemaining = Math.max(0, endTime - now)
+          }
           
           return {
             ...auction,
@@ -393,22 +249,6 @@ export default function PaginaLeilao() {
         })
         
         setAuctions(auctionsWithTime)
-        
-        // Sincroniza timers com servidor em background
-        setTimeout(async () => {
-          const activeAuctions = auctionsWithTime.filter(a => a.status === 'active')
-          for (const auction of activeAuctions) {
-            try {
-              const syncTime = await auctionFinalizer.getSynchronizedRemainingTime(auction.id)
-              setAuctionTimers(prev => ({
-                ...prev,
-                [auction.id]: syncTime
-              }))
-            } catch (error) {
-              console.warn(`⚠️ Erro ao sincronizar timer inicial ${auction.id}:`, error)
-            }
-          }
-        }, 1000)
       }
     } catch (error) {
       console.error('❌ Erro ao carregar leilões:', error)
@@ -416,7 +256,8 @@ export default function PaginaLeilao() {
     }
   }
 
-  const handleAuctionUpdate = async (auctionId: string) => {
+  // ⚡ FUNÇÃO QUE ATUALIZA UM LEILÃO ESPECÍFICO
+  const updateSingleAuction = async (auctionId: string) => {
     try {
       const { data: fullAuction, error } = await supabase
         .from('auctions')
@@ -428,47 +269,38 @@ export default function PaginaLeilao() {
         .eq('id', auctionId)
         .single()
 
-      if (error) {
+      if (error || !fullAuction) {
         console.error('❌ Erro ao buscar leilão:', error)
         return
       }
 
-      if (fullAuction) {
-        // Calcula tempo sincronizado
-        let timeRemaining = 0
-        if (fullAuction.end_time && fullAuction.status === 'active') {
-          try {
-            timeRemaining = await auctionFinalizer.getSynchronizedRemainingTime(auctionId)
-          } catch (syncError) {
-            // Fallback: tempo local
-            const endTime = new Date(fullAuction.end_time).getTime()
-            const now = Date.now()
-            timeRemaining = Math.max(0, endTime - now)
-          }
-        }
-        
-        const updatedAuction = {
-          ...fullAuction,
-          time_remaining: timeRemaining
-        }
-
-        setAuctions(prev => {
-          const index = prev.findIndex(a => a.id === auctionId)
-          if (index >= 0) {
-            const newAuctions = [...prev]
-            newAuctions[index] = updatedAuction
-            return newAuctions
-          } else {
-            return [updatedAuction, ...prev]
-          }
-        })
-        
-        // Atualiza timer no estado
-        setAuctionTimers(prev => ({
-          ...prev,
-          [auctionId]: timeRemaining
-        }))
+      // ⚡ CRONÔMETRO IGUAL PARA TODOS
+      let timeRemaining = 0
+      if (fullAuction.end_time && fullAuction.status === 'active') {
+        // Usa end_time do BANCO (igual para todos)
+        const endTime = new Date(fullAuction.end_time).getTime()
+        const now = Date.now()
+        timeRemaining = Math.max(0, endTime - now)
       }
+
+      const updatedAuction = {
+        ...fullAuction,
+        time_remaining: timeRemaining
+      }
+
+      setAuctions(prev => {
+        const index = prev.findIndex(a => a.id === auctionId)
+        if (index >= 0) {
+          const newAuctions = [...prev]
+          newAuctions[index] = updatedAuction
+          return newAuctions
+        } else {
+          return [updatedAuction, ...prev]
+        }
+      })
+
+      console.log(`⚡ Leilão ${auctionId} atualizado em tempo real`)
+
     } catch (error) {
       console.error('❌ Erro ao atualizar leilão:', error)
     }
@@ -495,6 +327,12 @@ export default function PaginaLeilao() {
 
       if (data?.success) {
         toast.success(data.message || 'Lance realizado com sucesso!')
+        
+        // ⚡ ATUALIZA LOCALMENTE TAMBÉM (feedback imediato)
+        setTimeout(() => {
+          updateSingleAuction(auctionId)
+        }, 500)
+        
         if (team.id) {
           loadPendingReserves(team.id)
         }
@@ -565,14 +403,19 @@ export default function PaginaLeilao() {
     try {
       setFinalizingAuctions(prev => new Set(prev).add(auctionId))
       
-      const result = await auctionFinalizer.finalizeAuction(auctionId)
+      const { error } = await supabase
+        .from('auctions')
+        .update({ 
+          status: 'finished',
+          end_time: new Date().toISOString()
+        })
+        .eq('id', auctionId)
+
+      if (error) throw error
+
+      toast.success('Leilão finalizado!')
+      await loadAuctions()
       
-      if (result?.success) {
-        toast.success('Leilão finalizado!')
-        await loadAuctions()
-      } else {
-        toast.error(result?.error || 'Erro ao finalizar leilão')
-      }
     } catch (error: any) {
       toast.error('Erro: ' + error.message)
     } finally {
@@ -813,7 +656,6 @@ export default function PaginaLeilao() {
                       onForceFinish={handleForceFinish}
                       isAdmin={isAdmin}
                       finalizing={finalizingAuctions.has(auction.id)}
-                      synchronizedTime={auctionTimers[auction.id]} // 🔥 TIMER SINCRONIZADO
                     />
                   ))}
                 </div>
