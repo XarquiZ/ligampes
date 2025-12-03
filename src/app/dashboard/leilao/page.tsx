@@ -210,18 +210,7 @@ class AuctionFinalizer {
     
     try {
       console.log(`🔄 FINALIZANDO LEILÃO PARA TODOS: ${auctionId}`)
-      
-      // Usar função RPC que garante finalização atômica
-      const { data, error } = await supabase.rpc('finalize_expired_auction', {
-        p_auction_id: auctionId
-      })
-
-      if (error) {
-        console.error(`❌ Erro ao finalizar leilão ${auctionId}:`, error)
-        throw error
-      }
-
-      console.log(`✅ LEILÃO FINALIZADO PARA TODOS:`, data)
+    
 
       // Notificar todos os ouvintes
       this.notifyListeners(auctionId, data)
