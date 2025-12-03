@@ -53,6 +53,7 @@ interface AuctionCardProps {
   onForceFinish?: (auctionId: string) => Promise<void>
   isAdmin?: boolean
   finalizing?: boolean
+  synchronizedTime?: number // 🔥 NOVA PROP: Tempo sincronizado do servidor
 }
 
 const formatToMillions = (value: number): string => {
@@ -89,12 +90,15 @@ export function AuctionCard({
   onStartAuction,
   onForceFinish,
   isAdmin = false,
-  finalizing = false
+  finalizing = false,
+  synchronizedTime // 🔥 Recebe tempo sincronizado
 }: AuctionCardProps) {
   const [bidModalOpen, setBidModalOpen] = useState(false)
   const [selectedBid, setSelectedBid] = useState<number | null>(null)
   const [bidOptions, setBidOptions] = useState<{value: number, label: string}[]>([])
-  const [timeRemaining, setTimeRemaining] = useState<number>(0)
+  const [timeRemaining, setTimeRemaining] = useState<number>(
+    synchronizedTime !== undefined ? synchronizedTime : (auction.time_remaining || 0)
+  )
 
   useEffect(() => {
     if (auction && bidModalOpen) {
@@ -102,8 +106,13 @@ export function AuctionCard({
     }
   }, [auction, bidModalOpen])
 
+  // 🔥 USA TEMPO SINCRONIZADO DO PARENT
   useEffect(() => {
-    if (type === 'active' && auction.status === 'active' && auction.end_time) {
+    if (synchronizedTime !== undefined) {
+      // Atualiza com o tempo sincronizado vindo do page.tsx
+      setTimeRemaining(synchronizedTime)
+    } else if (type === 'active' && auction.status === 'active' && auction.end_time) {
+      // Fallback: calcula localmente se não houver tempo sincronizado
       const updateTimer = () => {
         const endTime = new Date(auction.end_time!).getTime()
         const now = Date.now()
@@ -117,9 +126,10 @@ export function AuctionCard({
     } else {
       setTimeRemaining(0)
     }
-  }, [auction, type])
+  }, [auction, type, synchronizedTime]) // 🔥 synchronizedTime é dependência
 
   const formatTime = (ms: number) => {
+    if (ms <= 0) return '00:00'
     const minutes = Math.floor(ms / 60000)
     const seconds = Math.floor((ms % 60000) / 1000)
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
@@ -157,6 +167,10 @@ export function AuctionCard({
       default: return "bg-gradient-to-br from-zinc-600/10 to-zinc-600/10 border-zinc-500/30"
     }
   }
+
+  // 🔥 INDICADOR DE SINCRONIZAÇÃO
+  const isSynchronized = synchronizedTime !== undefined
+  const isAlmostFinished = timeRemaining > 0 && timeRemaining < 30000 // menos de 30 segundos
 
   if (finalizing) {
     return (
@@ -207,11 +221,24 @@ export function AuctionCard({
             </div>
             <div className="text-right">
               {type === 'active' && timeRemaining > 0 && (
-                <div className="flex items-center gap-1 text-red-400 mb-1">
-                  <Timer className="w-4 h-4" />
-                  <span className="font-mono font-bold">
-                    {formatTime(timeRemaining)}
-                  </span>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1 text-red-400">
+                    <Timer className={cn(
+                      "w-4 h-4",
+                      isAlmostFinished && "animate-pulse"
+                    )} />
+                    <span className={cn(
+                      "font-mono font-bold",
+                      isAlmostFinished && "animate-pulse"
+                    )}>
+                      {formatTime(timeRemaining)}
+                    </span>
+                  </div>
+                  {isSynchronized && (
+                    <Badge variant="outline" className="bg-green-500/20 text-green-400 text-xs">
+                      ⚡ Sincronizado
+                    </Badge>
+                  )}
                 </div>
               )}
               <Badge variant={
