@@ -8,7 +8,11 @@ import {
   DollarSign, 
   Trophy,
   Lock,
-  Zap
+  Zap,
+  Award,
+  Frown,
+  PartyPopper,
+  CheckCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +25,8 @@ import { AuctionCard } from '@/components/leilao/auction-card'
 import { CreateAuctionModal } from '@/components/leilao/create-auction-modal'
 import { SaldoUpdateIndicator } from '@/components/leilao/saldo-update-indicator'
 import { useSaldoReservado } from '@/hooks/use-saldo-reservado'
+import { WinnerCelebrationModal } from '@/components/leilao/winner-celebration-modal'
+import { ConsolationModal } from '@/components/leilao/consolation-modal'
 
 interface Player {
   id: string
@@ -54,6 +60,15 @@ interface Team {
   balance: number
 }
 
+export interface FinishedAuctionResult {
+  auctionId: string
+  auction: Auction
+  isWinner: boolean
+  playerName: string
+  winningAmount: number
+  winningTeamName?: string
+}
+
 type TabType = 'active' | 'pending' | 'finished'
 
 const formatToMillions = (value: number): string => {
@@ -72,7 +87,12 @@ export default function PaginaLeilao() {
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [activeTab, setActiveTab] = useState<TabType>('active')
   const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [finalizingAuctions, setFinalizingAuctions] = useState<Set<string>>(new Set())
+  const [finishedAuctionResults, setFinishedAuctionResults] = useState<FinishedAuctionResult[]>([])
+  
+  // Modal states
+  const [winnerCelebrationOpen, setWinnerCelebrationOpen] = useState(false)
+  const [consolationModalOpen, setConsolationModalOpen] = useState(false)
+  const [currentFinishedResult, setCurrentFinishedResult] = useState<FinishedAuctionResult | null>(null)
 
   // Hooks
   const {
@@ -132,6 +152,14 @@ export default function PaginaLeilao() {
           
           // ⚡ ATUALIZAÇÃO DE LANCE
           if (payload.eventType === 'UPDATE' && payload.new) {
+            const oldStatus = payload.old?.status
+            const newStatus = payload.new.status
+            
+            // Verificar se o leilão acabou de ser finalizado
+            if (oldStatus === 'active' && newStatus === 'finished') {
+              await handleAuctionFinished(payload.new.id)
+            }
+            
             // Atualiza APENAS o leilão específico
             await updateSingleAuction(payload.new.id)
           }
@@ -306,6 +334,71 @@ export default function PaginaLeilao() {
     }
   }
 
+  // Função para lidar com leilão finalizado
+  const handleAuctionFinished = async (auctionId: string) => {
+    try {
+      const { data: auction, error } = await supabase
+        .from('auctions')
+        .select(`
+          *,
+          player:players(*),
+          current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
+        `)
+        .eq('id', auctionId)
+        .single()
+
+      if (error || !auction) {
+        console.error('❌ Erro ao buscar leilão finalizado:', error)
+        return
+      }
+
+      const isWinner = auction.current_bidder === team?.id
+      const result: FinishedAuctionResult = {
+        auctionId: auction.id,
+        auction,
+        isWinner,
+        playerName: auction.player?.name || 'Jogador',
+        winningAmount: auction.current_bid,
+        winningTeamName: auction.current_bidder_team?.name
+      }
+
+      // Adicionar ao histórico de resultados
+      setFinishedAuctionResults(prev => [...prev, result])
+
+      // Mostrar modal apropriado
+      if (isWinner) {
+        setCurrentFinishedResult(result)
+        setTimeout(() => {
+          setWinnerCelebrationOpen(true)
+        }, 1000) // Pequeno delay para transição
+      } else if (auction.current_bidder) {
+        // Verificar se o time participou do leilão
+        const { data: bids } = await supabase
+          .from('bids')
+          .select('*')
+          .eq('auction_id', auctionId)
+          .eq('team_id', team?.id)
+          .limit(1)
+
+        if (bids && bids.length > 0) {
+          // O time participou mas não ganhou
+          setCurrentFinishedResult(result)
+          setTimeout(() => {
+            setConsolationModalOpen(true)
+          }, 1000)
+        }
+      }
+
+      // Atualizar saldo reservado
+      if (team?.id) {
+        await loadPendingReserves(team.id)
+      }
+
+    } catch (error) {
+      console.error('❌ Erro ao processar leilão finalizado:', error)
+    }
+  }
+
   const handlePlaceBid = async (auctionId: string, amount: number) => {
     if (!team?.id) {
       toast.error('❌ Você precisa ter um time para dar lances.')
@@ -394,38 +487,6 @@ export default function PaginaLeilao() {
     } catch (error: any) {
       console.error('❌ Erro ao cancelar leilão:', error)
       toast.error(`Erro: ${error.message}`)
-    }
-  }
-
-  const handleForceFinish = async (auctionId: string) => {
-    if (!confirm('Forçar finalização do leilão?')) return
-    
-    try {
-      setFinalizingAuctions(prev => new Set(prev).add(auctionId))
-      
-      const { error } = await supabase
-        .from('auctions')
-        .update({ 
-          status: 'finished',
-          end_time: new Date().toISOString()
-        })
-        .eq('id', auctionId)
-
-      if (error) throw error
-
-      toast.success('Leilão finalizado!')
-      await loadAuctions()
-      
-    } catch (error: any) {
-      toast.error('Erro: ' + error.message)
-    } finally {
-      setTimeout(() => {
-        setFinalizingAuctions(prev => {
-          const newSet = new Set(prev)
-          newSet.delete(auctionId)
-          return newSet
-        })
-      }, 3000)
     }
   }
 
@@ -653,9 +714,7 @@ export default function PaginaLeilao() {
                       temSaldoReservado={safeTemSaldoReservado}
                       onCancelAuction={handleCancelAuction}
                       onStartAuction={handleStartAuction}
-                      onForceFinish={handleForceFinish}
                       isAdmin={isAdmin}
-                      finalizing={finalizingAuctions.has(auction.id)}
                     />
                   ))}
                 </div>
@@ -673,6 +732,20 @@ export default function PaginaLeilao() {
           loadAuctions()
           setActiveTab('pending')
         }}
+      />
+
+      {/* Modal de celebração do vencedor */}
+      <WinnerCelebrationModal 
+        open={winnerCelebrationOpen}
+        onOpenChange={setWinnerCelebrationOpen}
+        result={currentFinishedResult}
+      />
+
+      {/* Modal de consolação */}
+      <ConsolationModal 
+        open={consolationModalOpen}
+        onOpenChange={setConsolationModalOpen}
+        result={currentFinishedResult}
       />
     </div>
   )
