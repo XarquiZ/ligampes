@@ -8,11 +8,11 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown, Building2, Target, Footprints, Clock } from 'lucide-react'
+import { DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown, Building2, Target, Footprints, Clock, AlertTriangle } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
-import ChatPopup from '@/components/Chatpopup'
+import ChatPopup from '@/components/ChatPopup'
 import Sidebar from '@/components/Sidebar'
 
 // Definir tipos para user e team
@@ -59,6 +59,15 @@ export default function Dashboard() {
   const [isEditingName, setIsEditingName] = useState(false)
   const [newCoachName, setNewCoachName] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [playerCountWarning, setPlayerCountWarning] = useState<{
+    show: boolean;
+    type: 'below' | 'above' | null;
+    message: string;
+  }>({
+    show: false,
+    type: null,
+    message: ''
+  })
 
   // Novos estados para dados reais
   const [balanceTransactions, setBalanceTransactions] = useState<any[]>([])
@@ -153,6 +162,28 @@ export default function Dashboard() {
 
         if (!playersError) {
           setPlayers(playersData || [])
+          
+          // Verificar contagem de jogadores
+          const playerCount = playersData?.length || 0
+          if (playerCount < 18) {
+            setPlayerCountWarning({
+              show: true,
+              type: 'below',
+              message: 'Você está abaixo do nível mínimo de jogadores, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
+            })
+          } else if (playerCount > 28) {
+            setPlayerCountWarning({
+              show: true,
+              type: 'above',
+              message: 'Você está acima do nível máximo de jogadores, dispense ou venda, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
+            })
+          } else {
+            setPlayerCountWarning({
+              show: false,
+              type: null,
+              message: ''
+            })
+          }
         }
       } catch (error) {
         console.error('[Dashboard] Erro ao carregar jogadores:', error)
@@ -476,6 +507,23 @@ export default function Dashboard() {
     }, {} as Record<string, number>)
   }
 
+  // Função para obter a cor do contador de jogadores
+  const getPlayerCountColor = () => {
+    if (players.length < 18 || players.length > 28) {
+      return 'text-red-400'
+    }
+    return 'text-blue-400'
+  }
+
+  // Função para obter o valor do contador de jogadores
+  const getPlayerCountValue = () => {
+    const playerCount = players.length
+    if (playerCount < 18 || playerCount > 28) {
+      return `${playerCount}/28`
+    }
+    return `${playerCount}/28`
+  }
+
   const tiles = [
     { 
       title: 'SALDO', 
@@ -491,7 +539,7 @@ export default function Dashboard() {
       title: 'MEU ELENCO', 
       icon: Shirt, 
       color: 'blue', 
-      value: `${players.length}/25`, 
+      value: getPlayerCountValue(), 
       subtitle: 'jogadores no elenco', 
       link: '/dashboard/elenco',
       buttonText: 'Ver elenco',
@@ -595,7 +643,7 @@ export default function Dashboard() {
           <div className="space-y-3">
             <div className="flex justify-between items-center p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
               <span className="text-blue-400 text-sm font-semibold">Jogadores no Elenco</span>
-              <span className="text-blue-400 font-bold text-lg">{players.length}/25</span>
+              <span className={`font-bold text-lg ${getPlayerCountColor()}`}>{players.length}/28</span>
             </div>
             
             {teamStats.topPlayer && (
@@ -621,6 +669,23 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+
+            {/* Aviso de contagem de jogadores */}
+            {playerCountWarning.show && (
+              <div className="mt-2 p-3 bg-red-500/10 rounded-lg border border-red-500/20">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-red-400 text-sm font-semibold">
+                      {playerCountWarning.type === 'below' ? 'ELENCO INSUFICIENTE' : 'ELENCO EXCEDENTE'}
+                    </p>
+                    <p className="text-red-300 text-xs mt-1">
+                      {playerCountWarning.message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )
       
@@ -913,6 +978,20 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2 lg:gap-3">
                         <tile.icon className={`h-6 w-6 lg:h-8 lg:w-8 text-${tile.color}-400 drop-shadow-lg`} />
                         <span className="truncate">{tile.title}</span>
+                        
+                        {/* Ícone de aviso para MEU ELENCO se houver problema */}
+                        {tile.title === 'MEU ELENCO' && playerCountWarning.show && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setPlayerCountWarning(prev => ({ ...prev, show: !prev.show }))
+                            }}
+                            className="ml-1 text-red-400 hover:text-red-300 transition-colors"
+                            title="Clique para ver detalhes"
+                          >
+                            <AlertTriangle className="h-4 w-4 lg:h-5 lg:w-5" />
+                          </button>
+                        )}
                       </div>
                       {expandedTile === tile.title ? <ChevronUp className="h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0" /> : <ChevronDown className="h-4 w-4 lg:h-5 lg:w-5 flex-shrink-0" />}
                     </CardTitle>
@@ -920,11 +999,14 @@ export default function Dashboard() {
 
                   <CardContent className="relative z-10 space-y-3 lg:space-y-4">
                     <div className="transition-all duration-700">
-                      <p className={`font-black text-white break-words ${expandedTile === tile.title ? 'text-2xl lg:text-4xl' : 'text-xl lg:text-3xl'}`}>
+                      <p className={`font-black break-words ${tile.title === 'MEU ELENCO' ? getPlayerCountColor() : 'text-white'} ${expandedTile === tile.title ? 'text-2xl lg:text-4xl' : 'text-xl lg:text-3xl'}`}>
                         {tile.value}
                       </p>
-                      <p className={`font-medium text-${tile.color}-400 ${expandedTile === tile.title ? 'text-sm lg:text-base mt-2 lg:mt-3' : 'text-xs lg:text-sm'}`}>
+                      <p className={`font-medium ${tile.title === 'MEU ELENCO' && playerCountWarning.show ? 'text-red-400' : `text-${tile.color}-400`} ${expandedTile === tile.title ? 'text-sm lg:text-base mt-2 lg:mt-3' : 'text-xs lg:text-sm'}`}>
                         {tile.subtitle}
+                        {tile.title === 'MEU ELENCO' && playerCountWarning.show && (
+                          <span className="ml-1 text-red-400">⚠️</span>
+                        )}
                       </p>
                     </div>
 
@@ -952,9 +1034,14 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-zinc-400 text-xs">Jogadores</p>
-                      <p className="text-white font-bold text-xl">{players.length}/25</p>
+                      <p className={`font-bold text-xl ${players.length < 18 || players.length > 28 ? 'text-red-400' : 'text-white'}`}>
+                        {players.length}/28
+                        {(players.length < 18 || players.length > 28) && (
+                          <AlertTriangle className="inline-block ml-1 w-4 h-4" />
+                        )}
+                      </p>
                     </div>
-                    <Users className="w-8 h-8 text-purple-400" />
+                    <Users className={`w-8 h-8 ${players.length < 18 || players.length > 28 ? 'text-red-400' : 'text-purple-400'}`} />
                   </div>
                 </Card>
 
