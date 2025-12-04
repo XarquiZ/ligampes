@@ -186,8 +186,16 @@ export default function ListaJogadores() {
   const [selectedPositions, setSelectedPositions] = useState<string[]>([])
   const [positionFilterOpen, setPositionFilterOpen] = useState(false)
 
+  // Estados para filtros de playstyles (MULTIPLA SELEÇÃO)
+  const [selectedPlaystyles, setSelectedPlaystyles] = useState<string[]>([])
+  const [playstyleFilterOpen, setPlaystyleFilterOpen] = useState(false)
+
   // Constantes movidas para dentro do componente para evitar hoisting
   const POSITIONS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA']
+  
+  // Playstyles da página de elenco
+  const PLAYSTYLES = ['Artilheiro', 'Armador criativo', 'Atacante surpresa', 'Clássica nº 10', 'Especialista em cruz.', 'Goleiro defensivo', 'Goleiro ofensivo', 'Homem de área', 'Jog. de infiltração', 'Jog. de Lado de Campo', 'Lateral móvel', 'Meia versátil', 'Nenhum', 'Orquestrador', 'Pivô', 'Ponta velocista', 'Primeiro volante', 'Provocador', 'Puxa marcação', 'Volantão', 'Zagueiro defensivo', 'Zagueiro ofensivo']
+
   const FOOT_OPTIONS = ['Todos', 'Direito', 'Esquerdo', 'Ambos']
 
   const ATTRIBUTE_GROUPS = [
@@ -290,6 +298,17 @@ export default function ListaJogadores() {
   }
 
   const clearPositionFilters = () => setSelectedPositions([])
+
+  // Funções para manipular checkboxes de playstyles
+  const togglePlaystyle = (playstyle: string) => {
+    setSelectedPlaystyles(prev =>
+      prev.includes(playstyle)
+        ? prev.filter(p => p !== playstyle)
+        : [...prev, playstyle]
+    )
+  }
+
+  const clearPlaystyleFilters = () => setSelectedPlaystyles([])
 
   // Funções auxiliares simplificadas
   const formatHeight = (height: number | null | undefined) => {
@@ -666,6 +685,8 @@ export default function ListaJogadores() {
       const name = j.name.toLowerCase().includes(searchName.toLowerCase())
       // Filtro de posições (múltipla seleção)
       const pos = selectedPositions.length === 0 || selectedPositions.includes(j.position)
+      // Filtro de playstyles (múltipla seleção)
+      const playstyle = selectedPlaystyles.length === 0 || (j.playstyle && selectedPlaystyles.includes(j.playstyle))
       const foot = filterFoot === 'Todos' || j.preferred_foot === filterFoot
       const team = filterTeam === 'Todos' || (filterTeam === 'Sem Time' ? !j.team_id : j.team_id === filterTeam)
       const skills = selectedSkills.length === 0 || selectedSkills.every(s => j.skills?.includes(s))
@@ -674,12 +695,13 @@ export default function ListaJogadores() {
       // Filtro de altura
       const height = filterMinHeight === 'all' || (j.height && j.height >= parseInt(filterMinHeight))
       
-      return name && pos && foot && team && skills && attrs && height
+      return name && pos && playstyle && foot && team && skills && attrs && height
     })
-  }, [jogadores, searchName, selectedPositions, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight])
+  }, [jogadores, searchName, selectedPositions, selectedPlaystyles, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight])
 
   const activeAdvancedFilters = [
     selectedPositions.length > 0,
+    selectedPlaystyles.length > 0,
     filterFoot !== 'Todos',
     filterTeam !== 'Todos',
     selectedSkills.length > 0,
@@ -690,6 +712,7 @@ export default function ListaJogadores() {
   const clearAllFilters = useCallback(() => {
     setSearchName('')
     setSelectedPositions([])
+    setSelectedPlaystyles([])
     setFilterFoot('Todos')
     setFilterTeam('Todos')
     setSelectedSkills([])
@@ -931,17 +954,17 @@ export default function ListaJogadores() {
                 />
               </div>
 
-              {/* FILTRO DE POSIÇÕES COM CHECKBOXES - ATUALIZADO */}
+              {/* FILTRO DE POSIÇÕES COM CHECKBOXES - ATUALIZADO E MENOR */}
               <div className="relative">
                 <Button 
                   variant="outline" 
                   className={cn(
-                    "h-12 lg:h-14 bg-zinc-900/70 border-zinc-700 flex items-center gap-2 text-sm lg:text-base w-full lg:w-64",
+                    "h-12 lg:h-14 bg-zinc-900/70 border-zinc-700 flex items-center gap-1 lg:gap-2 text-sm w-full lg:w-40",
                     selectedPositions.length > 0 && "border-purple-500 text-purple-400"
                   )}
                   onClick={() => setPositionFilterOpen(!positionFilterOpen)}
                 >
-                  <Filter className="w-4 h-4 lg:w-5 lg:h-5" />
+                  <Filter className="w-3 h-3 lg:w-4 lg:h-4" />
                   Posições
                   {selectedPositions.length > 0 && (
                     <Badge className="bg-purple-600 text-xs h-5 px-2 min-w-5">{selectedPositions.length}</Badge>
@@ -978,17 +1001,67 @@ export default function ListaJogadores() {
                 )}
               </div>
 
+              {/* FILTRO DE ESTILOS DE JOGO COM CHECKBOXES */}
+              <div className="relative">
+                <Button 
+                  variant="outline" 
+                  className={cn(
+                    "h-12 lg:h-14 bg-zinc-900/70 border-zinc-700 flex items-center gap-1 lg:gap-2 text-sm w-full lg:w-40",
+                    selectedPlaystyles.length > 0 && "border-purple-500 text-purple-400"
+                  )}
+                  onClick={() => setPlaystyleFilterOpen(!playstyleFilterOpen)}
+                >
+                  <Filter className="w-3 h-3 lg:w-4 lg:h-4" />
+                  Estilos
+                  {selectedPlaystyles.length > 0 && (
+                    <Badge className="bg-purple-600 text-xs h-5 px-2 min-w-5">{selectedPlaystyles.length}</Badge>
+                  )}
+                </Button>
+                
+                {playstyleFilterOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-40 p-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="font-semibold text-base">Filtrar por Estilo</h3>
+                      {selectedPlaystyles.length > 0 && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={clearPlaystyleFilters}
+                          className="text-xs text-red-400 hover:text-red-300 h-6"
+                        >
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {PLAYSTYLES.map(playstyle => (
+                        <CustomCheckbox
+                          key={playstyle}
+                          id={`playstyle-${playstyle}`}
+                          checked={selectedPlaystyles.includes(playstyle)}
+                          onChange={() => togglePlaystyle(playstyle)}
+                          label={playstyle}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Button variant="outline" size="lg" onClick={clearAllFilters} className="h-12 lg:h-14 px-4 lg:px-6 bg-zinc-900/70 border-zinc-700 hover:bg-zinc-800 hover:border-purple-500 text-white">
                 <X className="w-4 h-4 lg:w-5 lg:h-5 mr-2" />
                 Resetar Filtros
               </Button>
             </div>
 
-            {/* Fechar filtro de posições quando clicar fora */}
-            {positionFilterOpen && (
+            {/* Fechar filtros quando clicar fora */}
+            {(positionFilterOpen || playstyleFilterOpen) && (
               <div 
                 className="fixed inset-0 z-0 bg-transparent cursor-default"
-                onClick={() => setPositionFilterOpen(false)}
+                onClick={() => {
+                  setPositionFilterOpen(false)
+                  setPlaystyleFilterOpen(false)
+                }}
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               />
             )}
