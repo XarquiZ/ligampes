@@ -8,7 +8,11 @@ import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight, Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown, Building2, Target, Footprints, Clock, AlertTriangle } from 'lucide-react'
+import {
+  DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight,
+  Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown,
+  Building2, Target, Footprints, Clock, AlertTriangle, X
+} from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
@@ -46,6 +50,126 @@ function formatBalance(value: number): string {
   return `R$ ${value.toLocaleString('pt-BR')}`
 }
 
+// Componente Modal para avisos
+function WarningModal({ isOpen, onClose, type }: {
+  isOpen: boolean;
+  onClose: () => void;
+  type: 'below' | 'above' | null;
+}) {
+  if (!isOpen || !type) return null;
+
+  const messages = {
+    below: {
+      title: 'ELENCO INSUFICIENTE',
+      message: 'Você está abaixo do nível mínimo de jogadores, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
+    },
+    above: {
+      title: 'ELENCO EXCEDENTE',
+      message: 'Você está acima do nível máximo de jogadores, dispense ou venda, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
+    }
+  };
+
+  const currentMessage = messages[type];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="relative w-full max-w-md mx-4">
+        <div className="bg-gradient-to-br from-zinc-900 to-zinc-950 rounded-2xl border border-red-500/30 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+          {/* Cabeçalho do Modal */}
+          <div className="bg-gradient-to-r from-red-600/30 to-orange-600/30 p-6 border-b border-red-500/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-red-500/20 p-2 rounded-full">
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">{currentMessage.title}</h3>
+              </div>
+              <button
+                onClick={onClose}
+                className="text-zinc-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Corpo do Modal */}
+          <div className="p-6">
+            <div className="space-y-4">
+              <div className="bg-red-500/10 p-4 rounded-xl border border-red-500/20">
+                <p className="text-red-300 text-sm leading-relaxed">
+                  {currentMessage.message}
+                </p>
+              </div>
+
+              <div className="bg-zinc-800/50 p-4 rounded-xl border border-zinc-700">
+                <h4 className="text-white font-semibold mb-2 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-400" />
+                  Recomendações:
+                </h4>
+                <ul className="space-y-2 text-zinc-300 text-sm">
+                  {type === 'below' ? (
+                    <>
+                      <li className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full mt-1.5 flex-shrink-0" />
+                        <span>Contrate jogadores livres no mercado</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full mt-1.5 flex-shrink-0" />
+                        <span>Participe dos leilões disponíveis</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-blue-400 rounded-full mt-1.5 flex-shrink-0" />
+                        <span>Negocie transferências com outros times</span>
+                      </li>
+                    </>
+                  ) : (
+                    <>
+                      <li className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-red-400 rounded-full mt-1.5 flex-shrink-0" />
+                        <span>Dispense jogadores do seu elenco</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-red-400 rounded-full mt-1.5 flex-shrink-0" />
+                        <span>Venda jogadores no mercado de transferências</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-red-400 rounded-full mt-1.5 flex-shrink-0" />
+                        <span>Negocie trocas com outros times</span>
+                      </li>
+                    </>
+                  )}
+                </ul>
+              </div>
+
+              <div className="text-center text-zinc-400 text-xs">
+                A janela de transferências fecha em: 31/12/2024
+              </div>
+            </div>
+          </div>
+
+          {/* Rodapé do Modal */}
+          <div className="p-6 border-t border-zinc-800">
+            <div className="flex gap-3">
+              <Button
+                onClick={onClose}
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700"
+              >
+                Entendi
+              </Button>
+              <Link href="/dashboard/elenco" onClick={onClose} className="flex-1">
+                <Button className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white">
+                  Ver Elenco
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
@@ -68,6 +192,7 @@ export default function Dashboard() {
     type: null,
     message: ''
   })
+  const [warningModalOpen, setWarningModalOpen] = useState(false)
 
   // Novos estados para dados reais
   const [balanceTransactions, setBalanceTransactions] = useState<any[]>([])
@@ -466,6 +591,12 @@ export default function Dashboard() {
     }
   }
 
+  // Função para abrir o modal de aviso
+  const openWarningModal = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setWarningModalOpen(true)
+  }
+
   if (authLoading || dataLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -670,7 +801,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {/* Aviso de contagem de jogadores */}
+            {/* Aviso de contagem de jogadores (só aparece no tile expandido) */}
             {playerCountWarning.show && (
               <div className="mt-2 p-3 bg-red-500/10 rounded-lg border border-red-500/20">
                 <div className="flex items-start gap-2">
@@ -979,17 +1110,14 @@ export default function Dashboard() {
                         <tile.icon className={`h-6 w-6 lg:h-8 lg:w-8 text-${tile.color}-400 drop-shadow-lg`} />
                         <span className="truncate">{tile.title}</span>
                         
-                        {/* Ícone de aviso para MEU ELENCO se houver problema */}
-                        {tile.title === 'MEU ELENCO' && playerCountWarning.show && (
+                        {/* Ícone de aviso para MEU ELENCO se houver problema (primeiro estágio) */}
+                        {tile.title === 'MEU ELENCO' && playerCountWarning.show && expandedTile !== tile.title && (
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setPlayerCountWarning(prev => ({ ...prev, show: !prev.show }))
-                            }}
-                            className="ml-1 text-red-400 hover:text-red-300 transition-colors"
-                            title="Clique para ver detalhes"
+                            onClick={openWarningModal}
+                            className="ml-1 p-1 bg-red-500/20 hover:bg-red-500/30 rounded-full transition-all group/icon"
+                            title="Clique para ver detalhes do aviso"
                           >
-                            <AlertTriangle className="h-4 w-4 lg:h-5 lg:w-5" />
+                            <AlertTriangle className="h-4 w-4 lg:h-5 lg:w-5 text-red-400 group-hover/icon:text-red-300" />
                           </button>
                         )}
                       </div>
@@ -1001,12 +1129,12 @@ export default function Dashboard() {
                     <div className="transition-all duration-700">
                       <p className={`font-black break-words ${tile.title === 'MEU ELENCO' ? getPlayerCountColor() : 'text-white'} ${expandedTile === tile.title ? 'text-2xl lg:text-4xl' : 'text-xl lg:text-3xl'}`}>
                         {tile.value}
+                        {tile.title === 'MEU ELENCO' && playerCountWarning.show && expandedTile !== tile.title && (
+                          <AlertTriangle className="inline-block ml-1 w-4 h-4 text-red-400 animate-pulse" />
+                        )}
                       </p>
                       <p className={`font-medium ${tile.title === 'MEU ELENCO' && playerCountWarning.show ? 'text-red-400' : `text-${tile.color}-400`} ${expandedTile === tile.title ? 'text-sm lg:text-base mt-2 lg:mt-3' : 'text-xs lg:text-sm'}`}>
                         {tile.subtitle}
-                        {tile.title === 'MEU ELENCO' && playerCountWarning.show && (
-                          <span className="ml-1 text-red-400">⚠️</span>
-                        )}
                       </p>
                     </div>
 
@@ -1037,7 +1165,13 @@ export default function Dashboard() {
                       <p className={`font-bold text-xl ${players.length < 18 || players.length > 28 ? 'text-red-400' : 'text-white'}`}>
                         {players.length}/28
                         {(players.length < 18 || players.length > 28) && (
-                          <AlertTriangle className="inline-block ml-1 w-4 h-4" />
+                          <button
+                            onClick={openWarningModal}
+                            className="inline-block ml-1 p-0.5 hover:bg-red-500/20 rounded-full transition-colors"
+                            title="Clique para ver detalhes do aviso"
+                          >
+                            <AlertTriangle className="w-4 h-4 text-red-400" />
+                          </button>
                         )}
                       </p>
                     </div>
@@ -1102,6 +1236,13 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Modal de Aviso */}
+      <WarningModal
+        isOpen={warningModalOpen}
+        onClose={() => setWarningModalOpen(false)}
+        type={playerCountWarning.type}
+      />
     </div>
   )
 }
