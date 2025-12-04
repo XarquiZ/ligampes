@@ -61,11 +61,11 @@ function WarningModal({ isOpen, onClose, type }: {
   const messages = {
     below: {
       title: 'ELENCO INSUFICIENTE',
-      message: 'Você está abaixo do nível mínimo de jogadores, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
+      message: 'Você está abaixo da quantidade mínima de jogadores (18), caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
     },
     above: {
       title: 'ELENCO EXCEDENTE',
-      message: 'Você está acima do nível máximo de jogadores, dispense ou venda, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
+      message: 'Você está acima da quantidade máxima de jogadores (28), dispense ou venda, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
     }
   };
 
@@ -294,13 +294,13 @@ export default function Dashboard() {
             setPlayerCountWarning({
               show: true,
               type: 'below',
-              message: 'Você está abaixo do nível mínimo de jogadores, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
+              message: 'Você está abaixo da quantidade mínima de jogadores (18), caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
             })
           } else if (playerCount > 28) {
             setPlayerCountWarning({
               show: true,
               type: 'above',
-              message: 'Você está acima do nível máximo de jogadores, dispense ou venda, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
+              message: 'Você está acima da quantidade máxima de jogadores (28), dispense ou venda, caso não se regularize até o fim da janela, o clube será punido em 20M (3 pts na liga caso falta de saldo)'
             })
           } else {
             setPlayerCountWarning({
