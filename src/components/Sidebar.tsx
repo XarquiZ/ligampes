@@ -67,18 +67,6 @@ const navigationItems = [
     icon: Users, 
     color: 'text-pink-400' 
   },
-  { 
-    name: 'Leilão', 
-    href: '/dashboard/leilao', 
-    icon: Calendar, 
-    color: 'text-red-400' 
-  },
-  { 
-    name: 'Transferências', 
-    href: '/dashboard/transferencias', 
-    icon: ArrowLeftRight, 
-    color: 'text-purple-400' 
-  },
 ]
 
 export default function Sidebar({ user, profile, team }: SidebarProps) {
