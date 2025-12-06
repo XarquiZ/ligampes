@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
 import FloatingChatButton from '@/components/FloatingChatButton'
-import ChatPopup from '@/components/Chatpopup'
+import ChatPopup from '@/components/ChatPopup'
 
 interface Player {
   id: string

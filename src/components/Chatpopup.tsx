@@ -95,6 +95,52 @@ export default function ChatPopup({
     return conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0);
   }, []);
 
+// Atualize a função sortConversations para incluir logs mais detalhados:
+const sortConversations = (conversations: Conversation[]): Conversation[] => {
+  console.log('=== 🚀 INICIANDO ORDENAÇÃO DE CONVERSAS ===');
+  console.log('Quantidade de conversas:', conversations.length);
+  
+  const sorted = [...conversations].sort((a, b) => {
+    // Log detalhado de cada comparação
+    const aDate = a.last_message_at ? new Date(a.last_message_at) : new Date(0);
+    const bDate = b.last_message_at ? new Date(b.last_message_at) : new Date(0);
+    
+    const aTime = aDate.getTime();
+    const bTime = bDate.getTime();
+    
+    console.log(`\n🔍 Comparando:`);
+    console.log(`A: ${a.id} - Data: ${aDate.toLocaleString('pt-BR')} (${aTime})`);
+    console.log(`B: ${b.id} - Data: ${bDate.toLocaleString('pt-BR')} (${bTime})`);
+    console.log(`Diferença: ${bTime - aTime}`);
+    
+    // Ordenar por data (mais recente primeiro) - DESCENDENTE
+    if (bTime !== aTime) {
+      const result = bTime - aTime;
+      console.log(`📊 Resultado: ${result > 0 ? 'B mais novo (B primeiro)' : 'A mais novo (A primeiro)'}`);
+      return result;
+    }
+    
+    // Se mesma data, ordenar por não lidas (mais não lidas primeiro)
+    const aUnread = a.unread_count || 0;
+    const bUnread = b.unread_count || 0;
+    const unreadResult = bUnread - aUnread;
+    
+    console.log(`📊 Mesma data, ordenando por não lidas: A=${aUnread}, B=${bUnread}, Resultado: ${unreadResult}`);
+    
+    return unreadResult;
+  });
+  
+  console.log('\n=== 📊 RESULTADO FINAL DA ORDENAÇÃO ===');
+  sorted.forEach((conv, index) => {
+    const dateStr = conv.last_message_at 
+      ? new Date(conv.last_message_at).toLocaleString('pt-BR')
+      : 'SEM DATA';
+    console.log(`${index + 1}. ${conv.id.substring(0, 8)}... - ${dateStr} - Não lidas: ${conv.unread_count || 0}`);
+  });
+  
+  return sorted;
+};
+
   // Notificar mudança no contador
   const notifyUnreadCountChange = useCallback((count: number) => {
     console.log('Notificando mudança no contador:', count);
@@ -141,6 +187,7 @@ export default function ChatPopup({
     const loadData = async () => {
       setLoading(true);
       try {
+        console.log('📦 Iniciando carregamento de dados do chat...');
         await Promise.all([
           loadConversations(),
           loadCoaches()
@@ -155,10 +202,15 @@ export default function ChatPopup({
     loadData();
   }, [isOpen, currentUser.id]);
 
+  // Log quando conversations mudar
+  useEffect(() => {
+    console.log('🔄 Conversations state atualizado:', conversations.length, 'conversas');
+  }, [conversations]);
+
   // Carregar conversas do usuário
   const loadConversations = async () => {
     try {
-      console.log('Carregando conversas para usuário:', currentUser.id);
+      console.log('🔍 Carregando conversas para usuário:', currentUser.id);
       
       const { data: conversationsData, error } = await supabase
         .from('conversations')
@@ -167,15 +219,24 @@ export default function ChatPopup({
         .order('last_message_at', { ascending: false });
 
       if (error) {
-        console.error('Erro ao carregar conversas:', error);
+        console.error('❌ Erro ao carregar conversas:', error);
         return;
       }
 
+      console.log('📨 Dados brutos do Supabase:', conversationsData?.length || 0, 'conversas');
+
       if (!conversationsData?.length) {
+        console.log('📭 Nenhuma conversa encontrada');
         setConversations([]);
         notifyUnreadCountChange(0);
         return;
       }
+
+      // Log das datas das conversas
+      console.log('📅 Datas das conversas do Supabase:');
+      conversationsData.forEach((conv, i) => {
+        console.log(`${i + 1}. ID: ${conv.id}, Last message: ${conv.last_message_at} (${conv.last_message_at ? new Date(conv.last_message_at).toLocaleString('pt-BR') : 'N/A'})`);
+      });
 
       // Carrega os perfis com informações do time
       const userIds = conversationsData.flatMap(conv => [conv.user1_id, conv.user2_id]);
@@ -198,11 +259,12 @@ export default function ChatPopup({
         .in('id', uniqueUserIds);
 
       if (profilesError) {
-        console.error('Erro ao carregar perfis:', profilesError);
+        console.error('❌ Erro ao carregar perfis:', profilesError);
         return;
       }
 
       // Buscar contagem de mensagens não lidas em lote
+      console.log('🔢 Buscando contagem de mensagens não lidas...');
       const unreadCounts = await Promise.all(
         conversationsData.map(async (conv) => {
           const { count, error: countError } = await supabase
@@ -213,7 +275,7 @@ export default function ChatPopup({
             .neq('sender_id', currentUser.id);
 
           if (countError) {
-            console.error('Erro ao contar mensagens não lidas:', countError);
+            console.error('❌ Erro ao contar mensagens não lidas:', countError);
             return 0;
           }
 
@@ -261,15 +323,21 @@ export default function ChatPopup({
         };
       });
 
-      setConversations(formattedConversations);
+      console.log('✅ Conversas formatadas:', formattedConversations.length);
+      
+      // ORDENAÇÃO CRÍTICA: Chamar sortConversations
+      const sortedConversations = sortConversations(formattedConversations);
+      console.log('🎯 Aplicando ordenação...');
+      
+      setConversations(sortedConversations);
       
       // Calcular e notificar o total de mensagens não lidas
-      const totalUnread = calculateTotalUnread(formattedConversations);
+      const totalUnread = calculateTotalUnread(sortedConversations);
       console.log('📊 Total de mensagens não lidas calculado:', totalUnread);
       notifyUnreadCountChange(totalUnread);
       
     } catch (error) {
-      console.error('Erro ao processar conversas:', error);
+      console.error('❌ Erro ao processar conversas:', error);
     }
   };
 
@@ -450,8 +518,13 @@ export default function ChatPopup({
   // Compartilhar jogador
   const sharePlayer = async () => {
     if (!selectedPlayer || !selectedConversation) return;
-
+  
+    const NOW = new Date().toISOString();
+    
     try {
+      console.log(`🎮 Compartilhando jogador: ${selectedPlayer.name}`);
+      console.log(`⏰ Timestamp: ${NOW}`);
+  
       // Enviar mensagem com dados do jogador
       const { error: messageError } = await supabase
         .from('private_messages')
@@ -459,37 +532,44 @@ export default function ChatPopup({
           conversation_id: selectedConversation.id,
           sender_id: currentUser.id,
           message: `Jogador: ${selectedPlayer.name}`,
-          player_data: selectedPlayer
+          player_data: selectedPlayer,
+          created_at: NOW
         });
-
+  
       if (messageError) {
         console.error('Erro ao enviar jogador:', messageError);
         return;
       }
-
+  
       // Atualizar última mensagem na conversa
       await supabase
         .from('conversations')
         .update({
           last_message: `Compartilhou: ${selectedPlayer.name}`,
-          last_message_at: new Date().toISOString()
+          last_message_at: NOW // Usar timestamp atual
         })
         .eq('id', selectedConversation.id);
-
+  
+      console.log('✅ Jogador compartilhado, recarregando mensagens...');
+  
       // Recarregar apenas as mensagens
       await loadMessages(selectedConversation.id);
       
-      // Atualizar localmente
+      // Atualizar localmente COM A NOVA DATA
       const updatedConversations = conversations.map(conv => 
         conv.id === selectedConversation.id 
           ? { 
               ...conv, 
               last_message: `Compartilhou: ${selectedPlayer.name}`,
-              last_message_at: new Date().toISOString()
+              last_message_at: NOW // USAR A NOVA DATA
             }
           : conv
       );
-      setConversations(updatedConversations);
+      
+      // Reordenar após atualização
+      console.log('🔄 Reordenando conversas após compartilhar jogador...');
+      const sortedUpdatedConversations = sortConversations(updatedConversations);
+      setConversations(sortedUpdatedConversations);
       
       // Fechar seletor e limpar seleções
       setShowPlayerSelector(false);
@@ -562,6 +642,7 @@ export default function ChatPopup({
       setSelectedConversation(formattedConversation);
       setMessages([]);
       setActiveTab('conversations');
+      // Recarregar conversas para incluir a nova
       await loadConversations();
     } catch (error) {
       console.error('Erro ao processar nova conversa:', error);
@@ -573,52 +654,65 @@ export default function ChatPopup({
     e.preventDefault();
     
     if (!newMessage.trim() || !selectedConversation) return;
-
+  
     const messageText = newMessage.trim();
-
+    const NOW = new Date().toISOString();
+  
     try {
+      console.log(`✉️ Enviando mensagem: "${messageText}"`);
+      console.log(`⏰ Timestamp: ${NOW}`);
+  
       // Enviar mensagem via Supabase
       const { error: messageError } = await supabase
         .from('private_messages')
         .insert({
           conversation_id: selectedConversation.id,
           sender_id: currentUser.id,
-          message: messageText
+          message: messageText,
+          created_at: NOW // Forçar timestamp atual
         });
-
+  
       if (messageError) {
         console.error('Erro ao enviar mensagem:', messageError);
         return;
       }
-
-      // Atualizar última mensagem na conversa
+  
+      console.log('✅ Mensagem enviada, atualizando última mensagem...');
+  
+      // Atualizar última mensagem na conversa - IMPORTANTE: Usar NOW
       const { error: updateError } = await supabase
         .from('conversations')
         .update({
           last_message: messageText,
-          last_message_at: new Date().toISOString()
+          last_message_at: NOW // Usar o mesmo timestamp
         })
         .eq('id', selectedConversation.id);
-
+  
       if (updateError) {
         console.error('Erro ao atualizar conversa:', updateError);
         return;
       }
-
+  
+      console.log('✅ Conversa atualizada com nova data');
+  
       // Recarregar apenas as mensagens
       await loadMessages(selectedConversation.id);
       
-      // Atualizar a última mensagem localmente
+      // Atualizar a última mensagem localmente COM A NOVA DATA
       const updatedConversations = conversations.map(conv => 
         conv.id === selectedConversation.id 
           ? { 
               ...conv, 
               last_message: messageText,
-              last_message_at: new Date().toISOString()
+              last_message_at: NOW // USAR A NOVA DATA
             }
           : conv
       );
-      setConversations(updatedConversations);
+      
+      // Reordenar após atualização
+      console.log('🔄 Reordenando conversas após enviar mensagem...');
+      const sortedUpdatedConversations = sortConversations(updatedConversations);
+      setConversations(sortedUpdatedConversations);
       
       setNewMessage('');
     } catch (error) {
@@ -677,10 +771,13 @@ export default function ChatPopup({
               : conv
           );
           
-          setConversations(updatedConversations);
+          // Reordenar após marcar como lida
+          console.log('🔄 Reordenando conversas após marcar como lida...');
+          const sortedUpdatedConversations = sortConversations(updatedConversations);
+          setConversations(sortedUpdatedConversations);
           
           // 5. Atualizar o contador global
-          const totalUnread = calculateTotalUnread(updatedConversations);
+          const totalUnread = calculateTotalUnread(sortedUpdatedConversations);
           console.log('🔢 Total de não lidas após atualização:', totalUnread);
           notifyUnreadCountChange(totalUnread);
         }
@@ -794,6 +891,83 @@ export default function ChatPopup({
     }
   };
 
+  // Função para renderizar conversas ordenadas
+  const renderConversations = () => {
+    // SEMPRE ordenar antes de renderizar
+    const sortedConversations = sortConversations(conversations);
+    console.log('🎨 Renderizando conversas ordenadas:', sortedConversations.length);
+    
+    if (sortedConversations.length === 0) {
+      return (
+        <div className="text-center text-gray-500 py-6">
+          <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">
+            <MessageCircle size={16} className="text-gray-600" />
+          </div>
+          <p className="font-medium text-xs">Nenhuma conversa iniciada</p>
+          <p className="text-[10px] mt-1">Vá para "Treinadores" para começar</p>
+        </div>
+      );
+    }
+
+    return sortedConversations.map((conversation) => {
+      const otherUser = getOtherUser(conversation);
+      return (
+        <button
+          key={conversation.id}
+          onClick={() => handleSelectConversation(conversation)}
+          className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group relative"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                {otherUser.team_logo ? (
+                  <img 
+                    src={otherUser.team_logo} 
+                    alt={otherUser.team_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                    <User size={12} className="text-white" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-white text-xs flex items-center gap-1 truncate">
+                  {otherUser.name}
+                  {otherUser.role === 'admin' && (
+                    <Crown size={10} className="text-yellow-500 flex-shrink-0" />
+                  )}
+                </p>
+                <p className="text-purple-400 text-xs font-medium truncate">
+                  {otherUser.team_name}
+                </p>
+                <p className="text-gray-400 text-[10px] mt-0.5 truncate">
+                  {conversation.last_message || 'Nenhuma mensagem'}
+                </p>
+                <p className="text-gray-500 text-[9px]">
+                  {conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleString('pt-BR') : ''}
+                </p>
+              </div>
+            </div>
+            
+            {/* Indicador de mensagens não lidas */}
+            {conversation.unread_count && conversation.unread_count > 0 && (
+              <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
+                <span className="bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-bold shadow-lg">
+                  {conversation.unread_count}
+                </span>
+                <span className="bg-red-500/20 text-red-300 text-[8px] px-1 rounded">
+                  NOVA
+                </span>
+              </div>
+            )}
+          </div>
+        </button>
+      );
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -858,7 +1032,7 @@ export default function ChatPopup({
                     <img 
                       src={getOtherUser(selectedConversation).team_logo} 
                       alt={getOtherUser(selectedConversation).team_name}
-                      className="w-6 h-6 rounded-full object-cover border border-purple-500/50 flex-shrink-0"
+                      className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                     />
                   ) : (
                     <div className="w-6 h-6 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -1021,68 +1195,8 @@ export default function ChatPopup({
                   <div className="text-gray-500 text-xs font-medium">Carregando...</div>
                 </div>
               ) : activeTab === 'conversations' ? (
-                conversations.length === 0 ? (
-                  <div className="text-center text-gray-500 py-6">
-                    <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <MessageCircle size={16} className="text-gray-600" />
-                    </div>
-                    <p className="font-medium text-xs">Nenhuma conversa iniciada</p>
-                    <p className="text-[10px] mt-1">Vá para "Treinadores" para começar</p>
-                  </div>
-                ) : (
-                  conversations.map((conversation) => {
-                    const otherUser = getOtherUser(conversation);
-                    return (
-                      <button
-                        key={conversation.id}
-                        onClick={() => handleSelectConversation(conversation)}
-                        className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group relative"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center overflow-hidden border border-purple-500/50 group-hover:border-purple-400 transition-all flex-shrink-0">
-                              {otherUser.team_logo ? (
-                                <img 
-                                  src={otherUser.team_logo} 
-                                  alt={otherUser.team_name}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <User size={12} className="text-white" />
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-bold text-white text-xs flex items-center gap-1 truncate">
-                                {otherUser.name}
-                                {otherUser.role === 'admin' && (
-                                  <Crown size={10} className="text-yellow-500 flex-shrink-0" />
-                                )}
-                              </p>
-                              <p className="text-purple-400 text-xs font-medium truncate">
-                                {otherUser.team_name}
-                              </p>
-                              <p className="text-gray-400 text-[10px] mt-0.5 truncate">
-                                {conversation.last_message || 'Nenhuma mensagem'}
-                              </p>
-                            </div>
-                          </div>
-                          
-                          {/* Indicador de mensagens não lidas */}
-                          {conversation.unread_count && conversation.unread_count > 0 && (
-                            <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
-                              <span className="bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-bold shadow-lg">
-                                {conversation.unread_count}
-                              </span>
-                              <span className="bg-red-500/20 text-red-300 text-[8px] px-1 rounded">
-                                NOVA
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })
-                )
+                // Chama a função que sempre ordena antes de renderizar
+                renderConversations()
               ) : (
                 // Tab de Treinadores
                 filteredCoaches.length === 0 ? (
@@ -1101,7 +1215,7 @@ export default function ChatPopup({
                       className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center overflow-hidden border border-green-500/50 group-hover:border-green-400 transition-all flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
                           {coach.team_logo ? (
                             <img 
                               src={coach.team_logo} 
@@ -1109,7 +1223,9 @@ export default function ChatPopup({
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <User size={12} className="text-white" />
+                            <div className="w-full h-full bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
+                              <User size={12} className="text-white" />
+                            </div>
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
