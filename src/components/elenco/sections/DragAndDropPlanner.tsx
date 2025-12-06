@@ -975,7 +975,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
               disabled={!userTeamId}
             >
               <Eye className="w-4 h-4 mr-2" />
-              Minhas Formações ({savedFormations.length})
+              Minhas Formações
             </Button>
             <Button
               variant="outline"
