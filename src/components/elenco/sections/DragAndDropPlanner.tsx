@@ -303,10 +303,10 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       // Distribuição inicial das posições para campo comprido (mais longo que largo)
       switch(i) {
         case 0: position = 'GO'; x = 50; y = 88; break; // Goleiro mais atrás
-        case 1: position = 'LD'; x = 20; y = 70; break;  // Lateral direito
+        case 1: position = 'LE'; x = 20; y = 70; break;  // Lateral direito
         case 2: position = 'ZC'; x = 35; y = 70; break;  // Zagueiro central
         case 3: position = 'ZC'; x = 65; y = 70; break;  // Zagueiro central
-        case 4: position = 'LE'; x = 80; y = 70; break;  // Lateral esquerdo
+        case 4: position = 'LD'; x = 80; y = 70; break;  // Lateral esquerdo
         case 5: position = 'VOL'; x = 25; y = 50; break; // Volante
         case 6: position = 'MLG'; x = 50; y = 45; break; // Meia central
         case 7: position = 'MLG'; x = 75; y = 50; break; // Meia central
