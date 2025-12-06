@@ -16,7 +16,7 @@ import {
 import Image from 'next/image'
 import Link from 'next/link'
 import FloatingChatButton from '@/components/FloatingChatButton'
-import ChatPopup from '@/components/ChatPopup'
+import ChatPopup from '@/components/Chatpopup'
 import Sidebar from '@/components/Sidebar'
 
 // Definir tipos para user e team
