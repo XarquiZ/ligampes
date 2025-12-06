@@ -95,55 +95,33 @@ export default function ChatPopup({
     return conversations.reduce((total, conv) => total + (conv.unread_count || 0), 0);
   }, []);
 
-// Atualize a função sortConversations para incluir logs mais detalhados:
-const sortConversations = (conversations: Conversation[]): Conversation[] => {
-  console.log('=== 🚀 INICIANDO ORDENAÇÃO DE CONVERSAS ===');
-  console.log('Quantidade de conversas:', conversations.length);
-  
-  const sorted = [...conversations].sort((a, b) => {
-    // Log detalhado de cada comparação
-    const aDate = a.last_message_at ? new Date(a.last_message_at) : new Date(0);
-    const bDate = b.last_message_at ? new Date(b.last_message_at) : new Date(0);
+  // Função de ordenação
+  const sortConversations = (conversations: Conversation[]): Conversation[] => {
+    // Filtra conversas sem data (coloca no final)
+    const withDates = conversations.filter(c => c.last_message_at);
+    const withoutDates = conversations.filter(c => !c.last_message_at);
     
-    const aTime = aDate.getTime();
-    const bTime = bDate.getTime();
+    // Ordena as com datas - MAIS RECENTE PRIMEIRO
+    const sortedWithDates = [...withDates].sort((a, b) => {
+      try {
+        const aDate = new Date(a.last_message_at!);
+        const bDate = new Date(b.last_message_at!);
+        
+        if (isNaN(aDate.getTime())) return 1;
+        if (isNaN(bDate.getTime())) return -1;
+        
+        return bDate.getTime() - aDate.getTime();
+      } catch (error) {
+        return 0;
+      }
+    });
     
-    console.log(`\n🔍 Comparando:`);
-    console.log(`A: ${a.id} - Data: ${aDate.toLocaleString('pt-BR')} (${aTime})`);
-    console.log(`B: ${b.id} - Data: ${bDate.toLocaleString('pt-BR')} (${bTime})`);
-    console.log(`Diferença: ${bTime - aTime}`);
-    
-    // Ordenar por data (mais recente primeiro) - DESCENDENTE
-    if (bTime !== aTime) {
-      const result = bTime - aTime;
-      console.log(`📊 Resultado: ${result > 0 ? 'B mais novo (B primeiro)' : 'A mais novo (A primeiro)'}`);
-      return result;
-    }
-    
-    // Se mesma data, ordenar por não lidas (mais não lidas primeiro)
-    const aUnread = a.unread_count || 0;
-    const bUnread = b.unread_count || 0;
-    const unreadResult = bUnread - aUnread;
-    
-    console.log(`📊 Mesma data, ordenando por não lidas: A=${aUnread}, B=${bUnread}, Resultado: ${unreadResult}`);
-    
-    return unreadResult;
-  });
-  
-  console.log('\n=== 📊 RESULTADO FINAL DA ORDENAÇÃO ===');
-  sorted.forEach((conv, index) => {
-    const dateStr = conv.last_message_at 
-      ? new Date(conv.last_message_at).toLocaleString('pt-BR')
-      : 'SEM DATA';
-    console.log(`${index + 1}. ${conv.id.substring(0, 8)}... - ${dateStr} - Não lidas: ${conv.unread_count || 0}`);
-  });
-  
-  return sorted;
-};
+    // Concatena as sem datas no final
+    return [...sortedWithDates, ...withoutDates];
+  };
 
   // Notificar mudança no contador
   const notifyUnreadCountChange = useCallback((count: number) => {
-    console.log('Notificando mudança no contador:', count);
     if (onUnreadCountChange) {
       onUnreadCountChange(count);
     }
@@ -158,8 +136,6 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
   // Função para marcar mensagens como lidas
   const markMessagesAsRead = async (conversationId: string) => {
     try {
-      console.log('🎯 Marcando mensagens como lidas para conversa:', conversationId);
-      
       const { error } = await supabase
         .from('private_messages')
         .update({ read: true })
@@ -172,10 +148,40 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
         return false;
       }
 
-      console.log('✅ Mensagens marcadas como lidas com sucesso');
       return true;
     } catch (error) {
       console.error('❌ Erro ao processar marcação como lida:', error);
+      return false;
+    }
+  };
+
+  // Função para atualizar conversa (com tratamento de erro)
+  const updateConversation = async (
+    conversationId: string, 
+    lastMessage: string, 
+    lastMessageAt: string
+  ) => {
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .update({
+          last_message: lastMessage,
+          last_message_at: lastMessageAt,
+          updated_at: lastMessageAt
+        })
+        .eq('id', conversationId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Erro ao atualizar conversa:', error);
+        return false;
+      }
+
+      console.log('✅ Conversa atualizada:', data);
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao processar atualização:', error);
       return false;
     }
   };
@@ -187,7 +193,6 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
     const loadData = async () => {
       setLoading(true);
       try {
-        console.log('📦 Iniciando carregamento de dados do chat...');
         await Promise.all([
           loadConversations(),
           loadCoaches()
@@ -202,16 +207,12 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
     loadData();
   }, [isOpen, currentUser.id]);
 
-  // Log quando conversations mudar
-  useEffect(() => {
-    console.log('🔄 Conversations state atualizado:', conversations.length, 'conversas');
-  }, [conversations]);
-
   // Carregar conversas do usuário
   const loadConversations = async () => {
     try {
       console.log('🔍 Carregando conversas para usuário:', currentUser.id);
       
+      // 1. Buscar conversas
       const { data: conversationsData, error } = await supabase
         .from('conversations')
         .select('*')
@@ -223,22 +224,13 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
         return;
       }
 
-      console.log('📨 Dados brutos do Supabase:', conversationsData?.length || 0, 'conversas');
-
       if (!conversationsData?.length) {
-        console.log('📭 Nenhuma conversa encontrada');
         setConversations([]);
         notifyUnreadCountChange(0);
         return;
       }
 
-      // Log das datas das conversas
-      console.log('📅 Datas das conversas do Supabase:');
-      conversationsData.forEach((conv, i) => {
-        console.log(`${i + 1}. ID: ${conv.id}, Last message: ${conv.last_message_at} (${conv.last_message_at ? new Date(conv.last_message_at).toLocaleString('pt-BR') : 'N/A'})`);
-      });
-
-      // Carrega os perfis com informações do time
+      // 2. Carrega os perfis
       const userIds = conversationsData.flatMap(conv => [conv.user1_id, conv.user2_id]);
       const uniqueUserIds = [...new Set(userIds)];
 
@@ -263,8 +255,7 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
         return;
       }
 
-      // Buscar contagem de mensagens não lidas em lote
-      console.log('🔢 Buscando contagem de mensagens não lidas...');
+      // 3. Buscar contagem de mensagens não lidas
       const unreadCounts = await Promise.all(
         conversationsData.map(async (conv) => {
           const { count, error: countError } = await supabase
@@ -283,12 +274,11 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
         })
       );
 
-      // Formata as conversas
+      // 4. Formata as conversas
       const formattedConversations: Conversation[] = conversationsData.map((conv, index) => {
         const user1Profile = profilesData.find(p => p.id === conv.user1_id);
         const user2Profile = profilesData.find(p => p.id === conv.user2_id);
 
-        // Função helper para formatar usuário
         const formatUser = (profile: any, userId: string) => {
           if (!profile) {
             return {
@@ -323,17 +313,14 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
         };
       });
 
-      console.log('✅ Conversas formatadas:', formattedConversations.length);
-      
-      // ORDENAÇÃO CRÍTICA: Chamar sortConversations
+      // 5. Ordenar
       const sortedConversations = sortConversations(formattedConversations);
-      console.log('🎯 Aplicando ordenação...');
       
+      // 6. Aplicar ao state
       setConversations(sortedConversations);
       
-      // Calcular e notificar o total de mensagens não lidas
+      // 7. Calcular e notificar o total de mensagens não lidas
       const totalUnread = calculateTotalUnread(sortedConversations);
-      console.log('📊 Total de mensagens não lidas calculado:', totalUnread);
       notifyUnreadCountChange(totalUnread);
       
     } catch (error) {
@@ -366,7 +353,6 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
         return;
       }
 
-      // Formatação com tratamento para dados nulos
       const formattedCoaches: User[] = coachesData.map(coach => ({
         id: coach.id,
         name: coach.coach_name || coach.email || 'Treinador',
@@ -385,8 +371,6 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
   // Carregar mensagens de uma conversa
   const loadMessages = async (conversationId: string) => {
     try {
-      console.log('💬 Carregando mensagens da conversa:', conversationId);
-
       const { data: messagesData, error } = await supabase
         .from('private_messages')
         .select('*')
@@ -409,7 +393,6 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
           type: 'text'
         };
 
-        // Se a mensagem contém dados de jogador
         if (msg.player_data) {
           messageData = {
             ...messageData,
@@ -435,15 +418,12 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
 
     const teams: Team[] = [];
     
-    // Time do usuário atual
     if (currentTeam.id) {
       teams.push(currentTeam);
     }
 
-    // Time do outro usuário
     const otherUser = getOtherUser(selectedConversation);
     
-    // Buscar o time do outro usuário
     const { data: otherUserTeam } = await supabase
       .from('profiles')
       .select('teams(id, name, logo_url)')
@@ -519,13 +499,25 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
   const sharePlayer = async () => {
     if (!selectedPlayer || !selectedConversation) return;
   
-    const NOW = new Date().toISOString();
-    
     try {
       console.log(`🎮 Compartilhando jogador: ${selectedPlayer.name}`);
-      console.log(`⏰ Timestamp: ${NOW}`);
-  
-      // Enviar mensagem com dados do jogador
+
+      // 1. Atualizar conversa
+      const updateTimestamp = new Date().toISOString();
+      
+      const updateSuccess = await updateConversation(
+        selectedConversation.id,
+        `Compartilhou: ${selectedPlayer.name}`,
+        updateTimestamp
+      );
+
+      if (!updateSuccess) {
+        console.error('❌ Falha ao atualizar conversa');
+        return;
+      }
+
+      // 2. Enviar mensagem
+      const messageTimestamp = new Date().toISOString();
       const { error: messageError } = await supabase
         .from('private_messages')
         .insert({
@@ -533,50 +525,27 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
           sender_id: currentUser.id,
           message: `Jogador: ${selectedPlayer.name}`,
           player_data: selectedPlayer,
-          created_at: NOW
+          created_at: messageTimestamp
         });
-  
+
       if (messageError) {
-        console.error('Erro ao enviar jogador:', messageError);
+        console.error('❌ Erro ao enviar jogador:', messageError);
         return;
       }
-  
-      // Atualizar última mensagem na conversa
-      await supabase
-        .from('conversations')
-        .update({
-          last_message: `Compartilhou: ${selectedPlayer.name}`,
-          last_message_at: NOW // Usar timestamp atual
-        })
-        .eq('id', selectedConversation.id);
-  
-      console.log('✅ Jogador compartilhado, recarregando mensagens...');
-  
-      // Recarregar apenas as mensagens
+
+      // 3. Recarregar tudo
+      await loadConversations();
       await loadMessages(selectedConversation.id);
       
-      // Atualizar localmente COM A NOVA DATA
-      const updatedConversations = conversations.map(conv => 
-        conv.id === selectedConversation.id 
-          ? { 
-              ...conv, 
-              last_message: `Compartilhou: ${selectedPlayer.name}`,
-              last_message_at: NOW // USAR A NOVA DATA
-            }
-          : conv
-      );
-      
-      // Reordenar após atualização
-      console.log('🔄 Reordenando conversas após compartilhar jogador...');
-      const sortedUpdatedConversations = sortConversations(updatedConversations);
-      setConversations(sortedUpdatedConversations);
-      
-      // Fechar seletor e limpar seleções
+      // Fechar seletor
       setShowPlayerSelector(false);
       setSelectedPlayer(null);
       setPlayerSearch('');
+      
+      console.log('✅ Jogador compartilhado com sucesso');
+      
     } catch (error) {
-      console.error('Erro ao processar compartilhamento:', error);
+      console.error('❌ Erro ao processar compartilhamento:', error);
     }
   };
 
@@ -596,14 +565,12 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
     }
 
     try {
-      // Criar nova conversa
       const { data: newConversation, error } = await supabase
         .from('conversations')
         .insert({
           user1_id: currentUser.id,
           user2_id: coach.id,
-          last_message: 'Conversa iniciada',
-          last_message_at: new Date().toISOString()
+          last_message: 'Conversa iniciada'
         })
         .select()
         .single();
@@ -613,7 +580,6 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
         return;
       }
 
-      // Criar objeto de conversa formatado
       const formattedConversation: Conversation = {
         id: newConversation.id,
         user1_id: newConversation.user1_id,
@@ -634,7 +600,7 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
           team_name: coach.team_name,
           team_logo: coach.team_logo
         },
-        last_message: 'Conversa iniciada',
+        last_message: newConversation.last_message,
         last_message_at: newConversation.last_message_at,
         unread_count: 0
       };
@@ -642,8 +608,9 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
       setSelectedConversation(formattedConversation);
       setMessages([]);
       setActiveTab('conversations');
-      // Recarregar conversas para incluir a nova
+      
       await loadConversations();
+      
     } catch (error) {
       console.error('Erro ao processar nova conversa:', error);
     }
@@ -654,69 +621,53 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
     e.preventDefault();
     
     if (!newMessage.trim() || !selectedConversation) return;
-  
+
     const messageText = newMessage.trim();
-    const NOW = new Date().toISOString();
-  
+    
     try {
-      console.log(`✉️ Enviando mensagem: "${messageText}"`);
-      console.log(`⏰ Timestamp: ${NOW}`);
-  
-      // Enviar mensagem via Supabase
+      console.log('✉️ Enviando mensagem...');
+
+      // 1. Atualizar conversa
+      const updateTimestamp = new Date().toISOString();
+      
+      const updateSuccess = await updateConversation(
+        selectedConversation.id,
+        messageText,
+        updateTimestamp
+      );
+
+      if (!updateSuccess) {
+        console.error('❌ Falha ao atualizar conversa');
+        return;
+      }
+
+      // 2. Enviar mensagem
+      const messageTimestamp = new Date().toISOString();
+      
       const { error: messageError } = await supabase
         .from('private_messages')
         .insert({
           conversation_id: selectedConversation.id,
           sender_id: currentUser.id,
           message: messageText,
-          created_at: NOW // Forçar timestamp atual
+          created_at: messageTimestamp
         });
-  
+
       if (messageError) {
-        console.error('Erro ao enviar mensagem:', messageError);
+        console.error('❌ Erro ao enviar mensagem:', messageError);
         return;
       }
-  
-      console.log('✅ Mensagem enviada, atualizando última mensagem...');
-  
-      // Atualizar última mensagem na conversa - IMPORTANTE: Usar NOW
-      const { error: updateError } = await supabase
-        .from('conversations')
-        .update({
-          last_message: messageText,
-          last_message_at: NOW // Usar o mesmo timestamp
-        })
-        .eq('id', selectedConversation.id);
-  
-      if (updateError) {
-        console.error('Erro ao atualizar conversa:', updateError);
-        return;
-      }
-  
-      console.log('✅ Conversa atualizada com nova data');
-  
-      // Recarregar apenas as mensagens
+
+      // 3. Recarregar tudo
+      await loadConversations();
       await loadMessages(selectedConversation.id);
       
-      // Atualizar a última mensagem localmente COM A NOVA DATA
-      const updatedConversations = conversations.map(conv => 
-        conv.id === selectedConversation.id 
-          ? { 
-              ...conv, 
-              last_message: messageText,
-              last_message_at: NOW // USAR A NOVA DATA
-            }
-          : conv
-      );
-      
-      // Reordenar após atualização
-      console.log('🔄 Reordenando conversas após enviar mensagem...');
-      const sortedUpdatedConversations = sortConversations(updatedConversations);
-      setConversations(sortedUpdatedConversations);
-      
       setNewMessage('');
+      
+      console.log('✅ Mensagem enviada com sucesso');
+
     } catch (error) {
-      console.error('Erro ao processar envio de mensagem:', error);
+      console.error('💥 Erro ao processar envio:', error);
     }
   };
 
@@ -735,7 +686,7 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
     }, 300);
   };
 
-  // Função handleSelectConversation simplificada
+  // Função handleSelectConversation
   const handleSelectConversation = async (conversation: Conversation) => {
     if (isProcessingConversation && lastProcessedConversation === conversation.id) {
       console.log('⏳ Já processando esta conversa, ignorando...');
@@ -743,42 +694,30 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
     }
 
     console.log('🎯 Selecionando conversa:', conversation.id);
-    console.log('📊 unread_count inicial:', conversation.unread_count);
     
     setIsProcessingConversation(true);
     setLastProcessedConversation(conversation.id);
     
     try {
-      // 1. Atualizar UI imediatamente
       setSelectedConversation(conversation);
-      
-      // 2. Carregar mensagens primeiro para melhor UX
       await loadMessages(conversation.id);
       
-      // 3. Se há mensagens não lidas, marcar como lidas no banco
       if (conversation.unread_count && conversation.unread_count > 0) {
         console.log('🔴 Marcando mensagens como lidas...');
         
         const success = await markMessagesAsRead(conversation.id);
         
         if (success) {
-          console.log('✅ Mensagens marcadas como lidas! Atualizando UI...');
-          
-          // 4. Atualizar a conversa localmente
           const updatedConversations = conversations.map(conv => 
             conv.id === conversation.id 
               ? { ...conv, unread_count: 0 }
               : conv
           );
           
-          // Reordenar após marcar como lida
-          console.log('🔄 Reordenando conversas após marcar como lida...');
           const sortedUpdatedConversations = sortConversations(updatedConversations);
           setConversations(sortedUpdatedConversations);
           
-          // 5. Atualizar o contador global
           const totalUnread = calculateTotalUnread(sortedUpdatedConversations);
-          console.log('🔢 Total de não lidas após atualização:', totalUnread);
           notifyUnreadCountChange(totalUnread);
         }
       }
@@ -797,7 +736,6 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
   useEffect(() => {
     if (!isOpen || !currentUser.id) return;
 
-    // Subscribe para atualizações em tempo real das mensagens
     const subscription = supabase
       .channel('private_messages_changes')
       .on(
@@ -808,16 +746,13 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
           table: 'private_messages'
         },
         async (payload) => {
-          console.log('🔄 Nova mensagem detectada:', payload);
+          console.log('🔄 Nova mensagem detectada:', payload.new.id);
           
-          // Recarregar conversas para atualizar contadores
           await loadConversations();
           
-          // Se a mensagem é para a conversa atual, recarregar mensagens também
           if (selectedConversation?.id === payload.new.conversation_id) {
             await loadMessages(selectedConversation.id);
             
-            // Marcar como lida se estamos na conversa
             if (payload.new.sender_id !== currentUser.id) {
               await markMessagesAsRead(selectedConversation.id);
             }
@@ -837,17 +772,12 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
       const { conversationId } = event.detail;
       console.log('🎯 Evento focusConversation recebido:', conversationId);
       
-      // Primeiro, recarregar as conversas para garantir que temos os dados mais recentes
       await loadConversations();
       
-      // Encontrar a conversa pelo ID
       const conversation = conversations.find(conv => conv.id === conversationId);
       if (conversation) {
-        console.log('✅ Conversa encontrada, focando...');
         handleSelectConversation(conversation);
         setActiveTab('conversations');
-      } else {
-        console.log('⚠️ Conversa não encontrada após recarregar');
       }
     };
 
@@ -893,9 +823,7 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
 
   // Função para renderizar conversas ordenadas
   const renderConversations = () => {
-    // SEMPRE ordenar antes de renderizar
     const sortedConversations = sortConversations(conversations);
-    console.log('🎨 Renderizando conversas ordenadas:', sortedConversations.length);
     
     if (sortedConversations.length === 0) {
       return (
@@ -913,7 +841,7 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
       const otherUser = getOtherUser(conversation);
       return (
         <button
-          key={conversation.id}
+          key={`${conversation.id}-${conversation.last_message_at}`}
           onClick={() => handleSelectConversation(conversation)}
           className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group relative"
         >
@@ -1195,10 +1123,8 @@ const sortConversations = (conversations: Conversation[]): Conversation[] => {
                   <div className="text-gray-500 text-xs font-medium">Carregando...</div>
                 </div>
               ) : activeTab === 'conversations' ? (
-                // Chama a função que sempre ordena antes de renderizar
                 renderConversations()
               ) : (
-                // Tab de Treinadores
                 filteredCoaches.length === 0 ? (
                   <div className="text-center text-gray-500 py-6">
                     <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">

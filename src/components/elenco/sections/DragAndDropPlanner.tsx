@@ -39,6 +39,7 @@ interface SaveFormationDialogProps {
   isOpen: boolean
   onClose: () => void
   onSave: (name: string) => void
+  loading: boolean
 }
 
 interface LoadFormationDialogProps {
@@ -49,9 +50,13 @@ interface LoadFormationDialogProps {
   onDeleteFormation: (id: string) => void
 }
 
-const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({ isOpen, onClose, onSave }) => {
+const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSave,
+  loading 
+}) => {
   const [name, setName] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -59,13 +64,8 @@ const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({ isOpen, onClo
       return
     }
 
-    setIsSubmitting(true)
-    try {
-      await onSave(name.trim())
-      onClose()
-    } finally {
-      setIsSubmitting(false)
-    }
+    await onSave(name.trim())
+    setName('')
   }
 
   return (
@@ -83,7 +83,7 @@ const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({ isOpen, onClo
             onChange={(e) => setName(e.target.value)}
             placeholder="Ex: Minha Formação 4-3-3"
             className="bg-zinc-800 border-zinc-600 text-white"
-            onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+            onKeyDown={(e) => e.key === 'Enter' && !loading && handleSubmit()}
             autoFocus
           />
           <div className="flex justify-end gap-2">
@@ -91,15 +91,16 @@ const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({ isOpen, onClo
               variant="outline"
               onClick={onClose}
               className="border-zinc-600 text-zinc-300"
+              disabled={loading}
             >
               Cancelar
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !name.trim()}
+              disabled={loading || !name.trim()}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              {isSubmitting ? 'Salvando...' : 'Salvar'}
+              {loading ? 'Salvando...' : 'Salvar'}
             </Button>
           </div>
         </div>
@@ -121,7 +122,7 @@ const LoadFormationDialog: React.FC<LoadFormationDialogProps> = ({
     if (confirm('Tem certeza que deseja excluir esta formação?')) {
       setIsDeleting(id)
       try {
-        onDeleteFormation(id)
+        await onDeleteFormation(id)
       } finally {
         setIsDeleting(null)
       }
@@ -237,6 +238,10 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [showLoadDialog, setShowLoadDialog] = useState(false)
   const [selectedPlayers, setSelectedPlayers] = useState<Set<number>>(new Set())
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userTeamId, setUserTeamId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [savingFormation, setSavingFormation] = useState(false)
   const [dragging, setDragging] = useState<DraggingState>({
     isDragging: false,
     slotId: null,
@@ -279,6 +284,119 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
     
     setSelectedPlayers(newSelectedPlayers)
   }, [fieldSlots, reserveSlots])
+
+  // Obter usuário atual e seu team_id do perfil
+  useEffect(() => {
+    const loadUserAndTeam = async () => {
+      try {
+        setLoading(true)
+        
+        // Obter usuário atual
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError) {
+          console.error('Erro ao obter usuário:', userError)
+          setLoading(false)
+          return
+        }
+        
+        if (!user) {
+          console.log('Usuário não autenticado')
+          setUserId(null)
+          setUserTeamId(null)
+          setLoading(false)
+          return
+        }
+        
+        console.log('Usuário ID:', user.id)
+        setUserId(user.id)
+        
+        // Buscar o perfil do usuário para obter o team_id
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('team_id')
+          .eq('id', user.id)
+          .single()
+        
+        if (profileError) {
+          console.error('Erro ao buscar perfil:', profileError)
+          // Tentar buscar de outra maneira
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('team_id')
+            .eq('id', user.id)
+            .maybeSingle()
+          
+          if (!profilesError && profiles) {
+            console.log('Team ID encontrado no perfil:', profiles.team_id)
+            setUserTeamId(profiles.team_id)
+          } else {
+            console.warn('Usuário não tem perfil ou team_id não encontrado')
+          }
+        } else if (profile && profile.team_id) {
+          console.log('Team ID encontrado no perfil:', profile.team_id)
+          setUserTeamId(profile.team_id)
+        } else {
+          console.warn('Perfil encontrado mas sem team_id')
+        }
+        
+        setLoading(false)
+        
+      } catch (error) {
+        console.error('Erro ao carregar usuário/time:', error)
+        setLoading(false)
+      }
+    }
+    
+    loadUserAndTeam()
+  }, [])
+
+  // Carregar formações apenas quando o usuário clicar em "Minhas Formações"
+  const loadSavedFormations = async () => {
+    try {
+      console.log('Carregando formações... userId:', userId, 'userTeamId:', userTeamId)
+      
+      if (!userTeamId) {
+        console.warn('Usuário não tem team_id associado')
+        alert('Você precisa ter um time associado ao seu perfil para salvar formações.')
+        return
+      }
+      
+      // Buscar formações APENAS do team_id do usuário
+      const { data: formations, error: formationsError } = await supabase
+        .from('formations')
+        .select('*')
+        .eq('team_id', userTeamId)
+        .order('created_at', { ascending: false })
+
+      if (formationsError) {
+        console.error('Erro ao carregar formações:', formationsError)
+        alert('Erro ao carregar formações. Tente novamente.')
+        return
+      }
+
+      if (formations && formations.length > 0) {
+        console.log(`Formações carregadas: ${formations.length}`)
+        setSavedFormations(formations)
+      } else {
+        console.log('Nenhuma formação encontrada para este time')
+        setSavedFormations([])
+      }
+      
+    } catch (error) {
+      console.error('Erro ao carregar formações salvas:', error)
+      alert('Erro ao carregar formações.')
+    }
+  }
+
+  // Função para carregar formações quando o usuário clicar no botão
+  const handleLoadFormationsClick = async () => {
+    setShowLoadDialog(true)
+    if (savedFormations.length === 0) {
+      // Só carrega as formações quando o usuário clica no botão
+      await loadSavedFormations()
+    }
+  }
 
   // Verificar se o mouse está sobre as opções
   const isMouseOverOptions = (e: MouseEvent): boolean => {
@@ -337,7 +455,6 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
     setFieldSlots(initialFieldSlots)
     setReserveSlots(initialReserveSlots)
-    loadSavedFormations()
     
     return () => {
       if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current)
@@ -389,60 +506,6 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       document.removeEventListener('mouseup', handleMouseUp)
     }
   }, [dragging.isDragging, dragging.slotId])
-
-  const loadSavedFormations = async () => {
-    try {
-      // Carregar do Supabase
-      const { data: userTeams } = await supabase
-        .from('teams')
-        .select('id')
-        .limit(1)
-
-      if (userTeams && userTeams.length > 0) {
-        const teamId = userTeams[0].id
-        const { data: formations, error } = await supabase
-          .from('formations')
-          .select('*')
-          .eq('team_id', teamId)
-          .order('created_at', { ascending: false })
-
-        if (error) {
-          console.error('Erro ao carregar formações do Supabase:', error)
-          // Fallback para localStorage
-          const localSaved = localStorage.getItem('savedFormations')
-          if (localSaved) {
-            const parsed = JSON.parse(localSaved)
-            setSavedFormations(Array.isArray(parsed) ? parsed : [])
-          }
-          return
-        }
-
-        if (formations) {
-          setSavedFormations(formations)
-        }
-      } else {
-        // Fallback para localStorage se não houver time
-        const localSaved = localStorage.getItem('savedFormations')
-        if (localSaved) {
-          const parsed = JSON.parse(localSaved)
-          setSavedFormations(Array.isArray(parsed) ? parsed : [])
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar formações salvas:', error)
-      // Fallback para localStorage
-      try {
-        const localSaved = localStorage.getItem('savedFormations')
-        if (localSaved) {
-          const parsed = JSON.parse(localSaved)
-          setSavedFormations(Array.isArray(parsed) ? parsed : [])
-        }
-      } catch (localError) {
-        console.error('Erro ao carregar do localStorage:', localError)
-        setSavedFormations([])
-      }
-    }
-  }
 
   const handleMouseDown = (e: React.MouseEvent, slotId: string) => {
     e.preventDefault()
@@ -721,6 +784,11 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         return
       }
 
+      if (!userTeamId) {
+        alert('Você precisa ter um time associado ao seu perfil para salvar formações.')
+        return
+      }
+
       const formationData = {
         name: formationName,
         slots: fieldSlots.map(slot => ({
@@ -751,34 +819,13 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         stats: stats
       }
 
-      // Obter team_id
-      const { data: userTeams } = await supabase
-        .from('teams')
-        .select('id')
-        .limit(1)
+      setSavingFormation(true)
 
-      let teamId = null
-      if (userTeams && userTeams.length > 0) {
-        teamId = userTeams[0].id
-      } else {
-        // Criar um time temporário se não existir
-        const { data: newTeam, error: teamError } = await supabase
-          .from('teams')
-          .insert([{ name: 'Time Temporário' }])
-          .select()
-          .single()
-
-        if (teamError) {
-          throw new Error('Erro ao criar time temporário')
-        }
-        teamId = newTeam.id
-      }
-
-      // Salvar no Supabase
+      // Salvar no Supabase usando o team_id do perfil do usuário
       const { data, error } = await supabase
         .from('formations')
         .insert([{
-          team_id: teamId,
+          team_id: userTeamId, // Usando o team_id do perfil do usuário
           name: formationName,
           formation_data: formationData
         }])
@@ -786,73 +833,23 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
       if (error) {
         console.error('Erro ao salvar no Supabase:', error)
-        // Fallback para localStorage
-        handleSaveFormationLocal(formationName)
+        alert(`Erro ao salvar formação: ${error.message}`)
         return
       }
 
       // Atualizar lista local
-      await loadSavedFormations()
+      if (data && data[0]) {
+        setSavedFormations(prev => [data[0], ...prev])
+      }
 
       alert(`Formação "${formationName}" salva com sucesso!`)
-      return data?.[0]
+      setShowSaveDialog(false)
+      
     } catch (error) {
       console.error('Erro ao salvar formação:', error)
-      alert('Erro ao salvar formação. Salvando localmente...')
-      
-      // Fallback para localStorage
-      handleSaveFormationLocal(formationName)
-    }
-  }
-
-  const handleSaveFormationLocal = (formationName: string) => {
-    const stats = calculateFormationStats()
-    if (!stats || stats.fieldPlayerCount < 11) {
-      alert('Preencha todas as 11 posições do campo para salvar a formação!')
-      return
-    }
-
-    const formationData = {
-      id: Date.now().toString(),
-      name: formationName,
-      slots: fieldSlots.map(slot => ({
-        id: slot.id,
-        position: slot.position,
-        x: slot.x,
-        y: slot.y,
-        player: slot.player ? {
-          id: slot.player.id,
-          name: slot.player.name,
-          overall: slot.player.overall,
-          position: slot.player.position,
-          photo_url: slot.player.photo_url,
-          club: slot.player.club
-        } : null
-      })),
-      reserves: reserveSlots.filter(s => s.player).map(slot => ({
-        id: slot.id,
-        player: slot.player ? {
-          id: slot.player.id,
-          name: slot.player.name,
-          overall: slot.player.overall,
-          position: slot.player.position,
-          photo_url: slot.player.photo_url,
-          club: slot.player.club
-        } : null
-      })),
-      created_at: new Date().toISOString(),
-      stats: stats
-    }
-    
-    try {
-      const saved = JSON.parse(localStorage.getItem('savedFormations') || '[]')
-      saved.unshift(formationData)
-      localStorage.setItem('savedFormations', JSON.stringify(saved.slice(0, 20)))
-      loadSavedFormations()
-      
-      alert(`Formação "${formationName}" salva localmente!`)
-    } catch (error) {
-      alert('Erro ao salvar formação localmente')
+      alert('Erro ao salvar formação. Tente novamente.')
+    } finally {
+      setSavingFormation(false)
     }
   }
 
@@ -926,7 +923,6 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
   const handleDeleteFormation = async (id: string) => {
     try {
-      // Tentar deletar do Supabase
       const { error } = await supabase
         .from('formations')
         .delete()
@@ -934,29 +930,31 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
       if (error) {
         console.error('Erro ao deletar do Supabase:', error)
-        // Fallback para localStorage
-        const localSaved = JSON.parse(localStorage.getItem('savedFormations') || '[]')
-        const updated = localSaved.filter((f: any) => f.id !== id && f.id?.toString() !== id)
-        localStorage.setItem('savedFormations', JSON.stringify(updated))
+        alert('Erro ao excluir formação. Tente novamente.')
+        return
       }
 
       // Atualizar lista local
-      await loadSavedFormations()
+      setSavedFormations(prev => prev.filter(f => f.id !== id))
+      
     } catch (error) {
       console.error('Erro ao deletar formação:', error)
-      // Fallback para localStorage
-      try {
-        const localSaved = JSON.parse(localStorage.getItem('savedFormations') || '[]')
-        const updated = localSaved.filter((f: any) => f.id !== id && f.id?.toString() !== id)
-        localStorage.setItem('savedFormations', JSON.stringify(updated))
-        await loadSavedFormations()
-      } catch (localError) {
-        console.error('Erro ao deletar do localStorage:', localError)
-      }
+      alert('Erro ao excluir formação.')
     }
   }
 
   const stats = calculateFormationStats()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-zinc-400">Carregando planejador...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -972,8 +970,9 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowLoadDialog(true)}
+              onClick={handleLoadFormationsClick}
               className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+              disabled={!userTeamId}
             >
               <Eye className="w-4 h-4 mr-2" />
               Minhas Formações ({savedFormations.length})
@@ -987,6 +986,13 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
             </Button>
           </div>
         </div>
+        {!userTeamId && (
+          <div className="mt-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+            <p className="text-yellow-400 text-sm">
+              ⚠️ Você precisa ter um time associado ao seu perfil para salvar formações.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Campo de Futebol com resumo ao lado */}
@@ -1388,7 +1394,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           <Button
             onClick={() => setShowSaveDialog(true)}
             className="bg-purple-600 hover:bg-purple-700 w-full"
-            disabled={!stats || stats.fieldPlayerCount < 11}
+            disabled={!stats || stats.fieldPlayerCount < 11 || !userTeamId}
           >
             <Save className="w-4 h-4 mr-2" />
             Salvar Formação
@@ -1441,6 +1447,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         isOpen={showSaveDialog}
         onClose={() => setShowSaveDialog(false)}
         onSave={handleSaveFormationToServer}
+        loading={savingFormation}
       />
     </div>
   )
