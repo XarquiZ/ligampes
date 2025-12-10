@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useCallback, useMemo } from "react"
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation' // Adicione useSearchParams
 import { supabase } from "@/lib/supabase"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,6 +26,7 @@ import { Player, Team, POSITIONS, PLAYSTYLES } from '@/components/elenco/types'
 
 export default function ElencoPage() {
   const router = useRouter()
+  const searchParams = useSearchParams() // Para ler parâmetros da URL
   const { user, loading: authLoading } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [favoritePlayers, setFavoritePlayers] = useState<Player[]>([])
@@ -52,6 +53,44 @@ export default function ElencoPage() {
   const [playerToDismiss, setPlayerToDismiss] = useState<Player | null>(null)
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
+  
+  // Estado para armazenar o jogador pré-selecionado para comparação
+  const [preSelectedPlayerId, setPreSelectedPlayerId] = useState<string | null>(null)
+
+  // Função para obter jogador pré-selecionado do sessionStorage
+  const getPreSelectedPlayerFromStorage = useCallback(() => {
+    if (typeof window === 'undefined') return null
+    
+    const compareData = sessionStorage.getItem('comparePlayer1')
+    if (!compareData) return null
+    
+    try {
+      const parsedData = JSON.parse(compareData)
+      return parsedData.comparePlayer?.id || null
+    } catch {
+      return null
+    }
+  }, [])
+
+  // Verificar se há parâmetro de seção na URL
+  useEffect(() => {
+    const section = searchParams.get('section')
+    if (section && ['elenco', 'favoritos', 'comparacao', 'planejador'].includes(section)) {
+      setActiveSection(section as any)
+      
+      // Se a seção for comparação, verificar se há jogador armazenado
+      if (section === 'comparacao') {
+        const playerId = getPreSelectedPlayerFromStorage()
+        if (playerId) {
+          setPreSelectedPlayerId(playerId)
+          // Limpar o storage após usar
+          setTimeout(() => {
+            sessionStorage.removeItem('comparePlayer1')
+          }, 1000)
+        }
+      }
+    }
+  }, [searchParams, getPreSelectedPlayerFromStorage])
 
   // Funções auxiliares
   const formatHeight = (height: number | null | undefined) => {
@@ -539,10 +578,12 @@ export default function ElencoPage() {
         alert('Erro: Usuário não autenticado')
         return
       }
-
+  
+      // Preparar o payload base
       const transferPayload: any = {
         player_id: transferData.playerId,
         player_name: transferData.playerName,
+        // NÃO INVERTER OS IDs - usar os que vieram do modal corretamente
         from_team_id: transferData.fromTeamId,
         to_team_id: transferData.toTeamId,
         value: transferData.value,
@@ -553,18 +594,35 @@ export default function ElencoPage() {
         created_at: new Date().toISOString(),
         transfer_type: transferData.type
       }
-
-      if (transferData.type === 'exchange') {
+  
+      // Se for venda múltipla, adicionar os arrays de jogadores
+      if (transferData.type === 'multi_sell') {
+        transferPayload.transfer_players = transferData.transferPlayers || []
+        transferPayload.player_names = transferData.playerNames || []
+        transferPayload.player_values = transferData.playerValues || []
+        transferPayload.is_exchange = false
+      }
+      
+      // Se for troca, adicionar os jogadores da troca E A DIREÇÃO DO DINHEIRO
+      else if (transferData.type === 'exchange') {
         transferPayload.exchange_players = transferData.exchangePlayers || []
         transferPayload.exchange_value = transferData.exchangeValue || 0
+        transferPayload.money_direction = transferData.moneyDirection || 'send' // ← ADICIONADO
         transferPayload.is_exchange = true
       }
-
+      
+      // Se for venda única, apenas garantir que não é troca
+      else if (transferData.type === 'sell') {
+        transferPayload.is_exchange = false
+      }
+  
+      console.log('Enviando dados para transferência:', transferPayload)
+  
       const { data, error } = await supabase
         .from('player_transfers')
         .insert([transferPayload])
         .select()
-
+  
       if (error) {
         console.error('❌ Erro Supabase detalhado:', error)
         if (error.code === '42501') {
@@ -574,12 +632,14 @@ export default function ElencoPage() {
         }
         return
       }
-
+  
       setTransferModalOpen(false)
       setSelectedPlayer(null)
       loadPlayers()
       
-      const message = transferData.type === 'sell' 
+      const message = transferData.type === 'multi_sell'
+        ? '✅ Proposta de venda múltipla enviada com sucesso! Aguarde a aprovação do comprador e do administrador.'
+        : transferData.type === 'sell'
         ? '✅ Proposta de transferência enviada com sucesso! Aguarde a aprovação do comprador e do administrador.'
         : '✅ Proposta de troca enviada com sucesso! Aguarde a aprovação do outro time e do administrador.'
       
@@ -872,7 +932,10 @@ export default function ElencoPage() {
             )}
 
             {activeSection === 'comparacao' && (
-              <ComparisonSection players={allPlayers} />
+              <ComparisonSection 
+                players={allPlayers} 
+                preSelectedPlayerId={preSelectedPlayerId}
+              />
             )}
 
             {activeSection === 'planejador' && (

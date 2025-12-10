@@ -6,7 +6,10 @@ import { cn } from '@/lib/utils'
 import { LevelBars } from '../LevelBars'
 import { ComparisonSectionProps, Player } from '../types'
 
-export const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players }) => {
+export const ComparisonSection: React.FC<ComparisonSectionProps & { preSelectedPlayerId?: string | null }> = ({ 
+  players,
+  preSelectedPlayerId 
+}) => {
   const [player1, setPlayer1] = useState<Player | null>(null)
   const [player2, setPlayer2] = useState<Player | null>(null)
   const [search1, setSearch1] = useState('')
@@ -14,6 +17,17 @@ export const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players })
   const [filteredPlayers1, setFilteredPlayers1] = useState<Player[]>([])
   const [filteredPlayers2, setFilteredPlayers2] = useState<Player[]>([])
   const [activeTab, setActiveTab] = useState<'comparacao' | 'extras'>('comparacao')
+
+  // Efeito para pré-selecionar o jogador 1 quando o componente monta ou quando preSelectedPlayerId muda
+  useEffect(() => {
+    if (preSelectedPlayerId && players.length > 0 && !player1) {
+      const foundPlayer = players.find(p => p.id === preSelectedPlayerId)
+      if (foundPlayer) {
+        setPlayer1(foundPlayer)
+        console.log('Jogador pré-selecionado carregado:', foundPlayer.name)
+      }
+    }
+  }, [preSelectedPlayerId, players, player1])
 
   useEffect(() => {
     if (search1) {
@@ -293,6 +307,34 @@ export const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players })
               className="pl-10 bg-zinc-900/70 border-zinc-700"
             />
           </div>
+          {player1 && (
+            <div className="mt-2 p-2 bg-zinc-800/50 rounded-lg border border-zinc-700">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  {player1.photo_url ? (
+                    <img src={player1.photo_url} alt={player1.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                      <span className="text-xs font-bold text-white">{player1.position}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">{player1.name}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-purple-600 text-xs">{player1.position}</Badge>
+                    <span className="text-zinc-400 text-xs">OVR {player1.overall}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPlayer1(null)}
+                  className="text-zinc-400 hover:text-red-400 p-1"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
           {filteredPlayers1.length > 0 && (
             <div className="absolute z-10 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
               {filteredPlayers1.map(player => (
@@ -338,6 +380,34 @@ export const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players })
               className="pl-10 bg-zinc-900/70 border-zinc-700"
             />
           </div>
+          {player2 && (
+            <div className="mt-2 p-2 bg-zinc-800/50 rounded-lg border border-zinc-700">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full overflow-hidden">
+                  {player2.photo_url ? (
+                    <img src={player2.photo_url} alt={player2.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                      <span className="text-xs font-bold text-white">{player2.position}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">{player2.name}</p>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-blue-600 text-xs">{player2.position}</Badge>
+                    <span className="text-zinc-400 text-xs">OVR {player2.overall}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPlayer2(null)}
+                  className="text-zinc-400 hover:text-red-400 p-1"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
           {filteredPlayers2.length > 0 && (
             <div className="absolute z-10 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
               {filteredPlayers2.map(player => (
@@ -354,14 +424,14 @@ export const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players })
                     {player.photo_url ? (
                       <img src={player.photo_url} alt={player.name} className="w-8 h-8 rounded-full object-cover" />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
                         <span className="text-xs font-bold text-white">{player.position}</span>
                       </div>
                     )}
                     <div className="flex-1">
                       <p className="font-medium text-white text-sm">{player.name}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge className="bg-purple-600 text-xs">{player.position}</Badge>
+                        <Badge className="bg-blue-600 text-xs">{player.position}</Badge>
                         <span className="text-zinc-400 text-xs">OVR {player.overall}</span>
                       </div>
                     </div>
@@ -479,6 +549,14 @@ export const ComparisonSection: React.FC<ComparisonSectionProps> = ({ players })
           <GitCompare className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-zinc-400 mb-2">Selecione dois jogadores</h3>
           <p className="text-zinc-500">Escolha dois jogadores na database para comparar seus atributos</p>
+          {preSelectedPlayerId && (
+            <div className="mt-4 p-3 bg-purple-900/30 rounded-lg border border-purple-700/50">
+              <p className="text-sm text-purple-300">
+                ✨ Dica: Um jogador foi pré-selecionado para você no slot 1! 
+                Basta buscar outro jogador para comparar.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -120,9 +120,11 @@ export interface PlayerSelectionModalProps {
   isReserveSlot?: boolean  // Adicione esta linha
 }
 
+// ATUALIZADO: Adicionar preSelectedPlayerId
 export interface ComparisonSectionProps {
   players: Player[]
   onSharePlayer?: (player: Player) => void
+  preSelectedPlayerId?: string | null
 }
 
 export interface PlannerSectionProps {

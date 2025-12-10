@@ -1,199 +1,32 @@
-// src/app/dashboard/transferencias/page.tsx
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { 
-  CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
-  Calendar, Users, ArrowRightLeft, X, Ban, Tag, ShoppingCart, 
-  Plus, Trash2, Edit, Save, XCircle, Info, FileText, Check, ExternalLink,
-  Gavel, Scale
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import FloatingChatButton from '@/components/FloatingChatButton'
 import ChatPopup from '@/components/Chatpopup'
 
-// Função de formatar valor
-function formatBalance(value: number): string {
-  if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
-  if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1).replace('.0', '')}M`
-  if (value >= 1_000) return `R$ ${(value / 1_000).toFixed(0)} mil`
-  return `R$ ${value.toLocaleString('pt-BR')}`
-}
-
-// Função para formatar data e hora
-function formatDateTime(dateString: string) {
-  const date = new Date(dateString)
-  return {
-    date: date.toLocaleDateString('pt-BR'),
-    time: date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  }
-}
-
-interface UserProfile {
-  id: string
-  email?: string
-  user_metadata?: {
-    full_name?: string
-  }
-}
-
-interface Team {
-  id: string
-  name: string
-  logo_url: string | null
-  balance: number
-}
-
-interface MarketPlayer {
-  id: string
-  player_id: string
-  player_name: string
-  team_id: string
-  team_name: string
-  team_logo: string | null
-  price: number
-  description: string | null
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  // Player details
-  player?: {
-    id: string
-    name: string
-    position: string
-    overall: number
-    photo_url: string | null
-    base_price: number
-    team_id: string | null
-  }
-}
-
-interface Player {
-  id: string
-  name: string
-  position: string
-  overall: number
-  photo_url: string | null
-  base_price: number
-  team_id: string | null
-}
-
-// Modal para descrição
-const DescriptionModal = ({
-  isOpen,
-  onClose,
-  initialText,
-  onSave,
-  playerName
-}: {
-  isOpen: boolean
-  onClose: () => void
-  initialText: string
-  onSave: (text: string) => void
-  playerName: string
-}) => {
-  const [text, setText] = useState(initialText)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    if (isOpen && textareaRef.current) {
-      textareaRef.current.focus()
-      setText(initialText)
-    }
-  }, [isOpen, initialText])
-
-  const handleSave = () => {
-    onSave(text.trim())
-    onClose()
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose()
-    }
-    if (e.key === 'Enter' && e.ctrlKey) {
-      handleSave()
-    }
-  }
-
-  if (!isOpen) return null
-
-  return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div 
-        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6"
-        onKeyDown={handleKeyDown}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-blue-400" />
-            <h3 className="text-lg font-bold text-white">Descrição para {playerName}</h3>
-          </div>
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-zinc-400 hover:text-white"
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-        
-        <div className="mb-4">
-          <p className="text-zinc-400 text-sm mb-2">
-            Escreva uma descrição para o jogador (opcional)
-          </p>
-          <Textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Ex: Preciso de grana para reforçar o time, jogador não se adaptou ao sistema..."
-            className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none min-h-[120px]"
-            rows={4}
-          />
-        </div>
-        
-        <div className="flex justify-end gap-3">
-          <Button
-            onClick={onClose}
-            variant="outline"
-            className="text-white border-zinc-600 hover:bg-zinc-800"
-          >
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleSave}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Check className="w-4 h-4 mr-2" />
-            Aplicar Descrição
-          </Button>
-        </div>
-        
-        <div className="mt-3 text-xs text-zinc-500">
-          Dica: Pressione <kbd className="px-1.5 py-0.5 bg-zinc-800 rounded">Ctrl+Enter</kbd> para salvar
-        </div>
-      </div>
-    </div>
-  )
-}
+// Importando componentes modulares
+import {
+  DescriptionModal,
+  TransferenciasView,
+  MercadoView,
+  ViewSwitch,
+  type UserProfile,
+  type Team,
+  type MarketPlayer,
+  type Player,
+  type Transfer
+} from '@/components/transferencias'
 
 export default function PaginaTransferencias() {
   const router = useRouter()
-  // Switch principal entre Transferências e Mercado
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
   
   // Estados para Transferências
-  const [transfers, setTransfers] = useState<any[]>([])
-  const [allTransfers, setAllTransfers] = useState<any[]>([])
+  const [transfers, setTransfers] = useState<Transfer[]>([])
+  const [allTransfers, setAllTransfers] = useState<Transfer[]>([])
   const [userTeamId, setUserTeamId] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -220,18 +53,13 @@ export default function PaginaTransferencias() {
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
   const [editDescriptionText, setEditDescriptionText] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
-  
-  // Novos estados para o modal de descrição
   const [showDescriptionModal, setShowDescriptionModal] = useState(false)
-  
-  // Estados para o seletor de preços
   const [priceOptions, setPriceOptions] = useState<{ value: number; label: string }[]>([])
 
   // Carregar dados do usuário e time
   useEffect(() => {
     loadUserData()
     
-    // Subscribe para atualizações em tempo real
     const subscription = supabase
       .channel('transferencias')
       .on('postgres_changes', 
@@ -291,7 +119,6 @@ export default function PaginaTransferencias() {
 
     loadUnreadCount()
 
-    // Subscription para atualizar em tempo real
     const subscription = supabase
       .channel('unread_messages')
       .on(
@@ -318,7 +145,6 @@ export default function PaginaTransferencias() {
       const basePrice = selectedPlayer.base_price
       const options = []
       
-      // Cria 100 opções, de 1M em 1M, começando do valor base
       for (let i = 0; i < 100; i++) {
         const value = basePrice + (i * 1_000_000)
         options.push({
@@ -328,12 +154,10 @@ export default function PaginaTransferencias() {
       }
       
       setPriceOptions(options)
-      // Define o primeiro valor como padrão (valor base)
       setMarketPrice(`R$ ${basePrice.toLocaleString('pt-BR')}`)
     }
   }, [selectedPlayer])
 
-  // Carregar dados do usuário
   const loadUserData = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -344,7 +168,6 @@ export default function PaginaTransferencias() {
 
       setUser(session.user)
 
-      // Pega perfil do usuário (team_id e se é admin)
       const { data: profile } = await supabase
         .from('profiles')
         .select('*, teams(*)')
@@ -356,7 +179,6 @@ export default function PaginaTransferencias() {
         setUserTeamId(profile?.team_id || null)
         setIsAdmin(profile?.role === 'admin')
         
-        // Definir time diretamente do perfil
         if (profile.teams) {
           setTeam(profile.teams)
         } else {
@@ -364,7 +186,6 @@ export default function PaginaTransferencias() {
         }
       }
 
-      // Carregar dados baseado na view atual
       if (activeView === 'transferencias') {
         await loadData()
       } else {
@@ -376,8 +197,7 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // Funções para Transferências
-  const loadExchangePlayersDetails = async (transfer: any) => {
+  const loadExchangePlayersDetails = async (transfer: Transfer) => {
     if (!transfer.exchange_players || transfer.exchange_players.length === 0) return []
 
     try {
@@ -397,7 +217,6 @@ export default function PaginaTransferencias() {
     setLoading(true)
 
     try {
-      // Carrega TODAS as negociações (excluindo as rejeitadas)
       const { data: transferData, error } = await supabase
         .from('player_transfers')
         .select(`
@@ -419,7 +238,6 @@ export default function PaginaTransferencias() {
 
       setAllTransfers(safeTransferData)
       
-      // Carregar detalhes dos jogadores de troca
       const exchangeDetails: {[key: string]: any[]} = {}
       if (safeTransferData) {
         for (const transfer of safeTransferData) {
@@ -430,7 +248,6 @@ export default function PaginaTransferencias() {
       }
       setExchangePlayersDetails(exchangeDetails)
       
-      // Filtra baseado na aba ativa (excluindo rejeitadas)
       const filtered = activeTab === 'pending' 
         ? safeTransferData.filter(t => t.status === 'pending')
         : safeTransferData.filter(t => t.status === 'approved')
@@ -445,7 +262,6 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // Recarregar quando mudar a aba
   useEffect(() => {
     if (allTransfers.length > 0) {
       const filtered = activeTab === 'pending' 
@@ -456,23 +272,63 @@ export default function PaginaTransferencias() {
     }
   }, [activeTab, allTransfers])
 
-  // Função para verificar saldo e executar transferência
-  const checkAndExecuteTransfer = async (transfer: any) => {
+  const checkAndExecuteTransfer = async (transfer: Transfer) => {
     try {
-      // Verifica se todos aprovaram
       if (transfer.approved_by_seller && transfer.approved_by_buyer && transfer.approved_by_admin) {
         
-        // Para trocas, verifica se o time tem os jogadores
+        // VERIFICAÇÃO ESPECÍFICA PARA TROCAS COM DINHEIRO
+        if (transfer.is_exchange && transfer.exchange_value && transfer.exchange_value > 0) {
+          const moneyDirection = transfer.money_direction || 'send'
+          
+          let teamToCheckId: string
+          let teamToCheckName: string
+          
+          // Identificar qual time precisa mandar dinheiro
+          if (moneyDirection === 'send') {
+            // Time de origem (quem está dando o jogador) precisa mandar dinheiro
+            teamToCheckId = transfer.from_team_id
+            teamToCheckName = transfer.from_team?.name || 'Time de origem'
+          } else {
+            // Time destino (quem está recebendo o jogador) precisa mandar dinheiro
+            teamToCheckId = transfer.to_team_id
+            teamToCheckName = transfer.to_team?.name || 'Time destino'
+          }
+          
+          // Verificar saldo do time que precisa mandar dinheiro
+          const { data: teamData } = await supabase
+            .from('teams')
+            .select('balance, name')
+            .eq('id', teamToCheckId)
+            .single()
+
+          if (teamData && teamData.balance < transfer.exchange_value) {
+            const { error: rejectError } = await supabase
+              .from('player_transfers')
+              .update({ 
+                status: 'rejected',
+                approved_by_seller: false,
+                approved_by_buyer: false,
+                approved_by_admin: false
+              })
+              .eq('id', transfer.id)
+
+            if (!rejectError) {
+              alert(`❌ Troca rejeitada! ${teamData.name} não tem saldo suficiente para completar a transação.`)
+            }
+            return
+          }
+        }
+        
         if (transfer.is_exchange) {
+          // Lógica para trocas (mantida)
           const { data: exchangePlayers } = await supabase
             .from('players')
             .select('id, team_id')
             .in('id', transfer.exchange_players || [])
           
-          // Verifica se todos os jogadores ainda estão no time
           const invalidPlayers = exchangePlayers?.filter(p => p.team_id !== transfer.to_team_id) || []
           if (invalidPlayers.length > 0) {
-            alert('❌ Troca rejeitada! Alguns jogadores não estão mais disponíveis no time.')
+            alert('❌ Troca rejeita! Alguns jogadores não estão mais disponíveis no time.')
             
             const { error: rejectError } = await supabase
               .from('player_transfers')
@@ -486,7 +342,7 @@ export default function PaginaTransferencias() {
             return
           }
         } else {
-          // Para vendas normais, verifica saldo
+          // Verificar saldo para comprador (somente para vendas)
           const { data: buyerTeam, error: balanceError } = await supabase
             .from('teams')
             .select('balance, name')
@@ -496,7 +352,6 @@ export default function PaginaTransferencias() {
           if (balanceError) return
 
           if (buyerTeam.balance < transfer.value) {
-            // Saldo insuficiente - rejeita a transferência
             const { error: rejectError } = await supabase
               .from('player_transfers')
               .update({ 
@@ -514,32 +369,22 @@ export default function PaginaTransferencias() {
           }
         }
 
-        // Chama a função do Supabase
-        const { data, error } = await supabase.rpc('executar_transferencia_completa', {
-          p_transfer_id: transfer.id,
-          p_player_id: transfer.player_id,
-          p_from_team_id: transfer.from_team_id,
-          p_to_team_id: transfer.to_team_id,
-          p_value: transfer.value
-        })
+        // NOVA FUNÇÃO PARA PROCESSAR TRANSFERÊNCIA (INCLUINDO VENDAS MÚLTIPLAS)
+        const processTransferResult = await processCompleteTransfer(transfer)
 
-        if (error) {
-          alert(`Erro ao processar transferência: ${error.message}`)
+        if (!processTransferResult.success) {
+          alert(`Transferência falhou: ${processTransferResult.message}`)
           return
         }
 
-        if (data && !data.success) {
-          alert(`Transferência falhou: ${data.message}`)
-          return
-        }
-
-        if (data && data.success) {
-          const message = transfer.is_exchange 
-            ? '✅ Troca concluída com sucesso! Jogadores foram transferidos.'
-            : '✅ Transferência concluída com sucesso! Jogador foi transferido.'
-          alert(message)
-          loadData()
-        }
+        const message = transfer.transfer_type === 'multi_sell'
+          ? `✅ Venda múltipla concluída! ${processTransferResult.transferredCount} jogadores foram transferidos.`
+          : transfer.is_exchange 
+          ? '✅ Troca concluída com sucesso! Jogadores foram transferidos.'
+          : '✅ Transferência concluída com sucesso! Jogador foi transferido.'
+        
+        alert(message)
+        loadData()
       }
     } catch (error) {
       console.error('Erro inesperado ao processar transferência:', error)
@@ -547,7 +392,143 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // Função de aprovação
+  // FUNÇÃO ATUALIZADA: Processar transferência completa usando RPC unificada
+  const processCompleteTransfer = async (transfer: Transfer) => {
+    try {
+      // VERIFICAÇÃO DE SALDO PARA TROCAS COM DINHEIRO
+      if (transfer.is_exchange && transfer.exchange_value && transfer.exchange_value > 0) {
+        // Carregar dados da transferência completa
+        const { data: fullTransferData } = await supabase
+          .from('player_transfers')
+          .select(`
+            *,
+            from_team:teams!from_team_id(*),
+            to_team:teams!to_team_id(*)
+          `)
+          .eq('id', transfer.id)
+          .single()
+
+        if (!fullTransferData) {
+          throw new Error('Dados da transferência não encontrados')
+        }
+
+        const exchangeData = fullTransferData
+        const exchangeValue = exchangeData.exchange_value || 0
+        const moneyDirection = exchangeData.money_direction || 'send'
+        const fromTeam = exchangeData.from_team
+        const toTeam = exchangeData.to_team
+
+        // SE HÁ DINHEIRO ENVOLVIDO NA TROCA
+        if (exchangeValue > 0) {
+          // VERIFICAR SALDO QUANDO O TIME DE ORIGEM PRECISA MANDAR DINHEIRO
+          if (moneyDirection === 'send') {
+            // Time de origem (quem está dando o jogador) está mandando dinheiro
+            if (fromTeam.balance < exchangeValue) {
+              throw new Error(`${fromTeam.name} não tem saldo suficiente para mandar R$ ${exchangeValue.toLocaleString('pt-BR')}. Saldo atual: R$ ${fromTeam.balance.toLocaleString('pt-BR')}`)
+            }
+          }
+          // VERIFICAR SALDO QUANDO O TIME DESTINO PRECISA MANDAR DINHEIRO
+          else if (moneyDirection === 'receive') {
+            // Time destino (quem está recebendo o jogador) está mandando dinheiro
+            if (toTeam.balance < exchangeValue) {
+              throw new Error(`${toTeam.name} não tem saldo suficiente para mandar R$ ${exchangeValue.toLocaleString('pt-BR')}. Saldo atual: R$ ${toTeam.balance.toLocaleString('pt-BR')}`)
+            }
+          }
+        }
+      }
+
+      // Usar a RPC unificada para processar a transferência
+      const { data, error } = await supabase.rpc('processar_transferencia', {
+        p_transfer_id: transfer.id,
+        p_player_id: transfer.player_id,
+        p_from_team_id: transfer.from_team_id,
+        p_to_team_id: transfer.to_team_id,
+        p_value: transfer.value,
+        p_transfer_type: transfer.transfer_type || 'sell',
+        p_transfer_players: transfer.transfer_players || null,
+        p_is_exchange: transfer.is_exchange || false,
+        p_exchange_players: transfer.exchange_players || null
+      })
+
+      if (error) {
+        throw new Error(`Erro na função RPC: ${error.message}`)
+      }
+
+      if (data && !data.success) {
+        return { success: false, message: data.message }
+      }
+
+      // APÓS A TRANSFERÊNCIA PRINCIPAL, PROCESSAR DINHEIRO DA TROCA (SE HOUVER)
+      // Usando a função específica para isso
+      if (transfer.is_exchange && transfer.exchange_value && transfer.exchange_value > 0) {
+        // Carregar dados atualizados dos times
+        const { data: updatedTeams } = await supabase
+          .from('teams')
+          .select('id, balance, name')
+          .in('id', [transfer.from_team_id, transfer.to_team_id])
+
+        const fromTeamUpdated = updatedTeams?.find(t => t.id === transfer.from_team_id)
+        const toTeamUpdated = updatedTeams?.find(t => t.id === transfer.to_team_id)
+
+        if (!fromTeamUpdated || !toTeamUpdated) {
+          throw new Error('Não foi possível carregar os saldos atualizados dos times')
+        }
+
+        // Identificar quem paga e quem recebe
+        const exchangeValue = transfer.exchange_value;
+        const moneyDirection = transfer.money_direction || 'send';
+
+        let payerTeamId, receiverTeamId, payerName, receiverName;
+
+        if (moneyDirection === 'receive') {
+          // Quem abriu o modal vai RECEBER → o outro paga
+          payerTeamId = transfer.to_team_id;
+          receiverTeamId = transfer.from_team_id;
+          payerName = toTeamUpdated.name;
+          receiverName = fromTeamUpdated.name;
+        } else {
+          // Quem abriu o modal vai PAGAR
+          payerTeamId = transfer.from_team_id;
+          receiverTeamId = transfer.to_team_id;
+          payerName = fromTeamUpdated.name;
+          receiverName = toTeamUpdated.name;
+        }
+
+        // ✅ Chamar a função específica para dinheiro de trocas
+        const { error: rpcError } = await supabase.rpc('registrar_dinheiro_troca', {
+          p_payer_team_id: payerTeamId,
+          p_receiver_team_id: receiverTeamId,
+          p_amount: exchangeValue,
+          p_player_name: transfer.player_name,
+          p_payer_name: payerName,
+          p_receiver_name: receiverName
+        });
+
+        if (rpcError) {
+          console.error('Erro ao registrar dinheiro da troca via RPC:', rpcError);
+          throw rpcError;
+        }
+
+        console.log(`Dinheiro da troca registrado: ${payerName} → ${receiverName} | R$ ${exchangeValue.toLocaleString('pt-BR')}`);
+      }
+
+      const transferredCount = data?.transferred_count || 1;
+
+      return { 
+        success: true, 
+        message: data?.message || 'Transferência concluída com sucesso',
+        transferredCount: transferredCount
+      }
+
+    } catch (error: any) {
+      console.error('Erro ao processar transferência completa:', error)
+      return { 
+        success: false, 
+        message: error.message || 'Erro desconhecido ao processar transferência'
+      }
+    }
+  }
+
   const aprovar = async (transferId: string, type: 'seller' | 'buyer' | 'admin') => {
     const field = `approved_by_${type}`
 
@@ -558,23 +539,38 @@ export default function PaginaTransferencias() {
 
     if (error) {
       console.error('Erro ao aprovar transferência:', error)
+      alert(`Erro ao aprovar: ${error.message}`)
       return
     }
 
-    // Atualiza o estado local pra refletir a aprovação imediatamente
-    const updatedTransfers = transfers.map(t =>
-      t.id === transferId ? { ...t, [field]: true } : t
-    )
-    setTransfers(updatedTransfers)
+    // Recarregar os dados atualizados
+    const { data: updatedTransfer } = await supabase
+      .from('player_transfers')
+      .select('*, from_team:teams!from_team_id(*), to_team:teams!to_team_id(*), player:players(*)')
+      .eq('id', transferId)
+      .single()
 
-    // Encontra a transferência atualizada e verifica se pode executar
-    const updatedTransfer = updatedTransfers.find(t => t.id === transferId)
     if (updatedTransfer) {
-      await checkAndExecuteTransfer(updatedTransfer)
+      // Atualizar lista local
+      const updatedTransfers = transfers.map(t =>
+        t.id === transferId ? { ...t, [field]: true } : t
+      )
+      setTransfers(updatedTransfers)
+
+      // Verificar se todas as aprovações foram dadas
+      const allApproved = 
+        (type === 'seller' || updatedTransfer.approved_by_seller) &&
+        (type === 'buyer' || updatedTransfer.approved_by_buyer) &&
+        (type === 'admin' || updatedTransfer.approved_by_admin)
+
+      if (allApproved) {
+        await checkAndExecuteTransfer(updatedTransfer)
+      } else {
+        alert('✅ Aprovação registrada! Aguardando outras aprovações.')
+      }
     }
   }
 
-  // Rejeitar transferência (APENAS ADMIN) - CORRIGIDA
   const rejeitarTransferencia = async (transferId: string) => {
     if (!confirm('Tem certeza que deseja cancelar esta transferência? Esta ação não pode ser desfeita.')) {
       return
@@ -596,7 +592,6 @@ export default function PaginaTransferencias() {
         return
       }
 
-      // Atualizar estado local de forma segura
       setTransfers(prev => prev.filter(t => t.id !== transferId))
       setAllTransfers(prev => prev.filter(t => t.id !== transferId))
       
@@ -607,65 +602,11 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // Componente para exibir jogadores da troca
-  const ExchangePlayers = ({ transfer }: { transfer: any }) => {
-    const players = exchangePlayersDetails[transfer.id] || []
-    
-    if (players.length === 0) return null
-
-    return (
-      <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-        <div className="flex items-center gap-2 mb-2">
-          <ArrowRightLeft className="w-3 h-3 text-blue-400" />
-          <span className="text-blue-400 font-semibold text-xs">Jogadores na Troca</span>
-        </div>
-        <div className="space-y-1">
-          {players.map((player: any) => (
-            <div key={player.id} className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1">
-                {player.photo_url ? (
-                  <img 
-                    src={player.photo_url} 
-                    alt={player.name}
-                    className="w-4 h-4 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-4 h-4 rounded-full bg-blue-600 flex items-center justify-center">
-                    <span className="text-[8px] font-bold text-white">{player.position}</span>
-                  </div>
-                )}
-                <span className="text-white truncate max-w-[80px]">{player.name}</span>
-                <Badge className="bg-blue-600 text-[10px] px-1">{player.position}</Badge>
-              </div>
-              <span className="text-emerald-400 text-[10px]">
-                R$ {player.base_price?.toLocaleString('pt-BR') || '0'}
-              </span>
-            </div>
-          ))}
-          {transfer.exchange_value > 0 && (
-            <div className="flex items-center justify-between border-t border-blue-500/30 pt-1">
-              <span className="text-blue-300 text-xs">+ Dinheiro</span>
-              <span className="text-emerald-400 text-xs font-semibold">
-                R$ {transfer.exchange_value.toLocaleString('pt-BR')}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Contadores para as abas
-  const pendingCount = allTransfers.filter(t => t.status === 'pending').length
-  const completedCount = allTransfers.filter(t => t.status === 'approved').length
-
-  // Funções para o Mercado - ATUALIZADAS
   const loadMarketData = async () => {
     if (!team?.id) return
     
     setLoadingMarket(true)
     try {
-      // Carregar jogadores disponíveis no mercado (de outros times)
       const { data } = await supabase
         .from('market_listings')
         .select(`
@@ -699,7 +640,6 @@ export default function PaginaTransferencias() {
       setMarketPlayers(formattedData)
     } catch (error) {
       console.error('Erro ao carregar mercado:', error)
-      // Fallback se a relação não funcionar
       try {
         const { data } = await supabase
           .from('market_listings')
@@ -740,7 +680,6 @@ export default function PaginaTransferencias() {
     if (!team?.id) return
     
     try {
-      // Carregar jogadores do meu time (para adicionar ao mercado)
       const { data: playersData } = await supabase
         .from('players')
         .select('*')
@@ -749,7 +688,6 @@ export default function PaginaTransferencias() {
 
       setAvailablePlayers(playersData || [])
 
-      // Carregar meus jogadores no mercado (SOMENTE os ativos)
       const { data: marketData } = await supabase
         .from('market_listings')
         .select(`
@@ -770,7 +708,7 @@ export default function PaginaTransferencias() {
           )
         `)
         .eq('team_id', team.id)
-        .eq('is_active', true) // IMPORTANTE: Somente jogadores ativos no mercado
+        .eq('is_active', true)
         .order('created_at', { ascending: false })
 
       const formattedMarketData = (marketData || []).map(item => ({
@@ -786,12 +724,10 @@ export default function PaginaTransferencias() {
     }
   }, [team?.id, team?.name, team?.logo_url])
 
-  // Handler para mudança de preço (seletor)
   const handlePriceChange = (value: string) => {
     setMarketPrice(value)
   }
 
-  // Handler para modal de descrição
   const handleOpenDescriptionModal = () => {
     setShowDescriptionModal(true)
   }
@@ -804,18 +740,20 @@ export default function PaginaTransferencias() {
     setMarketDescription(text)
   }
 
-  // Função para navegar para a página de jogadores com o card expandido
-  const navigateToPlayerPage = (playerId: string) => {
-    router.push(`/dashboard/jogadores#player-${playerId}`)
-  }
-
-  const handleAddToMarket = async () => {
-    if (!selectedPlayer || !team?.id || !marketPrice) {
-      alert('Preencha todos os campos obrigatórios')
+  // FUNÇÃO MODIFICADA: Adicionar ao mercado (sem mudar tipo no banco)
+  const handleAddToMarket = async (saleMode: 'fixed_price' | 'negotiable') => {
+    if (!selectedPlayer || !team?.id) {
+      alert('Selecione um jogador')
       return
     }
 
-    // Extrai o valor numérico do preço selecionado
+    // Validação de preço para modo Fixar Preço
+    if (saleMode === 'fixed_price' && !marketPrice) {
+      alert('Informe o preço para venda com preço fixo')
+      return
+    }
+
+    // Para modo negociável, usa o preço atual como sugestão
     const priceMatch = marketPrice.match(/R\$\s?([\d.,]+)/)
     if (!priceMatch) {
       alert('Preço inválido')
@@ -835,6 +773,16 @@ export default function PaginaTransferencias() {
       return
     }
 
+    // Adicionar prefixo na descrição para modo negociável
+    let finalDescription = marketDescription.trim()
+    if (saleMode === 'negotiable') {
+      const prefix = '[Aceita Propostas] '
+      // Adiciona prefixo se não tiver já
+      if (!finalDescription.startsWith(prefix)) {
+        finalDescription = prefix + (finalDescription || 'Disponível para negociação')
+      }
+    }
+
     setAddingPlayer(true)
     try {
       const { error } = await supabase
@@ -844,7 +792,7 @@ export default function PaginaTransferencias() {
           player_name: selectedPlayer.name,
           team_id: team.id,
           price: price,
-          description: marketDescription.trim() || null,
+          description: finalDescription || null,
           is_active: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -852,14 +800,17 @@ export default function PaginaTransferencias() {
 
       if (error) throw error
 
-      // Limpar formulário e recarregar dados
+      // Limpar formulário
       setSelectedPlayer(null)
       setMarketPrice('')
       setMarketDescription('')
       setShowAddForm(false)
       setShowDescriptionModal(false)
       
-      alert('✅ Jogador anunciado no mercado com sucesso!')
+      alert(saleMode === 'fixed_price' 
+        ? '✅ Jogador anunciado com preço fixo no mercado!' 
+        : '✅ Jogador anunciado para negociação no mercado!'
+      )
       
       // Recarregar dados
       await Promise.all([
@@ -874,12 +825,10 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // DELETAR REALMENTE o anúncio
   const handleRemoveFromMarket = async (listingId: string) => {
     if (!confirm('Tem certeza que deseja REMOVER este jogador do mercado? Esta ação não pode ser desfeita.')) return
 
     try {
-      // DELETA completamente o registro da tabela
       const { error } = await supabase
         .from('market_listings')
         .delete()
@@ -887,10 +836,7 @@ export default function PaginaTransferencias() {
 
       if (error) throw error
 
-      // Atualizar estado local - remover imediatamente
       setMyMarketPlayers(prev => prev.filter(item => item.id !== listingId))
-      
-      // Se estiver na aba "disponiveis", também remover de lá
       setMarketPlayers(prev => prev.filter(item => item.id !== listingId))
       
       alert('✅ Jogador removido do mercado com sucesso!')
@@ -917,7 +863,6 @@ export default function PaginaTransferencias() {
 
       if (error) throw error
 
-      // Atualizar estado local
       setMyMarketPlayers(prev => prev.map(item => 
         item.id === listingId 
           ? { ...item, description: editDescriptionText.trim() }
@@ -943,6 +888,58 @@ export default function PaginaTransferencias() {
     setEditDescriptionText('')
   }
 
+  // NOVA FUNÇÃO: Abrir chat para negociação
+  const handleMakeProposal = async (listing: MarketPlayer) => {
+    if (!team?.id || !user?.id) {
+      alert('Você precisa estar logado para enviar propostas')
+      return
+    }
+
+    // Verificar se é um anúncio negociável (pela descrição)
+    const isNegotiable = listing.description?.includes('[Aceita Propostas]') || 
+                        listing.description?.toLowerCase().includes('negoci') ||
+                        listing.description?.toLowerCase().includes('proposta')
+
+    if (isNegotiable) {
+      // Para negociáveis, abrir chat com o vendedor
+      try {
+        const { data: sellerProfile } = await supabase
+          .from('profiles')
+          .select(`
+            id,
+            coach_name,
+            email,
+            teams!inner(id, name, logo_url)
+          `)
+          .eq('team_id', listing.team_id)
+          .single()
+
+        if (sellerProfile) {
+          // Disparar evento para abrir chat com o vendedor
+          window.dispatchEvent(new CustomEvent('openChatWithUser', {
+            detail: {
+              userId: sellerProfile.id,
+              userName: sellerProfile.coach_name || sellerProfile.email,
+              teamName: sellerProfile.teams.name,
+              teamLogo: sellerProfile.teams.logo_url,
+              playerName: listing.player_name,
+              playerId: listing.player_id
+            }
+          }))
+
+          // Abre o chat popup
+          setIsChatOpen(true)
+        }
+      } catch (error) {
+        console.error('Erro ao buscar informações do vendedor:', error)
+        alert('Não foi possível iniciar a conversa com o vendedor.')
+      }
+    } else {
+      // Para preço fixo, usar a função original de compra
+      handleBuyPlayer(listing)
+    }
+  }
+
   const handleBuyPlayer = async (listing: MarketPlayer) => {
     if (!team?.id) {
       alert('Você precisa ter um time para comprar jogadores')
@@ -959,7 +956,6 @@ export default function PaginaTransferencias() {
     }
 
     try {
-      // Verificar saldo do time
       const { data: buyerTeam, error: balanceError } = await supabase
         .from('teams')
         .select('balance, name')
@@ -973,7 +969,6 @@ export default function PaginaTransferencias() {
         return
       }
 
-      // Criar transferência
       const { error: transferError } = await supabase
         .from('player_transfers')
         .insert([{
@@ -984,7 +979,7 @@ export default function PaginaTransferencias() {
           value: listing.price,
           status: 'pending',
           approved_by_seller: false,
-          approved_by_buyer: true, // Comprador já está aprovando
+          approved_by_buyer: true,
           approved_by_admin: false,
           created_at: new Date().toISOString(),
           transfer_type: 'sell',
@@ -995,7 +990,7 @@ export default function PaginaTransferencias() {
 
       if (transferError) throw transferError
 
-      // Remover do mercado (DELETAR completamente)
+      // Remover do mercado
       await supabase
         .from('market_listings')
         .delete()
@@ -1003,10 +998,7 @@ export default function PaginaTransferencias() {
 
       alert('✅ Proposta de compra enviada! Aguarde a aprovação do vendedor.')
       
-      // Recarregar dados
       loadMarketData()
-      
-      // Alternar para a view de transferências para ver a proposta
       setActiveView('transferencias')
     } catch (error: any) {
       console.error('Erro ao comprar jogador:', error)
@@ -1014,970 +1006,14 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // Componente para exibir jogador do mercado
-  const MarketPlayerCard = ({ listing, isMine = false }: { listing: MarketPlayer, isMine?: boolean }) => {
-    const player = listing.player || {
-      id: listing.player_id,
-      name: listing.player_name,
-      position: 'N/A',
-      overall: 0,
-      photo_url: null,
-      base_price: 0,
-      team_id: null
-    }
-
-    const teamName = listing.team_name || 'Time desconhecido'
-    const teamLogo = listing.team_logo
-    const safeTeamName = teamName || 'Time'
-
-    return (
-      <Card className="bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all p-4">
-        {/* Header com time */}
-        <div className="flex items-center gap-2 mb-3">
-          {teamLogo ? (
-            <img 
-              src={teamLogo} 
-              alt={teamName}
-              className="w-6 h-6 rounded-full object-cover"
-            />
-          ) : (
-            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-              <span className="text-xs font-bold text-white">
-                {safeTeamName.substring(0, 2)}
-              </span>
-            </div>
-          )}
-          <span className="text-sm text-zinc-300">{teamName}</span>
-        </div>
-
-        {/* Player info */}
-        <div className="flex items-center gap-3 mb-3 cursor-pointer" onClick={() => navigateToPlayerPage(player.id)}>
-          {player.photo_url ? (
-            <img 
-              src={player.photo_url} 
-              alt={player.name}
-              className="w-14 h-14 rounded-full object-cover border-2 border-purple-500"
-            />
-          ) : (
-            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-              <span className="text-lg font-black text-white">{player.position}</span>
-            </div>
-          )}
-          <div className="flex-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-lg text-white">{player.name}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge className="bg-purple-600">{player.position}</Badge>
-                  <Badge className="bg-yellow-600">OVR {player.overall}</Badge>
-                </div>
-              </div>
-              <ExternalLink className="w-4 h-4 text-zinc-500 hover:text-white transition-colors" />
-            </div>
-          </div>
-        </div>
-
-        {/* Price */}
-        <div className="mb-3">
-          <p className="text-zinc-400 text-sm">Preço no Mercado</p>
-          <p className="text-emerald-400 font-bold text-xl">
-            R$ {listing.price.toLocaleString('pt-BR')}
-          </p>
-          <p className="text-zinc-500 text-xs">
-            Valor base: R$ {player.base_price.toLocaleString('pt-BR')}
-          </p>
-        </div>
-
-        {/* Description */}
-        {listing.description && (
-          <div className="mb-3">
-            <p className="text-zinc-400 text-sm flex items-center gap-1 mb-1">
-              <Info className="w-3 h-3" />
-              Descrição do vendedor
-            </p>
-            <p className="text-zinc-300 text-sm bg-zinc-800/30 rounded-lg p-2">
-              {listing.description}
-            </p>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-2">
-          {isMine ? (
-            <>
-              <Button
-                onClick={() => handleStartEditDescription(listing)}
-                variant="outline"
-                size="sm"
-                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700"
-              >
-                <Edit className="w-4 h-4 mr-1" />
-                Editar
-              </Button>
-              <Button
-                onClick={() => handleRemoveFromMarket(listing.id)}
-                variant="outline"
-                size="sm"
-                className="flex-1 bg-red-600/20 border-red-600 hover:bg-red-600/30 text-white"
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Remover
-              </Button>
-            </>
-          ) : (
-            <Button
-              onClick={() => handleBuyPlayer(listing)}
-              className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-            >
-              <ShoppingCart className="w-4 h-4 mr-1" />
-              Fazer Proposta
-            </Button>
-          )}
-        </div>
-
-        {/* Formulário de edição de descrição */}
-        {isMine && editingDescription === listing.id && (
-          <EditDescriptionForm listing={listing} />
-        )}
-      </Card>
-    )
+  // NOVA FUNÇÃO: Cancelar adição
+  const handleCancelAdd = () => {
+    setShowAddForm(false)
+    setSelectedPlayer(null)
+    setMarketPrice('')
+    setMarketDescription('')
   }
 
-  // Componente para editar descrição
-  const EditDescriptionForm = ({ listing }: { listing: MarketPlayer }) => {
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      // Permite submeter com Ctrl+Enter
-      if (e.key === 'Enter' && e.ctrlKey) {
-        e.preventDefault()
-        handleUpdateDescription(listing.id)
-      }
-      // Cancela com Escape
-      if (e.key === 'Escape') {
-        handleCancelEdit()
-      }
-    }
-
-    return (
-      <div className="mt-3 space-y-2">
-        <Textarea
-          value={editDescriptionText}
-          onChange={(e) => setEditDescriptionText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Digite a descrição para este jogador..."
-          className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-          rows={3}
-        />
-        <div className="flex gap-2">
-          <Button
-            onClick={() => handleUpdateDescription(listing.id)}
-            size="sm"
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-          >
-            <Save className="w-4 h-4 mr-1" />
-            Salvar
-          </Button>
-          <Button
-            onClick={handleCancelEdit}
-            variant="outline"
-            size="sm"
-            className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white border-zinc-700"
-          >
-            <XCircle className="w-4 h-4 mr-1" />
-            Cancelar
-          </Button>
-        </div>
-        <p className="text-xs text-zinc-400">
-          Dica: Use <kbd className="px-1 bg-zinc-700 rounded">Ctrl+Enter</kbd> para salvar
-        </p>
-      </div>
-    )
-  }
-
-  // Switch entre Transferências e Mercado
-  const ViewSwitch = () => (
-    <div className="flex bg-zinc-900/70 rounded-xl p-1 border border-zinc-700 w-fit mx-auto mb-6">
-      <Button
-        variant={activeView === 'transferencias' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => setActiveView('transferencias')}
-        className={cn(
-          'rounded-lg text-sm font-bold px-6 py-2 transition-all',
-          activeView === 'transferencias' && 'bg-purple-600 shadow-lg shadow-purple-600/20 text-white'
-        )}
-      >
-        <ArrowRightLeft className="w-4 h-4 mr-2" />
-        Transferências
-      </Button>
-      <Button
-        variant={activeView === 'mercado' ? 'default' : 'ghost'}
-        size="sm"
-        onClick={() => setActiveView('mercado')}
-        className={cn(
-          'rounded-lg text-sm font-bold px-6 py-2 transition-all',
-          activeView === 'mercado' && 'bg-green-600 shadow-lg shadow-green-600/20 text-white'
-        )}
-      >
-        <Tag className="w-4 h-4 mr-2" />
-        Mercado
-      </Button>
-    </div>
-  )
-
-  // Função para determinar se é um leilão (auction)
-  const isAuction = (transferType: string) => {
-    return transferType === 'auction'
-  }
-
-  // Componente TransferenciasView - ATUALIZADO com leilão
-  const TransferenciasView = () => (
-    <>
-      {/* Seletor de Abas */}
-      <div className="flex gap-4 mb-8 justify-center md:justify-start">
-        <Button
-          onClick={() => setActiveTab('pending')}
-          variant={activeTab === 'pending' ? 'default' : 'outline'}
-          className={cn(
-            "flex items-center gap-2 text-white",
-            activeTab === 'pending' ? "bg-purple-600 hover:bg-purple-700" : "bg-zinc-800/50 border-zinc-600"
-          )}
-        >
-          <Clock className="w-4 h-4" />
-          Em Andamento
-          <Badge variant="secondary" className="ml-2 bg-zinc-700">
-            {pendingCount}
-          </Badge>
-        </Button>
-        
-        <Button
-          onClick={() => setActiveTab('completed')}
-          variant={activeTab === 'completed' ? 'default' : 'outline'}
-          className={cn(
-            "flex items-center gap-2 text-white",
-            activeTab === 'completed' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
-          )}
-        >
-          <CheckCircle className="w-4 h-4" />
-          Finalizadas
-          <Badge variant="secondary" className="ml-2 bg-zinc-700">
-            {completedCount}
-          </Badge>
-        </Button>
-      </div>
-
-      {transfers.length === 0 ? (
-        <Card className="p-16 text-center bg-white/5 border-white/10">
-          <p className="text-xl text-zinc-400">
-            {activeTab === 'pending' 
-              ? 'Nenhuma negociação pendente no momento.' 
-              : 'Nenhuma transferência finalizada.'
-            }
-          </p>
-          <p className="text-zinc-500 mt-2">
-            {activeTab === 'pending' 
-              ? 'O mercado está calmo... por enquanto.' 
-              : 'Todas as negociações estão em andamento.'
-            }
-          </p>
-        </Card>
-      ) : (
-        <div className={cn(
-          "gap-4",
-          activeTab === 'pending' ? "grid grid-cols-1 lg:grid-cols-2" : "grid grid-cols-1 md:grid-cols-2"
-        )}>
-          {transfers.map((t) => {
-            // Verificar se é uma dispensa (to_team_id é null ou transfer_type é 'dismiss')
-            const isDismissal = !t.to_team_id || t.transfer_type === 'dismiss'
-            // Verificar se é um leilão
-            const isAuctionTransfer = isAuction(t.transfer_type)
-            
-            return (
-              <Card
-                key={t.id}
-                className={cn(
-                  "bg-white/5 backdrop-blur-xl border transition-all",
-                  t.status === 'approved' 
-                    ? "border-green-500/20 hover:border-green-500/40 p-4" 
-                    : "border-white/10 hover:border-white/20 p-5",
-                  t.is_exchange && "border-blue-500/20 hover:border-blue-500/40",
-                  isDismissal && "border-red-500/20 hover:border-red-500/40",
-                  isAuctionTransfer && "border-orange-500/20 hover:border-orange-500/40"
-                )}
-              >
-                {/* Badge de tipo de transferência */}
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex gap-2">
-                    <Badge className={cn(
-                      "text-xs",
-                      isAuctionTransfer ? "bg-orange-600" : 
-                      t.is_exchange ? "bg-blue-600" : 
-                      isDismissal ? "bg-red-600" : "bg-purple-600"
-                    )}>
-                      {isAuctionTransfer ? (
-                        <>
-                          <Gavel className="w-3 h-3 mr-1" />
-                          Leilão
-                        </>
-                      ) : t.is_exchange ? (
-                        <>
-                          <ArrowRightLeft className="w-3 h-3 mr-1" />
-                          Troca
-                        </>
-                      ) : isDismissal ? (
-                        <>
-                          <X className="w-3 h-3 mr-1" />
-                          Dispensa
-                        </>
-                      ) : (
-                        <>
-                          <DollarSign className="w-3 h-3 mr-1" />
-                          Venda
-                        </>
-                      )}
-                    </Badge>
-                    
-                    {/* Tag adicional para leilão */}
-              
-                  </div>
-                  
-                  {t.status === 'approved' && (
-                    <Badge className="bg-green-600 text-white text-xs">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Concluída
-                    </Badge>
-                  )}
-                </div>
-
-                {t.status === 'pending' ? (
-                  // LAYOUT COMPACTO PARA EM ANDAMENTO (2 por linha)
-                  <>
-                    {/* Times e Valor em linha compacta */}
-                    <div className="flex items-center justify-between mb-4">
-                      {/* Time Vendedor - PARA LEILÃO MOSTRA A LOGO DO LEILÃO */}
-                      <div className="flex flex-col items-center text-center flex-1">
-                        {isAuctionTransfer ? (
-                          // Logo do Leilão
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center mb-1">
-                            <Gavel className="w-5 h-5 text-white" />
-                          </div>
-                        ) : t.from_team?.logo_url ? (
-                          <img 
-                            src={t.from_team.logo_url} 
-                            alt={t.from_team.name}
-                            className="w-10 h-10 rounded-full object-cover border-2 border-red-500/50 mb-1"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center mb-1">
-                            <span className="text-xs font-bold text-white">
-                              {t.from_team?.name?.substring(0, 2) || 'VD'}
-                            </span>
-                          </div>
-                        )}
-                        <p className="text-white text-sm font-medium truncate w-full">
-                          {isAuctionTransfer ? 'Leilão' : t.from_team?.name || 'Vendedor'}
-                        </p>
-                        <p className="text-zinc-400 text-xs">
-                          {isAuctionTransfer ? 'Sistema de Leilão' : 'Vendedor'}
-                        </p>
-                      </div>
-
-                      {/* Setas e Valor - Compacto */}
-                      <div className="flex flex-col items-center mx-2">
-                        <div className="flex items-center gap-1">
-                          <ArrowRight className="w-4 h-4 text-yellow-400" />
-                          <div className="flex flex-col items-center">
-                            <div className="flex items-center gap-1">
-                              {t.is_exchange ? (
-                                <ArrowRightLeft className="w-3 h-3 text-blue-400" />
-                              ) : isAuctionTransfer ? (
-                                <Gavel className="w-3 h-3 text-orange-400" />
-                              ) : (
-                                <DollarSign className="w-3 h-3 text-emerald-400" />
-                              )}
-                              <span className={cn(
-                                "font-bold text-sm",
-                                t.is_exchange ? "text-blue-400" : 
-                                isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
-                              )}>
-                                {formatBalance(t.value)}
-                              </span>
-                            </div>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-yellow-400" />
-                        </div>
-                        <p className="text-zinc-400 text-xs mt-1 text-center">
-                          {isAuctionTransfer ? 'Leilão' : t.is_exchange ? 'Troca' : 'Venda'}
-                        </p>
-                      </div>
-
-                      {/* Time Comprador */}
-                      <div className="flex flex-col items-center text-center flex-1">
-                        {t.to_team?.logo_url ? (
-                          <img 
-                            src={t.to_team.logo_url} 
-                            alt={t.to_team.name}
-                            className="w-10 h-10 rounded-full object-cover border-2 border-green-500/50 mb-1"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center mb-1">
-                            <span className="text-xs font-bold text-white">
-                              {t.to_team?.name?.substring(0, 2) || 'CP'}
-                            </span>
-                          </div>
-                        )}
-                        <p className="text-white text-sm font-medium truncate w-full">
-                          {t.to_team?.name || 'Comprador'}
-                        </p>
-                        <p className="text-zinc-400 text-xs">Comprador</p>
-                      </div>
-                    </div>
-
-                    {/* Jogador Principal - Compacto */}
-                    <div className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg mb-4">
-                      {t.player?.photo_url ? (
-                        <img 
-                          src={t.player.photo_url} 
-                          alt={t.player.name}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-sm font-black text-white">
-                            {t.player?.position || 'N/A'}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-bold text-white truncate">
-                          {t.player?.name || 'Jogador Desconhecido'}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge className="bg-purple-600 text-xs">
-                            {t.player?.position || 'N/A'}
-                          </Badge>
-                          <span className="text-yellow-400 text-xs font-semibold">
-                            ⏳ Aguardando
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Jogadores da Troca (se for troca) */}
-                    {t.is_exchange && <ExchangePlayers transfer={t} />}
-
-                    {/* Aprovações - Compacto */}
-                    <div className="flex items-center justify-between mb-4 px-2">
-                      {/* Vendedor */}
-                      <div className="text-center group relative">
-                        <CheckCircle2
-                          className={cn(
-                            "h-8 w-8 transition-all",
-                            t.approved_by_seller ? "text-green-400" : "text-zinc-600"
-                          )}
-                        />
-                        <p className="text-xs text-zinc-400 mt-1">
-                          {isAuctionTransfer ? 'Sistema' : 'Vendedor'}
-                        </p>
-                      </div>
-
-                      {/* Comprador */}
-                      <div className="text-center group relative">
-                        <CheckCircle2
-                          className={cn(
-                            "h-8 w-8 transition-all",
-                            t.approved_by_buyer ? "text-green-400" : "text-zinc-600"
-                          )}
-                        />
-                        <p className="text-xs text-zinc-400 mt-1">Comprador</p>
-                      </div>
-
-                      {/* Admin */}
-                      <div className="text-center group relative">
-                        <CheckCircle2
-                          className={cn(
-                            "h-8 w-8 transition-all",
-                            t.approved_by_admin ? "text-green-400" : "text-zinc-600"
-                          )}
-                        />
-                        <p className="text-xs text-zinc-400 mt-1">Admin</p>
-                      </div>
-                    </div>
-
-                    {/* Botões de aprovação */}
-                    {(userTeamId === t.from_team_id || userTeamId === t.to_team_id || isAdmin) && (
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-2 justify-center">
-                          {userTeamId === t.from_team_id && !t.approved_by_seller && !isAuctionTransfer && (
-                            <Button
-                              onClick={() => aprovar(t.id, 'seller')}
-                              size="sm"
-                              className="bg-green-600 hover:bg-green-700 text-white text-xs px-3"
-                            >
-                              Aprovar Vendedor
-                            </Button>
-                          )}
-                          {userTeamId === t.to_team_id && !t.approved_by_buyer && (
-                            <Button
-                              onClick={() => aprovar(t.id, 'buyer')}
-                              size="sm"
-                              className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3"
-                            >
-                              Aprovar Comprador
-                            </Button>
-                          )}
-                          {isAdmin && !t.approved_by_admin && (
-                            <Button
-                              onClick={() => aprovar(t.id, 'admin')}
-                              size="sm"
-                              className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3"
-                            >
-                              Aprovar Admin
-                            </Button>
-                          )}
-                        </div>
-
-                        {/* BOTÃO DE CANCELAR - APENAS PARA ADMIN */}
-                        {isAdmin && (
-                          <div className="flex justify-center">
-                            <Button
-                              onClick={() => rejeitarTransferencia(t.id)}
-                              variant="outline"
-                              size="sm"
-                              className="bg-red-600 hover:bg-red-700 text-white border-red-600 text-xs"
-                            >
-                              <Ban className="w-3 h-3 mr-1" />
-                              Cancelar
-                            </Button>
-                          </div>
-                        )}
-
-                        {/* Mensagem se já aprovou */}
-                        {((userTeamId === t.from_team_id && t.approved_by_seller) ||
-                          (userTeamId === t.to_team_id && t.approved_by_buyer) ||
-                          (isAdmin && t.approved_by_admin)) && (
-                          <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
-                            <CheckCircle className="w-3 h-3" />
-                            Você já aprovou esta negociação
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  // LAYOUT PARA TRANSFERÊNCIAS FINALIZADAS (compacto) - ATUALIZADO COM LEILÃO
-                  <div className="space-y-3">
-                    {/* Header com data/hora */}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-zinc-400">
-                        <Calendar className="w-3 h-3" />
-                        <span className="text-xs">
-                          {formatDateTime(t.created_at).date} às {formatDateTime(t.created_at).time}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Conteúdo principal */}
-                    <div className="flex items-center justify-between">
-                      {/* Time de Origem - PARA LEILÃO MOSTRA A LOGO DO LEILÃO */}
-                      <div className="flex items-center gap-2">
-                        {isAuctionTransfer ? (
-                          // Logo do Leilão
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
-                            <Gavel className="w-4 h-4 text-white" />
-                          </div>
-                        ) : t.from_team?.logo_url ? (
-                          <img 
-                            src={t.from_team.logo_url} 
-                            alt={t.from_team.name}
-                            className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">
-                              {t.from_team?.name?.substring(0, 2) || 'VD'}
-                            </span>
-                          </div>
-                        )}
-                        <div className="text-right">
-                          <p className="text-white text-xs font-semibold truncate max-w-[60px]">
-                            {isAuctionTransfer ? 'Leilão' : t.from_team?.name || 'Vendedor'}
-                          </p>
-                          <p className="text-zinc-400 text-[10px]">
-                            {isAuctionTransfer ? 'Sistema de Leilão' : 
-                             isDismissal ? 'Anterior' : 'Vendedor'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Setas e Valor */}
-                      <div className="flex flex-col items-center flex-1 mx-2">
-                        <div className="flex items-center gap-1">
-                          <ArrowRight className="w-3 h-3 text-yellow-400" />
-                          <div className="flex items-center gap-1">
-                            {isDismissal ? (
-                              <X className="w-3 h-3 text-red-400" />
-                            ) : t.is_exchange ? (
-                              <ArrowRightLeft className="w-3 h-3 text-blue-400" />
-                            ) : isAuctionTransfer ? (
-                              <Gavel className="w-3 h-3 text-orange-400" />
-                            ) : (
-                              <DollarSign className="w-3 h-3 text-emerald-400" />
-                            )}
-                            <span className={cn(
-                              "font-bold text-sm",
-                              isDismissal ? "text-red-400" : 
-                              t.is_exchange ? "text-blue-400" : 
-                              isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
-                            )}>
-                              {formatBalance(t.value)}
-                            </span>
-                          </div>
-                          <ArrowRight className="w-3 h-3 text-yellow-400" />
-                        </div>
-                        <p className="text-zinc-400 text-[10px] mt-1">
-                          {isAuctionTransfer ? 'Leilão' : 
-                           isDismissal ? 'Dispensa' : t.is_exchange ? 'Troca' : 'Venda'}
-                        </p>
-                      </div>
-
-                      {/* Destino */}
-                      <div className="flex items-center gap-2">
-                        <div className="text-left">
-                          <p className="text-white text-xs font-semibold truncate max-w-[60px]">
-                            {isDismissal ? 'Sem Clube' : t.to_team?.name || 'Comprador'}
-                          </p>
-                          <p className="text-zinc-400 text-[10px]">
-                            {isDismissal ? 'Destino' : 'Comprador'}
-                          </p>
-                        </div>
-                        {isDismissal ? (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-400 flex items-center justify-center">
-                            <Users className="w-4 h-4 text-gray-300" />
-                          </div>
-                        ) : t.to_team?.logo_url ? (
-                          <img 
-                            src={t.to_team.logo_url} 
-                            alt={t.to_team.name}
-                            className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">
-                              {t.to_team?.name?.substring(0, 2) || 'CP'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Jogador Principal */}
-                    <div className="flex items-center gap-2 pt-2 border-t border-zinc-700/50">
-                      {t.player?.photo_url ? (
-                        <img 
-                          src={t.player.photo_url} 
-                          alt={t.player.name}
-                          className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
-                        />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                          <span className="text-xs font-black text-white">
-                            {t.player?.position || 'N/A'}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white text-sm font-semibold truncate">
-                          {t.player?.name || 'Jogador Desconhecido'}
-                        </p>
-                        <Badge className="bg-purple-600 text-[10px]">
-                          {t.player?.position || 'N/A'}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Jogadores da Troca (se for troca) */}
-                    {t.is_exchange && <ExchangePlayers transfer={t} />}
-                    
-                    {/* Tag laranja "Leilão" para transferências finalizadas que são leilões */}
-                    {isAuctionTransfer && activeTab === 'completed' && (
-                      <div className="mt-2 pt-2 border-t border-orange-500/20">
-                  
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            )
-          })}
-        </div>
-      )}
-    </>
-  )
-
-  // Componente principal do Mercado - ATUALIZADO
-  const MercadoView = () => {
-    return (
-      <>
-        {/* Tabs do Mercado */}
-        <div className="flex gap-4 mb-6 justify-center md:justify-start">
-          <Button
-            onClick={() => setMarketTab('disponiveis')}
-            variant={marketTab === 'disponiveis' ? 'default' : 'outline'}
-            className={cn(
-              "flex items-center gap-2 text-white",
-              marketTab === 'disponiveis' ? "bg-blue-600 hover:bg-blue-700" : "bg-zinc-800/50 border-zinc-600"
-            )}
-          >
-            <ShoppingCart className="w-4 h-4" />
-            Disponíveis
-            <Badge variant="secondary" className="ml-2 bg-zinc-700">
-              {marketPlayers.length}
-            </Badge>
-          </Button>
-          
-          <Button
-            onClick={() => setMarketTab('meus')}
-            variant={marketTab === 'meus' ? 'default' : 'outline'}
-            className={cn(
-              "flex items-center gap-2 text-white",
-              marketTab === 'meus' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
-            )}
-          >
-            <Users className="w-4 h-4" />
-            Meus Jogadores
-            <Badge variant="secondary" className="ml-2 bg-zinc-700">
-              {myMarketPlayers.length}
-            </Badge>
-          </Button>
-        </div>
-
-        {marketTab === 'meus' && (
-          <Card className="p-6 mb-6 bg-white/5 border-white/10">
-            <div className="flex justify-between items-center mb-4">
-              <div>
-                <h3 className="text-xl font-bold text-white">Anunciar Jogador</h3>
-                <p className="text-zinc-400">Coloque jogadores do seu time disponíveis para negociação</p>
-              </div>
-              {!showAddForm && (
-                <Button
-                  onClick={() => {
-                    setShowAddForm(true)
-                    // Resetar seleção quando abrir o formulário
-                    setSelectedPlayer(null)
-                    setMarketPrice('')
-                    setMarketDescription('')
-                  }}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adicionar Jogador
-                </Button>
-              )}
-            </div>
-
-            {showAddForm && (
-              <div className="space-y-4 p-4 bg-zinc-800/30 rounded-lg">
-                {/* Selecionar jogador */}
-                <div>
-                  <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                    Selecione um jogador do seu time
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
-                    {availablePlayers.map(player => (
-                      <div
-                        key={player.id}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
-                          selectedPlayer?.id === player.id
-                            ? "bg-blue-500/20 border-blue-500/50"
-                            : "bg-zinc-800/30 border-zinc-600 hover:border-zinc-500"
-                        )}
-                        onClick={() => {
-                          setSelectedPlayer(player)
-                          // Resetar descrição quando mudar jogador
-                          setMarketDescription('')
-                        }}
-                      >
-                        {player.photo_url ? (
-                          <img 
-                            src={player.photo_url} 
-                            alt={player.name}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-700 to-cyan-700 flex items-center justify-center">
-                            <span className="text-sm font-black text-white">{player.position}</span>
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <p className="font-medium text-white">{player.name}</p>
-                          <div className="flex items-center gap-2 text-sm">
-                            <Badge className="bg-blue-600">{player.position}</Badge>
-                            <span className="text-zinc-400">OVR {player.overall}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-emerald-400 font-bold">
-                            R$ {player.base_price.toLocaleString('pt-BR')}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {selectedPlayer && (
-                  <>
-                    {/* Preço - SELEÇÃO DE OPÇÕES (100 opções de 1M em 1M) */}
-                    <div>
-                      <label className="text-zinc-400 text-sm font-medium mb-2 block">
-                        Selecione o Preço de Venda
-                      </label>
-                      <div className="relative">
-                        <select
-                          value={marketPrice}
-                          onChange={(e) => handlePriceChange(e.target.value)}
-                          className="w-full p-3 bg-zinc-800/50 border border-zinc-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none cursor-pointer"
-                        >
-                          <option value="">Selecione um preço...</option>
-                          {priceOptions.map((option, index) => (
-                            <option 
-                              key={index} 
-                              value={option.label}
-                              className="bg-zinc-800 text-white"
-                            >
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                          <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                      <p className="text-zinc-500 text-xs mt-1">
-                        Valor base do jogador: R$ {selectedPlayer.base_price.toLocaleString('pt-BR')}
-                        <span className="block mt-1">
-                          Seleção de 100 opções a partir do valor base, aumentando R$ 1.000.000 a cada opção
-                        </span>
-                      </p>
-                    </div>
-
-                    {/* Descrição - BOTÃO PARA ABRIR MODAL */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-zinc-400 text-sm font-medium">
-                          Descrição (opcional)
-                        </label>
-                        <Button
-                          type="button"
-                          onClick={handleOpenDescriptionModal}
-                          variant="outline"
-                          size="sm"
-                          className="text-blue-400 border-blue-400/30 hover:bg-blue-400/10"
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          {marketDescription ? 'Editar Descrição' : 'Adicionar Descrição'}
-                        </Button>
-                      </div>
-                      
-                      {/* Visualização da descrição atual */}
-                      {marketDescription ? (
-                        <div className="mt-2 p-3 bg-zinc-800/30 rounded-lg border border-zinc-700">
-                          <p className="text-zinc-300 text-sm">{marketDescription}</p>
-                        </div>
-                      ) : (
-                        <p className="text-zinc-500 text-sm italic">
-                          Nenhuma descrição adicionada. Clique no botão acima para adicionar uma descrição.
-                        </p>
-                      )}
-                      
-                      <p className="text-zinc-500 text-xs mt-1">
-                        Por que está colocando à venda?
-                      </p>
-                    </div>
-
-                    {/* Botões */}
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={handleAddToMarket}
-                        disabled={addingPlayer || !marketPrice}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {addingPlayer ? 'Anunciando...' : 'Anunciar no Mercado'}
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setShowAddForm(false)
-                          setSelectedPlayer(null)
-                          setMarketPrice('')
-                          setMarketDescription('')
-                        }}
-                        variant="outline"
-                        className="flex-1 text-white border-zinc-600 hover:bg-zinc-800"
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Meus jogadores no mercado */}
-            {myMarketPlayers.length > 0 && (
-              <div className="mt-6">
-                <h4 className="text-lg font-bold text-white mb-4">Meus jogadores anunciados</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {myMarketPlayers.map(listing => (
-                    <MarketPlayerCard 
-                      key={listing.id} 
-                      listing={listing} 
-                      isMine={true}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* Lista de jogadores disponíveis */}
-        {loadingMarket ? (
-          <div className="text-center py-16">
-            <p className="text-xl text-zinc-400 animate-pulse">Carregando mercado...</p>
-          </div>
-        ) : marketTab === 'disponiveis' && marketPlayers.length === 0 ? (
-          <Card className="p-16 text-center bg-white/5 border-white/10">
-            <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-            <p className="text-xl text-zinc-400">Nenhum jogador disponível no mercado</p>
-            <p className="text-zinc-500 mt-2">Os times ainda não anunciaram jogadores para venda</p>
-          </Card>
-        ) : marketTab === 'meus' && myMarketPlayers.length === 0 && !showAddForm ? (
-          <Card className="p-16 text-center bg-white/5 border-white/10">
-            <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-            <p className="text-xl text-zinc-400">Você ainda não anunciou jogadores</p>
-            <p className="text-zinc-500 mt-2">Clique em "Adicionar Jogador" para começar</p>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(marketTab === 'disponiveis' ? marketPlayers : myMarketPlayers)
-              .filter(listing => marketTab === 'disponiveis' ? listing.is_active : true)
-              .map(listing => (
-                <MarketPlayerCard 
-                  key={listing.id} 
-                  listing={listing} 
-                  isMine={marketTab === 'meus'}
-                />
-              ))
-            }
-          </div>
-        )}
-      </>
-    )
-  }
-
-  // Criar objetos compatíveis com os componentes de chat
   const chatUser = {
     id: user?.id || '',
     name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
@@ -1989,24 +1025,14 @@ export default function PaginaTransferencias() {
     name: team?.name || 'Sem time'
   }
 
-  if (loading && activeView === 'transferencias') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
-        <p className="text-2xl text-white animate-pulse">Carregando negociações...</p>
-      </div>
-    )
-  }
-
   return (
     <div className="flex min-h-screen bg-zinc-950">
-      {/* Sidebar */}
       <Sidebar 
         user={user!}
         profile={profile}
         team={team}
       />
 
-      {/* Conteúdo Principal */}
       <div className="flex-1 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
           <div className="mx-auto max-w-6xl">
@@ -2020,19 +1046,58 @@ export default function PaginaTransferencias() {
               }
             </p>
 
-            {/* Switch entre Transferências e Mercado */}
-            <ViewSwitch />
+            <ViewSwitch activeView={activeView} setActiveView={setActiveView} />
 
-            {/* Renderizar view ativa */}
             {activeView === 'transferencias' ? (
-              <TransferenciasView />
+              <TransferenciasView
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                transfers={transfers}
+                allTransfers={allTransfers}
+                userTeamId={userTeamId}
+                isAdmin={isAdmin}
+                exchangePlayersDetails={exchangePlayersDetails}
+                aprovar={aprovar}
+                rejeitarTransferencia={rejeitarTransferencia}
+                loading={loading}
+              />
             ) : (
-              <MercadoView />
+              <MercadoView
+                marketTab={marketTab}
+                setMarketTab={setMarketTab}
+                marketPlayers={marketPlayers}
+                myMarketPlayers={myMarketPlayers}
+                availablePlayers={availablePlayers}
+                loadingMarket={loadingMarket}
+                showAddForm={showAddForm}
+                setShowAddForm={setShowAddForm}
+                selectedPlayer={selectedPlayer}
+                setSelectedPlayer={setSelectedPlayer}
+                marketPrice={marketPrice}
+                setMarketPrice={setMarketPrice}
+                marketDescription={marketDescription}
+                setMarketDescription={setMarketDescription}
+                editingDescription={editingDescription}
+                setEditingDescription={setEditingDescription}
+                editDescriptionText={editDescriptionText}
+                setEditDescriptionText={setEditDescriptionText}
+                priceOptions={priceOptions}
+                handlePriceChange={handlePriceChange}
+                handleOpenDescriptionModal={handleOpenDescriptionModal}
+                handleAddToMarket={handleAddToMarket}
+                handleRemoveFromMarket={handleRemoveFromMarket}
+                handleBuyPlayer={handleBuyPlayer}
+                handleMakeProposal={handleMakeProposal} // NOVA PROP
+                handleStartEditDescription={handleStartEditDescription}
+                handleUpdateDescription={handleUpdateDescription}
+                handleCancelEdit={handleCancelEdit}
+                addingPlayer={addingPlayer}
+                handleCancelAdd={handleCancelAdd} // NOVA PROP
+              />
             )}
           </div>
         </div>
 
-        {/* Chat Components */}
         {user && team && (
           <>
             <FloatingChatButton 
@@ -2051,7 +1116,6 @@ export default function PaginaTransferencias() {
           </>
         )}
 
-        {/* Modal de Descrição */}
         <DescriptionModal
           isOpen={showDescriptionModal}
           onClose={handleCloseDescriptionModal}

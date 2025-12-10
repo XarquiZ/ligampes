@@ -230,3 +230,46 @@ div:focus {
 .transition-all {
   transition: all 0.3s ease-in-out;
 }
+
+/* Adicione estas cores personalizadas */
+:root {
+  /* Tons suaves e delicados */
+  --color-lilac: 230, 225, 255;
+  --color-periwinkle: 200, 210, 255;
+  --color-mint: 220, 245, 235;
+  --color-peach: 255, 230, 220;
+  --color-apricot: 255, 210, 180;
+  --color-teal: 100, 200, 190;
+}
+
+/* Classes de cores */
+.bg-lilac-50 { background-color: rgba(var(--color-lilac), 0.5); }
+.bg-lilac-100 { background-color: rgba(var(--color-lilac), 0.8); }
+.text-lilac-600 { color: #6C63FF; }
+.border-lilac-200 { border-color: rgba(var(--color-lilac), 0.8); }
+
+.bg-periwinkle-50 { background-color: rgba(var(--color-periwinkle), 0.5); }
+.bg-periwinkle-100 { background-color: rgba(var(--color-periwinkle), 0.8); }
+
+.bg-mint-50 { background-color: rgba(var(--color-mint), 0.5); }
+.bg-mint-100 { background-color: rgba(var(--color-mint), 0.8); }
+.text-teal-700 { color: #0D9488; }
+
+.bg-peach-50 { background-color: rgba(var(--color-peach), 0.5); }
+.bg-peach-100 { background-color: rgba(var(--color-peach), 0.8); }
+
+/* Sombras suaves */
+.shadow-soft {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+}
+.shadow-gentle {
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.07);
+}
+.shadow-subtle {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
+
+/* Gradientes suaves */
+.bg-gradient-soft {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+}

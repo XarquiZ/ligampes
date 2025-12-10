@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Trash2, Save, Users, Target, X, Move, Edit2, GripVertical, Eye } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Trash2, Save, Users, Target, X, Move, Edit2, GripVertical, Eye, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PlannerSectionProps, Player, POSITION_MAP, POSITIONS } from '../types'
 import { PlayerSelectionModal } from '../modals/PlayerSelectionModal'
@@ -48,6 +48,81 @@ interface LoadFormationDialogProps {
   formations: any[]
   onLoadFormation: (formation: any) => void
   onDeleteFormation: (id: string) => void
+}
+
+interface RemoveConfirmationModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onConfirm: () => void
+  playerName: string
+  playerPosition: string
+}
+
+const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  playerName,
+  playerPosition
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-zinc-900 border-zinc-700">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-500/20 rounded-lg">
+              <AlertTriangle className="w-6 h-6 text-red-400" />
+            </div>
+            <div>
+              <DialogTitle className="text-white">Remover Jogador</DialogTitle>
+              <DialogDescription className="text-zinc-400">
+                Tem certeza que deseja remover este jogador do esquema?
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+        
+        <div className="py-4">
+          <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-zinc-700 flex items-center justify-center">
+                <span className="text-lg font-bold text-white">{playerPosition}</span>
+              </div>
+              <div>
+                <h4 className="font-bold text-white">{playerName}</h4>
+                <p className="text-sm text-zinc-400">Posição: {playerPosition}</p>
+              </div>
+            </div>
+            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+              <p className="text-sm text-yellow-400">
+                ⚠️ O jogador será movido para o banco de reservas se houver espaço disponível.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="border-zinc-600 hover:bg-zinc-800 flex-1"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={() => {
+              onConfirm()
+              onClose()
+            }}
+            className="bg-red-600 hover:bg-red-700 flex-1"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Sim, Remover
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({ 
@@ -233,6 +308,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
   const [selectedSlot, setSelectedSlot] = useState<FieldSlot | null>(null)
   const [showPlayerModal, setShowPlayerModal] = useState(false)
   const [showPositionModal, setShowPositionModal] = useState(false)
+  const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false)
+  const [slotToRemove, setSlotToRemove] = useState<string | null>(null)
   const [savedFormations, setSavedFormations] = useState<any[]>([])
   const [showStats, setShowStats] = useState(false)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
@@ -717,12 +794,64 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
     }
   }
 
-  const handleRemovePlayer = (slotId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    const updatedFieldSlots = fieldSlots.map(slot =>
-      slot.id === slotId ? { ...slot, player: null, isOccupied: false } : slot
-    )
-    setFieldSlots(updatedFieldSlots)
+  // Função para remover jogador com confirmação - ATUALIZADA
+  const handleRemovePlayerWithConfirmation = (slotId: string, e?: React.MouseEvent) => {
+    // Prevenir comportamento padrão e propagação
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    
+    // Cancelar qualquer timeout de arrasto pendente
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current)
+    }
+    
+    // Resetar estado de arrasto imediatamente
+    setDragging({ isDragging: false, slotId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 })
+    
+    const slot = fieldSlots.find(s => s.id === slotId)
+    if (slot?.player) {
+      setSlotToRemove(slotId)
+      setShowRemoveConfirmation(true)
+    }
+    
+    // Fechar opções de hover
+    setHovering({ isHovering: false, slotId: null, showOptions: false })
+  }
+
+  // Função para confirmar remoção
+  const confirmRemovePlayer = () => {
+    if (slotToRemove) {
+      const slot = fieldSlots.find(s => s.id === slotToRemove)
+      if (slot?.player) {
+        // Tentar mover para o banco de reservas se houver espaço
+        const emptyReserveSlot = reserveSlots.find(s => !s.player)
+        
+        if (emptyReserveSlot) {
+          // Move para o banco
+          const updatedFieldSlots = fieldSlots.map(s =>
+            s.id === slotToRemove ? { ...s, player: null, isOccupied: false } : s
+          )
+          
+          const updatedReserveSlots = reserveSlots.map(s =>
+            s.id === emptyReserveSlot.id ? { ...s, player: slot.player, isOccupied: true } : s
+          )
+          
+          setFieldSlots(updatedFieldSlots)
+          setReserveSlots(updatedReserveSlots)
+        } else {
+          // Remove completamente
+          const updatedFieldSlots = fieldSlots.map(s =>
+            s.id === slotToRemove ? { ...s, player: null, isOccupied: false } : s
+          )
+          setFieldSlots(updatedFieldSlots)
+        }
+      }
+      
+      setSlotToRemove(null)
+      setShowRemoveConfirmation(false)
+    }
   }
 
   const handleClearReserveSlot = (slotId: string, e: React.MouseEvent) => {
@@ -964,7 +1093,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           <div>
             <h3 className="text-lg font-bold text-white">Planejador de Formação Personalizada</h3>
             <p className="text-sm text-zinc-400">
-              • Segure e arraste para mover • Hover para ver opções • Click para editar posição
+              • Segure e arraste para mover • Hover para ver opções • Click no jogador para editar posição
             </p>
           </div>
           <div className="flex gap-2">
@@ -1052,7 +1181,18 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDropOnField(e, slot.id)}
                   onMouseDown={(e) => slot.player && handleMouseDown(e, slot.id)}
-                  onMouseUp={(e) => slot.player && handleMouseUp(e, slot.id)}
+                  onMouseUp={(e) => {
+                    // Verifica se o clique foi no jogador (ícone circular) e não nas opções
+                    const target = e.target as HTMLElement;
+                    const clickedOnPlayerIcon = 
+                      target.closest('.player-icon-container') || 
+                      target.classList.contains('player-icon-container');
+                    
+                    if (slot.player && clickedOnPlayerIcon && !dragging.isDragging) {
+                      setSelectedSlot(slot)
+                      setShowPositionModal(true)
+                    }
+                  }}
                   onMouseEnter={() => slot.player && handleMouseEnter(slot.id)}
                   onMouseLeave={handleMouseLeave}
                   className={cn(
@@ -1080,12 +1220,20 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             onMouseEnter={() => handleMouseEnter(slot.id)}
                             onMouseLeave={handleMouseLeave}
                           >
-                            {/* Remover jogador */}
+                            {/* Remover jogador - ATUALIZADO: usa onMouseDown em vez de onClick */}
                             <button
-                              onClick={(e) => {
+                              onMouseDown={(e) => {
+                                e.preventDefault()
                                 e.stopPropagation()
-                                handleRemovePlayer(slot.id, e)
+                                // Cancelar arrasto imediatamente
+                                if (dragTimeoutRef.current) {
+                                  clearTimeout(dragTimeoutRef.current)
+                                }
+                                setDragging({ isDragging: false, slotId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 })
+                                // Chamar função de remoção
+                                handleRemovePlayerWithConfirmation(slot.id, e)
                               }}
+                              onClick={(e) => e.preventDefault()} // Prevenir clique duplo
                               className="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/50 flex items-center justify-center hover:bg-red-500/30 transition-colors group/btn"
                               title="Remover jogador"
                             >
@@ -1094,11 +1242,20 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             
                             {/* Mudar posição */}
                             <button
-                              onClick={(e) => {
+                              onMouseDown={(e) => {
+                                e.preventDefault()
                                 e.stopPropagation()
+                                // Cancelar arrasto imediatamente
+                                if (dragTimeoutRef.current) {
+                                  clearTimeout(dragTimeoutRef.current)
+                                }
+                                setDragging({ isDragging: false, slotId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 })
+                                // Abrir modal de posição
                                 setSelectedSlot(slot)
                                 setShowPositionModal(true)
+                                setHovering({ isHovering: false, slotId: null, showOptions: false })
                               }}
+                              onClick={(e) => e.preventDefault()} // Prevenir clique duplo
                               className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/50 flex items-center justify-center hover:bg-blue-500/30 transition-colors group/btn"
                               title="Mudar posição"
                             >
@@ -1107,7 +1264,11 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             
                             {/* Arrastar */}
                             <button
-                              onMouseDown={(e) => handleMouseDown(e, slot.id)}
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleMouseDown(e, slot.id)
+                              }}
                               className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center hover:bg-emerald-500/30 transition-colors cursor-grab active:cursor-grabbing group/btn"
                               title="Segure para arrastar"
                             >
@@ -1116,12 +1277,14 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                           </div>
                         )}
                         
-                        {/* Jogador */}
-                        <div className={cn(
-                          "w-16 h-16 rounded-full overflow-hidden border-2 shadow-lg flex flex-col items-center justify-center relative",
-                          getPositionColor(slot.position),
-                          isDraggingThisSlot ? "scale-110 shadow-2xl" : "hover:scale-105"
-                        )}>
+                        {/* Jogador - adicionada classe player-icon-container para identificar clique */}
+                        <div 
+                          className={cn(
+                            "player-icon-container w-16 h-16 rounded-full overflow-hidden border-2 shadow-lg flex flex-col items-center justify-center relative",
+                            getPositionColor(slot.position),
+                            isDraggingThisSlot ? "scale-110 shadow-2xl" : "hover:scale-105"
+                          )}
+                        >
                           {slot.player.photo_url ? (
                             <img 
                               src={slot.player.photo_url} 
@@ -1430,6 +1593,20 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           onSelectPosition={handleSelectPosition}
           currentPosition={selectedSlot.position}
           player={selectedSlot.player}
+        />
+      )}
+
+      {/* Modal de confirmação para remover jogador */}
+      {slotToRemove && (
+        <RemoveConfirmationModal
+          isOpen={showRemoveConfirmation}
+          onClose={() => {
+            setShowRemoveConfirmation(false)
+            setSlotToRemove(null)
+          }}
+          onConfirm={confirmRemovePlayer}
+          playerName={fieldSlots.find(s => s.id === slotToRemove)?.player?.name || ''}
+          playerPosition={fieldSlots.find(s => s.id === slotToRemove)?.position || ''}
         />
       )}
 

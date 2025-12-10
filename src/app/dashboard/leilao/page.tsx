@@ -51,6 +51,7 @@ interface Auction {
     logo_url: string
   }
   time_remaining?: number
+  auction_duration?: number
 }
 
 interface Team {
@@ -76,6 +77,34 @@ const formatToMillions = (value: number): string => {
     return `${(value / 1000000).toFixed(0)}M`
   }
   return value.toLocaleString('pt-BR')
+}
+
+// Função para formatar o tempo restante de forma mais legível para durações longas
+const formatTimeRemaining = (milliseconds: number, auctionDuration?: number) => {
+  // Se for um leilão de 24 horas ou mais, mostrar de forma mais detalhada
+  if (auctionDuration && auctionDuration >= 1440) { // 24 horas ou mais
+    const totalSeconds = Math.floor(milliseconds / 1000)
+    const days = Math.floor(totalSeconds / 86400)
+    const hours = Math.floor((totalSeconds % 86400) / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    
+    if (days > 0) {
+      return `${days}d ${hours}h ${minutes}m`
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`
+    }
+  }
+  
+  // Para durações menores, manter o formato original
+  const totalSeconds = Math.floor(milliseconds / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  
+  if (minutes > 0) {
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
+  return `${seconds}s`
 }
 
 export default function PaginaLeilao() {
@@ -440,12 +469,18 @@ export default function PaginaLeilao() {
 
   const handleStartAuction = async (auctionId: string) => {
     try {
+      const auction = auctions.find(a => a.id === auctionId)
+      if (!auction) return
+
+      // Obter a duração do leilão (se disponível)
+      const durationMinutes = auction.auction_duration || 5
+      
       const { error } = await supabase
         .from('auctions')
         .update({ 
           status: 'active',
           start_time: new Date().toISOString(),
-          end_time: new Date(Date.now() + 5 * 60000).toISOString()
+          end_time: new Date(Date.now() + durationMinutes * 60000).toISOString()
         })
         .eq('id', auctionId)
 
@@ -463,30 +498,80 @@ export default function PaginaLeilao() {
 
   const handleCancelAuction = async (auctionId: string) => {
     if (!confirm('Tem certeza que deseja cancelar este leilão?')) return
-
+  
     try {
-      // Primeiro deletar os bids
-      await supabase
+      console.log(`🗑️ Tentando cancelar leilão: ${auctionId}`)
+      
+      // 1. Primeiro, verificar se há lances no leilão
+      const { data: bids, error: bidsError } = await supabase
+        .from('bids')
+        .select('*')
+        .eq('auction_id', auctionId)
+  
+      if (bidsError) throw bidsError
+  
+      // 2. Se houver lances, primeiro liberar o saldo reservado dos times
+      if (bids && bids.length > 0) {
+        console.log(`📊 Encontrados ${bids.length} lances no leilão`)
+        
+        // Agrupar lances por time
+        const teamIds = [...new Set(bids.map(bid => bid.team_id))]
+        
+        // Para cada time, liberar o saldo reservado
+        for (const teamId of teamIds) {
+          const teamBids = bids.filter(bid => bid.team_id === teamId)
+          const highestBid = Math.max(...teamBids.map(bid => bid.amount))
+          
+          // Atualizar saldo do time
+          const { error: updateError } = await supabase.rpc('liberar_saldo_reservado', {
+            p_team_id: teamId,
+            p_auction_id: auctionId,
+            p_amount: highestBid
+          })
+          
+          if (updateError) {
+            console.error(`❌ Erro ao liberar saldo do time ${teamId}:`, updateError)
+          } else {
+            console.log(`✅ Saldo liberado para o time ${teamId}`)
+          }
+        }
+      }
+  
+      // 3. Depois deletar todos os lances
+      const { error: deleteBidsError } = await supabase
         .from('bids')
         .delete()
         .eq('auction_id', auctionId)
-
-      // Depois deletar o leilão
-      await supabase
+  
+      if (deleteBidsError) throw deleteBidsError
+      console.log('✅ Todos os lances deletados')
+  
+      // 4. Finalmente deletar o leilão
+      const { error: deleteAuctionError } = await supabase
         .from('auctions')
         .delete()
         .eq('id', auctionId)
-
-      toast.success('Leilão cancelado!')
+  
+      if (deleteAuctionError) throw deleteAuctionError
+      console.log('✅ Leilão deletado')
+  
+      toast.success('Leilão cancelado com sucesso!')
+      
+      // Recarregar dados
       await loadAuctions()
-
+      
       if (team?.id) {
         await loadPendingReserves(team.id)
       }
-
+  
     } catch (error: any) {
-      console.error('❌ Erro ao cancelar leilão:', error)
-      toast.error(`Erro: ${error.message}`)
+      console.error('❌ Erro completo ao cancelar leilão:', error)
+      
+      if (error.code === '23503') {
+        toast.error('Não foi possível cancelar o leilão. Existem referências ativas. Tente novamente.')
+      } else {
+        toast.error(`Erro: ${error.message || 'Falha ao cancelar leilão'}`)
+      }
     }
   }
 
@@ -715,6 +800,7 @@ export default function PaginaLeilao() {
                       onCancelAuction={handleCancelAuction}
                       onStartAuction={handleStartAuction}
                       isAdmin={isAdmin}
+                      formatTimeRemaining={formatTimeRemaining}
                     />
                   ))}
                 </div>

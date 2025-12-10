@@ -1,10 +1,9 @@
-// src/app/dashboard/saldo/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter, RefreshCw, ArrowRightLeft } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter, RefreshCw, ArrowRightLeft, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,7 +27,7 @@ interface BalanceTransaction {
   id: string
   team_id: string
   amount: number
-  type: 'credit' | 'debit' | 'exchange_only' | 'exchange_with_money'
+  type: 'credit' | 'debit' | 'exchange_trade'
   description: string
   created_at: string
   player_name?: string
@@ -36,20 +35,7 @@ interface BalanceTransaction {
   related_team?: string
   exchange_value?: number
   is_exchange?: boolean
-}
-
-interface PlayerTransfer {
-  id: string
-  player_id: string
-  player_name: string
-  from_team_id: string | null
-  to_team_id: string | null
-  value: number
-  status: string
-  created_at: string
-  transfer_type: string
-  exchange_value: number | null
-  is_exchange: boolean | null
+  exchange_only?: boolean // Nova propriedade para trocas sem dinheiro
 }
 
 // Função de formatar valor
@@ -71,146 +57,75 @@ function formatDate(dateString: string) {
   })
 }
 
-// Função para buscar transferências de troca
-const fetchExchangeTransfers = async (teamId: string): Promise<BalanceTransaction[]> => {
+// Função para buscar apenas as trocas sem dinheiro (jogador por jogador)
+const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]> => {
   try {
-    console.log('🔄 Buscando transferências de troca para o time:', teamId)
+    console.log('🔄 Buscando trocas sem dinheiro para o time:', teamId)
     
-    // Buscar transferências onde o time está envolvido (como comprador ou vendedor)
+    // Buscar transferências de troca onde não há dinheiro envolvido
     const { data: exchangeTransfers, error } = await supabase
       .from('player_transfers')
       .select('*')
       .or(`from_team_id.eq.${teamId},to_team_id.eq.${teamId}`)
       .eq('transfer_type', 'exchange')
       .eq('status', 'approved')
+      .eq('exchange_value', 0)
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('❌ Erro ao buscar transferências de troca:', error)
+      console.error('❌ Erro ao buscar trocas sem dinheiro:', error)
       return []
     }
 
-    console.log('✅ Transferências de troca encontradas:', exchangeTransfers?.length)
+    console.log('✅ Trocas sem dinheiro encontradas:', exchangeTransfers?.length)
 
-    const exchangeTransactions: BalanceTransaction[] = []
+    const pureExchanges: BalanceTransaction[] = []
 
     exchangeTransfers?.forEach(transfer => {
       const isBuyer = transfer.to_team_id === teamId
       const isSeller = transfer.from_team_id === teamId
       
-      // Se for apenas troca (sem dinheiro envolvido)
-      if (transfer.exchange_value === 0 || !transfer.exchange_value) {
-        // Para o vendedor - perde o jogador
-        if (isSeller) {
-          exchangeTransactions.push({
-            id: `${transfer.id}_sell`,
-            team_id: teamId,
-            amount: transfer.value,
-            type: 'exchange_only',
-            description: `Troca - ${transfer.player_name} saiu`,
-            created_at: transfer.created_at,
-            player_name: transfer.player_name,
-            transfer_type: 'exchange',
-            related_team: transfer.to_team_id || undefined,
-            exchange_value: 0,
-            is_exchange: true
-          })
-        }
-        
-        // Para o comprador - ganha o jogador
-        if (isBuyer) {
-          exchangeTransactions.push({
-            id: `${transfer.id}_buy`,
-            team_id: teamId,
-            amount: transfer.value,
-            type: 'exchange_only',
-            description: `Troca - ${transfer.player_name} chegou`,
-            created_at: transfer.created_at,
-            player_name: transfer.player_name,
-            transfer_type: 'exchange',
-            related_team: transfer.from_team_id || undefined,
-            exchange_value: 0,
-            is_exchange: true
-          })
-        }
-      } else {
-        // Se há dinheiro envolvido na troca
-        const exchangeValue = transfer.exchange_value || 0
-        
-        // Para o vendedor - perde jogador, pode receber ou pagar dinheiro
-        if (isSeller) {
-          exchangeTransactions.push({
-            id: `${transfer.id}_sell`,
-            team_id: teamId,
-            amount: transfer.value,
-            type: 'exchange_only',
-            description: `Troca - ${transfer.player_name} saiu`,
-            created_at: transfer.created_at,
-            player_name: transfer.player_name,
-            transfer_type: 'exchange',
-            related_team: transfer.to_team_id || undefined,
-            exchange_value: exchangeValue,
-            is_exchange: true
-          })
-          
-          // Se recebeu dinheiro na troca
-          if (exchangeValue > 0) {
-            exchangeTransactions.push({
-              id: `${transfer.id}_money_in`,
-              team_id: teamId,
-              amount: exchangeValue,
-              type: 'exchange_with_money',
-              description: `Dinheiro recebido na troca por ${transfer.player_name}`,
-              created_at: transfer.created_at,
-              player_name: transfer.player_name,
-              transfer_type: 'exchange',
-              related_team: transfer.to_team_id || undefined,
-              exchange_value: exchangeValue,
-              is_exchange: true
-            })
-          }
-        }
-        
-        // Para o comprador - ganha jogador, pode pagar ou receber dinheiro
-        if (isBuyer) {
-          exchangeTransactions.push({
-            id: `${transfer.id}_buy`,
-            team_id: teamId,
-            amount: transfer.value,
-            type: 'exchange_only',
-            description: `Troca - ${transfer.player_name} chegou`,
-            created_at: transfer.created_at,
-            player_name: transfer.player_name,
-            transfer_type: 'exchange',
-            related_team: transfer.from_team_id || undefined,
-            exchange_value: exchangeValue,
-            is_exchange: true
-          })
-          
-          // Se pagou dinheiro na troca
-          if (exchangeValue > 0) {
-            exchangeTransactions.push({
-              id: `${transfer.id}_money_out`,
-              team_id: teamId,
-              amount: exchangeValue,
-              type: 'exchange_with_money',
-              description: `Dinheiro pago na troca por ${transfer.player_name}`,
-              created_at: transfer.created_at,
-              player_name: transfer.player_name,
-              transfer_type: 'exchange',
-              related_team: transfer.from_team_id || undefined,
-              exchange_value: exchangeValue,
-              is_exchange: true
-            })
-          }
-        }
+      // Para o vendedor - perde o jogador
+      if (isSeller) {
+        pureExchanges.push({
+          id: `${transfer.id}_sell`,
+          team_id: teamId,
+          amount: transfer.value, // Valor do jogador (só para referência)
+          type: 'exchange_trade',
+          description: `Troca: ${transfer.player_name} saiu`,
+          created_at: transfer.created_at,
+          player_name: transfer.player_name,
+          transfer_type: 'exchange',
+          related_team: transfer.to_team_id || undefined,
+          exchange_value: 0,
+          is_exchange: true,
+          exchange_only: true // Marca como troca sem dinheiro
+        })
+      }
+      
+      // Para o comprador - ganha o jogador
+      if (isBuyer) {
+        pureExchanges.push({
+          id: `${transfer.id}_buy`,
+          team_id: teamId,
+          amount: transfer.value, // Valor do jogador (só para referência)
+          type: 'exchange_trade',
+          description: `Troca: ${transfer.player_name} chegou`,
+          created_at: transfer.created_at,
+          player_name: transfer.player_name,
+          transfer_type: 'exchange',
+          related_team: transfer.from_team_id || undefined,
+          exchange_value: 0,
+          is_exchange: true,
+          exchange_only: true // Marca como troca sem dinheiro
+        })
       }
     })
 
-    return exchangeTransactions
+    return pureExchanges
 
   } catch (error) {
-    console.error('❌ Erro ao processar transferências de troca:', error)
+    console.error('❌ Erro ao processar trocas sem dinheiro:', error)
     return []
   }
 }
@@ -368,19 +283,19 @@ export default function PaginaSaldo() {
 
         if (transactionsError) throw transactionsError
 
-        // 4. Carregar transferências de troca
-        const exchangeTransactions = await fetchExchangeTransfers(profile.team_id)
+        // 4. Carregar apenas trocas sem dinheiro (jogador por jogador)
+        const pureExchanges = await fetchPureExchanges(profile.team_id)
 
         // 5. Combinar todas as transações
         const allTransactions = [
           ...(transactionsData || []),
-          ...exchangeTransactions
+          ...pureExchanges // Adiciona apenas trocas sem dinheiro
         ].sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
 
         console.log('📊 Total de transações:', allTransactions.length)
-        console.log('🔄 Transações de troca:', exchangeTransactions.length)
+        console.log('🔄 Trocas sem dinheiro:', pureExchanges.length)
         
         setTransactions(allTransactions)
       }
@@ -430,13 +345,13 @@ export default function PaginaSaldo() {
 
       if (transactionsError) throw transactionsError
 
-      // Buscar transferências de troca atualizadas
-      const exchangeTransactions = await fetchExchangeTransfers(teamId)
+      // Buscar trocas sem dinheiro atualizadas
+      const pureExchanges = await fetchPureExchanges(teamId)
 
       // Combinar todas as transações
       const allTransactions = [
         ...(transactionsData || []),
-        ...exchangeTransactions
+        ...pureExchanges
       ].sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
@@ -615,34 +530,13 @@ export default function PaginaSaldo() {
 
   // Função para obter cor baseada no tipo de transação
   const getTransactionColor = (transaction: BalanceTransaction) => {
-    if (transaction.type === 'exchange_only') {
+    if (transaction.type === 'exchange_trade') {
       return {
         bg: 'bg-blue-500/20',
         icon: 'text-blue-400',
         text: 'text-blue-400',
         badge: 'bg-blue-500/20 text-blue-300 border-blue-500/50',
         iconComponent: ArrowRightLeft
-      }
-    } else if (transaction.type === 'exchange_with_money') {
-      // Verificar se é entrada ou saída pelo valor
-      const isMoneyIn = transaction.description.includes('recebido') || transaction.description.includes('recebida')
-      
-      if (isMoneyIn) {
-        return {
-          bg: 'bg-emerald-500/20',
-          icon: 'text-emerald-400',
-          text: 'text-emerald-400',
-          badge: 'bg-emerald-500/20 text-emerald-400',
-          iconComponent: ArrowUpRight
-        }
-      } else {
-        return {
-          bg: 'bg-red-500/20',
-          icon: 'text-red-400',
-          text: 'text-red-400',
-          badge: 'bg-red-500/20 text-red-400',
-          iconComponent: ArrowDownLeft
-        }
       }
     } else if (transaction.type === 'credit') {
       return {
@@ -665,11 +559,8 @@ export default function PaginaSaldo() {
 
   // Função para obter texto do badge
   const getBadgeText = (transaction: BalanceTransaction) => {
-    if (transaction.type === 'exchange_only') {
+    if (transaction.type === 'exchange_trade') {
       return 'Troca'
-    } else if (transaction.type === 'exchange_with_money') {
-      const isMoneyIn = transaction.description.includes('recebido') || transaction.description.includes('recebida')
-      return isMoneyIn ? 'Troca - Entrada' : 'Troca - Saída'
     } else if (transaction.type === 'credit') {
       return 'Entrada'
     } else {
@@ -679,17 +570,17 @@ export default function PaginaSaldo() {
 
   // Calcular totais
   const totalCredits = transactions
-    .filter(t => t.type === 'credit' || t.type === 'exchange_with_money')
+    .filter(t => t.type === 'credit')
     .reduce((sum, t) => sum + t.amount, 0)
 
   const totalDebits = transactions
-    .filter(t => t.type === 'debit' || t.type === 'exchange_with_money')
+    .filter(t => t.type === 'debit')
     .reduce((sum, t) => sum + t.amount, 0)
 
   const filteredTransactions = filter === 'all' 
     ? transactions 
     : filter === 'exchange'
-    ? transactions.filter(t => t.type === 'exchange_only' || t.type === 'exchange_with_money')
+    ? transactions.filter(t => t.type === 'exchange_trade')
     : transactions.filter(t => t.type === filter)
 
   // Criar objetos compatíveis com os componentes de chat
@@ -1022,7 +913,7 @@ export default function PaginaSaldo() {
                                   </p>
                                   {transaction.is_exchange && (
                                     <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-300 border-blue-500/50">
-                                      Troca
+                                      {transaction.exchange_only ? 'Troca Jogador' : 'Troca'}
                                     </Badge>
                                   )}
                                 </div>
@@ -1053,7 +944,7 @@ export default function PaginaSaldo() {
                             </div>
 
                             <div className="text-right flex-shrink-0 ml-2">
-                              {transaction.type === 'exchange_only' ? (
+                              {transaction.type === 'exchange_trade' ? (
                                 <div>
                                   <p className={cn("text-base lg:text-xl font-bold", colors.text)}>
                                     {formatBalance(transaction.amount)}
@@ -1063,10 +954,7 @@ export default function PaginaSaldo() {
                               ) : (
                                 <div>
                                   <p className={cn("text-base lg:text-xl font-bold", colors.text)}>
-                                    {transaction.type === 'credit' || 
-                                     (transaction.type === 'exchange_with_money' && 
-                                      (transaction.description.includes('recebido') || transaction.description.includes('recebida'))) 
-                                      ? '+' : '-'} {formatBalance(transaction.amount)}
+                                    {transaction.type === 'credit' ? '+' : '-'} {formatBalance(transaction.amount)}
                                   </p>
                                 </div>
                               )}

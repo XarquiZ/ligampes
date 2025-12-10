@@ -7,7 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { User, Timer, Crown, Lock, Trophy, DollarSign, Play, Minus, ChevronRight, History } from 'lucide-react'
+import { 
+  User, Timer, Crown, Lock, Trophy, DollarSign, Play, 
+  Minus, ChevronRight, History, Calendar, Clock, Award,
+  TrendingUp, Users, Shield, Target, Zap, Sparkles, Flame,
+  X
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 interface Player {
@@ -47,6 +52,7 @@ interface Auction {
     logo_url: string
   }
   time_remaining?: number
+  auction_duration?: number
 }
 
 interface AuctionCardProps {
@@ -62,6 +68,7 @@ interface AuctionCardProps {
   onForceFinish?: (auctionId: string) => Promise<void>
   isAdmin?: boolean
   finalizing?: boolean
+  formatTimeRemaining?: (milliseconds: number, auctionDuration?: number) => string
 }
 
 const formatToMillions = (value: number): string => {
@@ -71,11 +78,13 @@ const formatToMillions = (value: number): string => {
   return value.toLocaleString('pt-BR')
 }
 
+// Função atualizada para gerar 200 opções de 1 em 1 milhão
 const generateBidOptions = (currentBid: number) => {
   const options = []
   const minBid = currentBid + 1000000
   
-  for (let i = 0; i < 10; i++) {
+  // Gera 200 opções de 1 em 1 milhão (1-200M acima do lance mínimo)
+  for (let i = 0; i < 200; i++) {
     const bidValue = minBid + (i * 1000000)
     options.push({
       value: bidValue,
@@ -83,7 +92,37 @@ const generateBidOptions = (currentBid: number) => {
     })
   }
   
-  return options
+  // Adiciona algumas opções maiores para cobrir casos especiais
+  for (let i = 0; i < 10; i++) {
+    const bidValue = minBid + ((200 + i * 10) * 1000000)
+    options.push({
+      value: bidValue,
+      label: `${formatToMillions(bidValue)}`
+    })
+  }
+  
+  return options.sort((a, b) => a.value - b.value)
+}
+
+// Função para agrupar opções em grupos de 10 para melhor visualização
+const groupBidOptions = (options: {value: number, label: string}[]) => {
+  const grouped = []
+  for (let i = 0; i < options.length; i += 10) {
+    grouped.push(options.slice(i, i + 10))
+  }
+  return grouped
+}
+
+// Componente de Progresso Customizado
+const CustomProgress = ({ value, className }: { value: number; className?: string }) => {
+  return (
+    <div className="w-full h-1.5 bg-zinc-800/50 rounded-full overflow-hidden">
+      <div 
+        className={cn("h-full transition-all duration-300", className)}
+        style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
+      />
+    </div>
+  )
 }
 
 export function AuctionCard({
@@ -99,20 +138,30 @@ export function AuctionCard({
   onForceFinish,
   isAdmin = false,
   finalizing = false,
+  formatTimeRemaining
 }: AuctionCardProps) {
   const [bidModalOpen, setBidModalOpen] = useState(false)
   const [selectedBid, setSelectedBid] = useState<number | null>(null)
   const [bidOptions, setBidOptions] = useState<{value: number, label: string}[]>([])
+  const [groupedBidOptions, setGroupedBidOptions] = useState<{value: number, label: string}[][]>([])
   const [timeRemaining, setTimeRemaining] = useState<number>(auction.time_remaining || 0)
   const [bids, setBids] = useState<Bid[]>([])
   const [showBidHistory, setShowBidHistory] = useState(false)
   const [loadingBids, setLoadingBids] = useState(false)
+  const [timerProgress, setTimerProgress] = useState(100)
+  const [isCancelling, setIsCancelling] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const mountedRef = useRef(true)
 
+  // Obter a duração do leilão
+  const auctionDuration = auction.auction_duration || 5
+  const isLongAuction = auctionDuration >= 1440 // 24 horas ou mais
+
   useEffect(() => {
     if (auction && bidModalOpen) {
-      setBidOptions(generateBidOptions(auction.current_bid))
+      const options = generateBidOptions(auction.current_bid)
+      setBidOptions(options)
+      setGroupedBidOptions(groupBidOptions(options))
     }
   }, [auction, bidModalOpen])
 
@@ -154,34 +203,35 @@ export function AuctionCard({
     }
   }
 
-  // ⚡ TIMER SIMPLES E EFETIVO - APENAS USANDO end_time DO BANCO
+  // ⚡ TIMER COM BARRA DE PROGRESSO
   useEffect(() => {
     mountedRef.current = true
     
     if (type === 'active' && auction.status === 'active' && auction.end_time) {
-      console.log(`⏰ Iniciando timer para leilão ${auction.id}`)
+      // Calcular duração total
+      const startTime = new Date(auction.start_time).getTime()
+      const endTime = new Date(auction.end_time!).getTime()
+      const totalDuration = endTime - startTime
       
-      // Função que atualiza o timer localmente
       const updateTimer = () => {
         if (!mountedRef.current) return
         
-        // ⚡ USA O end_time DO BANCO (igual para todos)
-        const endTime = new Date(auction.end_time!).getTime()
         const now = Date.now()
         const remaining = Math.max(0, endTime - now)
         
-        setTimeRemaining(remaining)
+        // Calcular progresso
+        const progress = Math.max(0, Math.min(100, ((totalDuration - remaining) / totalDuration) * 100))
         
-        // ⚡ SE TEMPO ACABOU, NOTIFICA O PARENT
+        setTimeRemaining(remaining)
+        setTimerProgress(progress)
+        
         if (remaining <= 0 && onForceFinish) {
           setTimeout(() => onForceFinish(auction.id), 1000)
         }
       }
       
-      // Atualiza imediatamente
       updateTimer()
       
-      // ⚡ ATUALIZA A CADA SEGUNDO
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
@@ -196,45 +246,47 @@ export function AuctionCard({
       }
     } else {
       setTimeRemaining(0)
+      setTimerProgress(100)
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
     }
-  }, [auction.end_time, auction.status, type, onForceFinish, auction.id])
+  }, [auction.end_time, auction.start_time, auction.status, type, onForceFinish, auction.id])
 
-  // ⚡ ADICIONA UMA SINCRONIZAÇÃO PERIÓDICA SIMPLES
-  useEffect(() => {
-    if (type === 'active' && auction.status === 'active' && auction.end_time) {
-      // Sincroniza o timer a cada 30 segundos para evitar drift
-      const syncInterval = setInterval(() => {
-        const endTime = new Date(auction.end_time!).getTime()
-        const now = Date.now()
-        const remaining = Math.max(0, endTime - now)
-        
-        // Corrige se houver diferença maior que 2 segundos
-        if (Math.abs(remaining - timeRemaining) > 2000) {
-          console.log(`⏰ Corrigindo timer: ${remaining - timeRemaining}ms`)
-          setTimeRemaining(remaining)
-        }
-      }, 30000)
-      
-      return () => clearInterval(syncInterval)
+  // Função corrigida para formatar tempo restante em horas, minutos e segundos
+  const defaultFormatTimeRemaining = (ms: number) => {
+    if (ms <= 0) return '00:00:00'
+    
+    const totalSeconds = Math.floor(ms / 1000)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+    } else {
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
     }
-  }, [auction.end_time, auction.status, type, timeRemaining, auction.id])
-
-  const formatTime = (ms: number) => {
-    if (ms <= 0) return '00:00'
-    const minutes = Math.floor(ms / 60000)
-    const seconds = Math.floor((ms % 60000) / 1000)
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
+
+  const formatTime = formatTimeRemaining || defaultFormatTimeRemaining
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('pt-BR', {
       hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
+      minute: '2-digit'
+    })
+  }
+
+  const formatFullDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     })
   }
 
@@ -254,36 +306,156 @@ export function AuctionCard({
       await onBid(auction.id, selectedBid)
       setBidModalOpen(false)
       setSelectedBid(null)
-      // Recarrega histórico após dar lance
       setTimeout(() => loadBidHistory(), 500)
     } catch (error) {
       console.error('Erro ao dar lance:', error)
     }
   }
 
-  // Verifica se tem saldo reservado
-  const hasReservedBalance = team?.id && temSaldoReservado ? temSaldoReservado(auction.id) : false
-  
-  const getCardStyles = () => {
-    switch (type) {
-      case 'active': return "bg-gradient-to-br from-red-600/10 to-orange-600/10 border-red-500/30"
-      case 'pending': return "bg-gradient-to-br from-yellow-600/10 to-amber-600/10 border-yellow-500/30"
-      case 'finished': return "bg-gradient-to-br from-green-600/10 to-emerald-600/10 border-green-500/30"
-      default: return "bg-gradient-to-br from-zinc-600/10 to-zinc-600/10 border-zinc-500/30"
+  // Função de cancelamento aprimorada
+  const handleCancel = async () => {
+    if (!onCancelAuction) return
+    
+    if (!confirm('Tem certeza que deseja cancelar este leilão? Esta ação não pode ser desfeita.')) {
+      return
+    }
+    
+    try {
+      setIsCancelling(true)
+      await onCancelAuction(auction.id)
+      toast.success('Leilão cancelado com sucesso!')
+    } catch (error: any) {
+      console.error('❌ Erro ao cancelar leilão:', error)
+      toast.error(error.message || 'Erro ao cancelar leilão')
+    } finally {
+      setIsCancelling(false)
     }
   }
 
-  // Indicadores visuais
-  const isAlmostFinished = timeRemaining > 0 && timeRemaining < 30000 // menos de 30 segundos
-  const isCritical = timeRemaining > 0 && timeRemaining < 10000 // menos de 10 segundos
+  // Verifica se tem saldo reservado
+  const hasReservedBalance = team?.id && temSaldoReservado ? temSaldoReservado(auction.id) : false
+  const isWinning = auction.current_bidder === team?.id
+  const isParticipating = hasReservedBalance
+  const isAlmostFinished = timeRemaining > 0 && timeRemaining < 30000
+  const isCritical = timeRemaining > 0 && timeRemaining < 10000
+
+  // PALETA ESCURA COM LARANJA (mesma da página principal)
+  const getCardStyles = () => {
+    switch (type) {
+      case 'active': 
+        return {
+          // Card principal - fundo escuro com gradiente
+          container: "bg-gradient-to-br from-zinc-900/90 to-zinc-800/90 border-orange-600/30 shadow-xl hover:shadow-2xl hover:shadow-orange-500/20 transition-all duration-300 backdrop-blur-sm",
+          statusColor: "text-orange-400",
+          statusBg: "bg-orange-500/20",
+          borderColor: "border-orange-600/30",
+          
+          // Progresso do timer - laranja vibrante
+          progressColor: isCritical ? "bg-gradient-to-r from-red-500 to-orange-500" : 
+                       isAlmostFinished ? "bg-gradient-to-r from-orange-500 to-yellow-500" : 
+                       "bg-gradient-to-r from-orange-600 to-orange-400",
+          
+          // Containers de valores - escurinhos
+          valueBg: "bg-zinc-800/80 backdrop-blur-sm",
+          valueBorder: "border-zinc-700/60",
+          valueHover: "hover:bg-zinc-700/80 hover:border-zinc-600 hover:shadow-lg transition-all duration-200",
+          
+          // Timer - fundo laranja escuro
+          timerBg: "bg-gradient-to-r from-orange-900/40 to-red-900/40",
+          timerText: isCritical ? "text-red-300" : "text-orange-300",
+          
+          // Cores de destaque
+          highlight: {
+            primary: "bg-gradient-to-r from-orange-600 to-orange-700",
+            primaryHover: "bg-gradient-to-r from-orange-700 to-orange-800",
+            secondary: "bg-yellow-500/20",
+            secondaryText: "text-yellow-300"
+          }
+        }
+      case 'pending': 
+        return {
+          container: "bg-gradient-to-br from-zinc-900/90 to-zinc-800/90 border-yellow-600/30 shadow-xl hover:shadow-2xl hover:shadow-yellow-500/20 transition-all duration-300 backdrop-blur-sm",
+          statusColor: "text-yellow-400",
+          statusBg: "bg-yellow-500/20",
+          borderColor: "border-yellow-600/30",
+          progressColor: "bg-gradient-to-r from-yellow-600 to-yellow-400",
+          valueBg: "bg-zinc-800/80 backdrop-blur-sm",
+          valueBorder: "border-zinc-700/60",
+          valueHover: "hover:bg-zinc-700/80 hover:border-zinc-600 hover:shadow-lg transition-all duration-200",
+          timerBg: "bg-gradient-to-r from-yellow-900/40 to-amber-900/40",
+          timerText: "text-yellow-300",
+          highlight: {
+            primary: "bg-gradient-to-r from-yellow-600 to-yellow-700",
+            primaryHover: "bg-gradient-to-r from-yellow-700 to-yellow-800",
+            secondary: "bg-yellow-500/20",
+            secondaryText: "text-yellow-300"
+          }
+        }
+      case 'finished': 
+        return {
+          container: "bg-gradient-to-br from-zinc-900/90 to-zinc-800/90 border-zinc-600/30 shadow-xl hover:shadow-2xl hover:shadow-zinc-500/20 transition-all duration-300 backdrop-blur-sm",
+          statusColor: "text-zinc-400",
+          statusBg: "bg-zinc-500/20",
+          borderColor: "border-zinc-600/30",
+          progressColor: "bg-gradient-to-r from-zinc-600 to-zinc-500",
+          valueBg: "bg-zinc-800/80 backdrop-blur-sm",
+          valueBorder: "border-zinc-700/60",
+          valueHover: "hover:bg-zinc-700/80 hover:border-zinc-600 hover:shadow-lg transition-all duration-200",
+          timerBg: "bg-gradient-to-r from-zinc-900/40 to-zinc-800/40",
+          timerText: "text-zinc-400",
+          highlight: {
+            primary: "bg-gradient-to-r from-zinc-700 to-zinc-800",
+            primaryHover: "bg-gradient-to-r from-zinc-800 to-zinc-900",
+            secondary: "bg-zinc-500/20",
+            secondaryText: "text-zinc-300"
+          }
+        }
+      default: 
+        return {
+          container: "bg-gradient-to-br from-zinc-900/90 to-zinc-800/90 border-zinc-600/30 shadow-xl hover:shadow-2xl hover:shadow-zinc-500/20 transition-all duration-300 backdrop-blur-sm",
+          statusColor: "text-zinc-400",
+          statusBg: "bg-zinc-500/20",
+          borderColor: "border-zinc-600/30",
+          progressColor: "bg-gradient-to-r from-zinc-600 to-zinc-500",
+          valueBg: "bg-zinc-800/80 backdrop-blur-sm",
+          valueBorder: "border-zinc-700/60",
+          valueHover: "hover:bg-zinc-700/80 hover:border-zinc-600 hover:shadow-lg transition-all duration-200",
+          timerBg: "bg-gradient-to-r from-zinc-900/40 to-zinc-800/40",
+          timerText: "text-zinc-400",
+          highlight: {
+            primary: "bg-gradient-to-r from-zinc-700 to-zinc-800",
+            primaryHover: "bg-gradient-to-r from-zinc-800 to-zinc-900",
+            secondary: "bg-zinc-500/20",
+            secondaryText: "text-zinc-300"
+          }
+        }
+    }
+  }
+
+  const styles = getCardStyles()
+
+  // Formatar duração do leilão
+  const formatAuctionDuration = () => {
+    if (auctionDuration < 60) {
+      return `${auctionDuration} minutos`
+    } else if (auctionDuration === 60) {
+      return '1 hora'
+    } else if (auctionDuration < 1440) {
+      const hours = auctionDuration / 60
+      return `${hours} horas`
+    } else {
+      const days = auctionDuration / 1440
+      return `${days} dia${days > 1 ? 's' : ''}`
+    }
+  }
 
   if (finalizing) {
     return (
-      <Card className={cn("p-6 relative opacity-70", getCardStyles())}>
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm rounded-lg flex items-center justify-center">
+      <Card className="p-4 relative opacity-70 bg-gradient-to-br from-zinc-900 to-zinc-800 border-orange-600/30 rounded-xl shadow-lg">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm rounded-xl flex items-center justify-center">
           <div className="text-center">
-            <div className="w-8 h-8 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-            <p className="text-white font-bold">Finalizando...</p>
+            <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            <p className="text-zinc-300 font-bold">Finalizando...</p>
           </div>
         </div>
       </Card>
@@ -291,328 +463,535 @@ export function AuctionCard({
   }
 
   return (
-    <Card className={cn("p-6 relative", getCardStyles())}>
-      {hasReservedBalance && type !== 'finished' && (
-        <div className="absolute -top-2 -right-2">
-          <Badge className="bg-blue-500 text-white">
-            <Lock className="w-3 h-3 mr-1" />
-            Reservado
+    <Card className={cn("relative overflow-hidden border rounded-xl", styles.container)}>
+      {/* Indicadores de status */}
+      <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+        {hasReservedBalance && type !== 'finished' && (
+          <Badge className="bg-gradient-to-r from-orange-600 to-orange-700 text-white text-xs px-3 py-1.5 rounded-full shadow-lg">
+            <Lock className="w-3 h-3 mr-1.5" />
+            Participando
           </Badge>
-        </div>
-      )}
-
-      <div className="flex items-start gap-4 mb-4">
-        {auction.player?.photo_url ? (
-          <img 
-            src={auction.player.photo_url} 
-            alt={auction.player.name}
-            className="w-16 h-16 rounded-full object-cover border-2 border-current"
-          />
-        ) : (
-          <div className="w-16 h-16 rounded-full bg-zinc-700 border-2 border-current flex items-center justify-center">
-            <User className="w-8 h-8 text-zinc-400" />
-          </div>
         )}
-        <div className="flex-1">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-xl font-bold text-white">{auction.player?.name}</h3>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant="secondary">{auction.player?.position}</Badge>
-                <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400">
-                  OVR {auction.player?.overall}
-                </Badge>
+        
+        {isWinning && (
+          <Badge className="bg-gradient-to-r from-yellow-600 to-yellow-700 text-white text-xs px-3 py-1.5 rounded-full shadow-lg">
+            <Crown className="w-3 h-3 mr-1.5" />
+            Líder
+          </Badge>
+        )}
+
+        {isLongAuction && type === 'active' && (
+          <Badge className="bg-gradient-to-r from-zinc-700 to-zinc-800 text-white text-xs px-3 py-1.5 rounded-full shadow-lg">
+            <Clock className="w-3 h-3 mr-1.5" />
+            {formatAuctionDuration()}
+          </Badge>
+        )}
+      </div>
+
+      {/* Cabeçalho */}
+      <div className="p-4 border-b border-zinc-700/50">
+        <div className="flex items-start gap-4">
+          {/* Avatar do jogador */}
+          <div className="relative flex-shrink-0">
+            {auction.player?.photo_url ? (
+              <img 
+                src={auction.player.photo_url} 
+                alt={auction.player.name}
+                className="w-20 h-20 rounded-xl object-cover border-2 border-orange-500/50 shadow-lg"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-orange-900/80 to-orange-700/80 border-2 border-orange-500/50 shadow-lg flex items-center justify-center">
+                <User className="w-10 h-10 text-orange-400/80" />
+              </div>
+            )}
+          </div>
+
+          {/* Informações do jogador */}
+          <div className="flex-1 min-w-0">
+            <div className="flex justify-between items-start mb-2">
+              <div>
+                <h3 className="text-xl font-bold text-white mb-1 truncate">
+                  {auction.player?.name}
+                </h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="bg-zinc-800/80 text-zinc-300 border-zinc-700 shadow-md">
+                    {auction.player?.position}
+                  </Badge>
+                  
+                  {/* OVR badge */}
+                  <Badge className="bg-gradient-to-r from-orange-600 to-orange-700 text-white text-xs font-bold px-3 py-1.5 shadow-lg">
+                    OVR {auction.player?.overall}
+                  </Badge>
+                  
+                  <Badge className={cn("text-xs px-3 py-1.5 rounded-lg border shadow-md", 
+                    styles.statusBg, styles.statusColor, styles.borderColor)}>
+                    {type === 'active' ? 'LEILÃO ATIVO' : 
+                     type === 'pending' ? 'AGENDADO' : 'FINALIZADO'}
+                  </Badge>
+                </div>
               </div>
             </div>
-            <div className="text-right">
+
+            {/* Timer e informações do leilão */}
+            <div className="mt-3 space-y-2">
               {type === 'active' && timeRemaining > 0 && (
-                <div className="flex items-center gap-1">
-                  <div className={cn(
-                    "flex items-center gap-1 font-mono font-bold",
-                    isCritical ? "text-red-500 animate-pulse" :
-                    isAlmostFinished ? "text-red-400" :
-                    "text-yellow-400"
-                  )}>
-                    <Timer className={cn(
-                      "w-4 h-4",
-                      isCritical && "animate-pulse"
-                    )} />
-                    <span className={cn(
-                      isCritical && "animate-pulse"
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className={cn(
+                      "flex items-center gap-2 font-mono px-3 py-2 rounded-lg border shadow-md",
+                      styles.timerBg,
+                      styles.timerText,
+                      "border-zinc-700/50"
                     )}>
-                      {formatTime(timeRemaining)}
-                    </span>
+                      <Timer className="w-4 h-4" />
+                      <span className="font-bold text-lg tracking-wider">
+                        {formatTime(timeRemaining)}
+                      </span>
+                    </div>
+                    {!isLongAuction && (
+                      <span className={cn(
+                        "text-xs font-medium px-2 py-1 rounded-full shadow-md",
+                        isCritical ? "bg-gradient-to-r from-red-500/20 to-red-600/20 text-red-300" :
+                        isAlmostFinished ? "bg-gradient-to-r from-orange-500/20 to-orange-600/20 text-orange-300" :
+                        "bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 text-yellow-300"
+                      )}>
+                        {Math.round(timerProgress)}%
+                      </span>
+                    )}
+                  </div>
+                  
+                  {!isLongAuction && (
+                    <CustomProgress 
+                      value={timerProgress} 
+                      className={styles.progressColor}
+                    />
+                  )}
+                </div>
+              )}
+              
+              {type === 'pending' && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-zinc-400 text-sm">
+                  <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-900/30 to-amber-900/30 px-3 py-2 rounded-lg border border-yellow-600/30 shadow-md">
+                    <Calendar className="w-4 h-4 text-yellow-400" />
+                    <span>Início: <span className="text-white font-medium">{formatFullDate(auction.start_time)}</span></span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-gradient-to-r from-yellow-900/30 to-amber-900/30 px-3 py-2 rounded-lg border border-yellow-600/30 shadow-md">
+                    <Zap className="w-4 h-4 text-yellow-400" />
+                    <span>Duração: <span className="text-white font-medium">{formatAuctionDuration()}</span></span>
                   </div>
                 </div>
               )}
-              <Badge variant={
-                type === 'active' ? 'destructive' : 
-                type === 'pending' ? 'secondary' : 'outline'
-              } className="mt-1">
-                {type === 'active' ? 'ATIVO' : 
-                 type === 'pending' ? 'AGENDADO' : 'FINALIZADO'}
-              </Badge>
             </div>
           </div>
-          {type === 'pending' && (
-            <div className="mt-2 text-sm text-zinc-400">
-              <Timer className="w-3 h-3 inline mr-1" />
-              Início: {new Date(auction.start_time).toLocaleString('pt-BR')}
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="space-y-3">
-        {type === 'active' && auction.current_bid === auction.start_price ? (
-          <div className="flex justify-between items-center p-3 bg-zinc-800/50 rounded-lg">
-            <span className="text-zinc-400">Preço Inicial</span>
-            <span className="text-2xl font-bold text-white">
-              R$ {formatToMillions(auction.start_price)}
-            </span>
-          </div>
-        ) : (
-          <>
-            <div className="flex justify-between items-center p-3 bg-zinc-800/50 rounded-lg">
-              <span className="text-zinc-400">
-                {type === 'active' ? 'Lance Atual' : 'Valor Atual'}
-              </span>
-              <span className="text-2xl font-bold text-white">
-                R$ {formatToMillions(auction.current_bid)}
-              </span>
+      {/* Conteúdo principal */}
+      <div className="p-4 space-y-4">
+        {/* Grid de valores */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Valor atual */}
+          <div className={cn(
+            "rounded-lg p-4 border shadow-md transition-all duration-200 cursor-pointer group",
+            styles.valueBg,
+            styles.valueBorder,
+            styles.valueHover
+          )}>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-gradient-to-br from-orange-600/20 to-orange-700/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
+                  <DollarSign className="w-4 h-4 text-orange-400" />
+                </div>
+                <span className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Valor Atual</span>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-white mb-1 tracking-tight">
+                  R$ {formatToMillions(auction.current_bid)}
+                </div>
+                {type === 'active' && auction.current_bid === auction.start_price && (
+                  <div className="text-xs text-orange-400 font-medium">Preço inicial</div>
+                )}
+              </div>
             </div>
-            
-            {auction.current_bidder !== null && (
-              <div className={cn(
-                "flex justify-between items-center p-3 rounded-lg border",
-                auction.current_bidder === team?.id 
-                  ? "bg-yellow-500/20 border-yellow-500/50" 
-                  : "bg-zinc-800/30 border-yellow-500/30"
-              )}>
-                <span className="text-zinc-400 flex items-center gap-2">
-                  <Crown className={cn(
-                    "w-4 h-4",
-                    auction.current_bidder === team?.id ? "text-yellow-400" : "text-yellow-400"
-                  )} />
-                  {type === 'active' ? 'Líder' : 'Vencedor'}
-                  {auction.current_bidder === team?.id && type === 'active' && (
-                    <Badge variant="secondary" className="bg-green-500 text-white text-xs">
-                      Você
-                    </Badge>
-                  )}
-                </span>
+          </div>
+
+          {/* Preço inicial */}
+          <div className={cn(
+            "rounded-lg p-4 border shadow-md transition-all duration-200 cursor-pointer group",
+            styles.valueBg,
+            styles.valueBorder,
+            styles.valueHover
+          )}>
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-gradient-to-br from-yellow-600/20 to-yellow-700/20 rounded-lg group-hover:scale-110 transition-transform duration-200">
+                  <Target className="w-4 h-4 text-yellow-400" />
+                </div>
+                <span className="text-xs text-zinc-400 uppercase tracking-wider font-medium">Preço Inicial</span>
+              </div>
+              <div className="text-center">
+                <div className="text-xl font-bold text-white tracking-tight">
+                  R$ {formatToMillions(auction.start_price)}
+                </div>
+                <div className="text-xs text-zinc-500 mt-1 font-medium">Valor base</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Time líder/vencedor */}
+        {auction.current_bidder !== null && (
+          <div className={cn(
+            "rounded-lg p-4 border shadow-md transition-all duration-200",
+            isWinning ? "bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border-yellow-600/30" : 
+            cn("bg-gradient-to-r from-orange-900/30 to-red-900/30 border-orange-600/30", styles.valueBorder)
+          )}>
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "p-1.5 rounded-lg shadow-md",
+                    isWinning ? "bg-gradient-to-r from-yellow-600/20 to-yellow-700/20" : "bg-gradient-to-r from-orange-600/20 to-orange-700/20"
+                  )}>
+                    <Crown className={cn(
+                      "w-4 h-4",
+                      isWinning ? "text-yellow-400" : "text-orange-400"
+                    )} />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-zinc-300">
+                      {type === 'active' ? 'Lance líder' : 'Vencedor'}
+                    </span>
+                    {isWinning && type === 'active' && (
+                      <Badge variant="secondary" className="bg-gradient-to-r from-yellow-600 to-yellow-700 text-white text-xs px-2 py-0.5 rounded-full">
+                        Você
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 bg-zinc-800/80 px-3 py-2 rounded-lg border border-zinc-700/60 shadow-md">
                   {auction.current_bidder_team?.logo_url && (
                     <img 
                       src={auction.current_bidder_team.logo_url} 
                       alt={auction.current_bidder_team.name}
-                      className="w-6 h-6 rounded-full"
+                      className="w-7 h-7 rounded-full border-2 border-orange-500/50 flex-shrink-0"
                     />
                   )}
                   <span className={cn(
-                    "font-medium",
-                    auction.current_bidder === team?.id ? "text-yellow-400" : "text-white"
+                    "text-sm font-medium truncate",
+                    isWinning ? "text-yellow-300" : "text-orange-300"
                   )}>
-                    {auction.current_bidder_team?.name || 'Time Desconhecido'}
+                    {auction.current_bidder_team?.name || 'Time desconhecido'}
                   </span>
                 </div>
               </div>
-            )}
-
-            {/* HISTÓRICO DE LANCES */}
-            {(type === 'active' || type === 'finished') && bids.length > 0 && (
-              <div className="space-y-2">
-                <button
-                  onClick={() => setShowBidHistory(!showBidHistory)}
-                  className="flex items-center justify-between w-full p-2 bg-zinc-800/30 rounded-lg hover:bg-zinc-700/30 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <History className="w-4 h-4 text-zinc-400" />
-                    <span className="text-sm font-medium text-zinc-300">
-                      Histórico de Lances ({bids.length})
-                    </span>
-                  </div>
-                  <ChevronRight className={cn(
-                    "w-4 h-4 text-zinc-400 transition-transform",
-                    showBidHistory && "rotate-90"
-                  )} />
-                </button>
-
-                {showBidHistory && (
-                  <div className="max-h-60 overflow-y-auto space-y-2 p-2 bg-zinc-800/20 rounded-lg border border-zinc-700/30">
-                    {loadingBids ? (
-                      <div className="flex justify-center p-4">
-                        <div className="w-6 h-6 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-                      </div>
-                    ) : (
-                      bids.map((bid, index) => (
-                        <div 
-                          key={bid.id} 
-                          className={cn(
-                            "flex items-center justify-between p-2 rounded-lg",
-                            index === 0 ? "bg-yellow-500/10 border border-yellow-500/20" :
-                            index < 3 ? "bg-blue-500/5" :
-                            "bg-zinc-800/20"
-                          )}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2 min-w-0">
-                              {bid.team?.logo_url ? (
-                                <img 
-                                  src={bid.team.logo_url} 
-                                  alt={bid.team.name}
-                                  className="w-6 h-6 rounded-full border border-zinc-600"
-                                />
-                              ) : (
-                                <div className="w-6 h-6 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center">
-                                  <User className="w-3 h-3 text-zinc-400" />
-                                </div>
-                              )}
-                              <span className="text-sm font-medium text-white truncate max-w-[120px]">
-                                {bid.team?.name || 'Time Desconhecido'}
-                              </span>
-                            </div>
-                            {index === 0 && (
-                              <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 text-xs py-0 px-1">
-                                <Crown className="w-3 h-3 mr-1" />
-                                Líder
-                              </Badge>
-                            )}
-                          </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-bold text-white">
-                              R$ {formatToMillions(bid.amount)}
-                            </span>
-                            <span className="text-xs text-zinc-400 hidden sm:inline">
-                              {formatDateTime(bid.created_at)}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                    
-                    {bids.length === 0 && !loadingBids && (
-                      <div className="text-center p-4 text-zinc-400 text-sm">
-                        Nenhum lance registrado ainda
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+            </div>
+          </div>
         )}
 
+        {/* Botão de lance ou modal */}
         {type === 'active' && timeRemaining > 0 && (
           bidModalOpen ? (
-            <div className="space-y-3 p-4 bg-zinc-800/30 rounded-lg border border-zinc-600">
-              <h4 className="text-lg font-bold text-white mb-2">Fazer Lance</h4>
-              
-              <div className="space-y-2">
-                <label className="text-zinc-400 text-sm font-medium">
-                  Selecione o valor:
-                </label>
-                <Select onValueChange={handleBidSelect} value={selectedBid?.toString() || ''}>
-                  <SelectTrigger className="w-full bg-zinc-800/50 border-zinc-600">
-                    <SelectValue placeholder="Selecione um valor" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-zinc-800 border-zinc-600">
-                    {bidOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value.toString()}>
-                        <div className="flex justify-between items-center w-full">
-                          <span>R$ {option.label}</span>
-                          <span className="text-zinc-400 text-sm">
-                            {option.value.toLocaleString('pt-BR')}
-                          </span>
+            <div className="space-y-4 p-4 bg-gradient-to-br from-orange-900/30 to-red-900/30 rounded-lg border border-orange-600/30 shadow-lg">
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                  <h4 className="font-bold text-white text-lg flex items-center gap-2">
+                    <Flame className="w-5 h-5 text-orange-400" />
+                    Fazer Lance
+                  </h4>
+                  <Badge className={cn("text-xs px-3 py-1.5 rounded-lg border shadow-md", styles.statusBg, styles.statusColor, styles.borderColor)}>
+                    Mínimo: R$ {formatToMillions(auction.current_bid + 1000000)}
+                  </Badge>
+                </div>
+                
+                <div className="space-y-3">
+                  <Select onValueChange={handleBidSelect} value={selectedBid?.toString() || ''}>
+                    <SelectTrigger className="w-full bg-zinc-800 border-orange-600/50 text-white hover:border-orange-500 shadow-md">
+                      <SelectValue placeholder="Selecione um valor" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-800 border-orange-600/50 max-h-80 shadow-2xl">
+                      <div className="max-h-72 overflow-y-auto pr-1">
+                        {groupedBidOptions.map((group, groupIndex) => (
+                          <div key={groupIndex} className="mb-2">
+                            <div className="text-xs text-zinc-400 px-3 py-1.5 bg-zinc-900/80 rounded-lg mb-1 border border-zinc-700/60 shadow-md">
+                              Grupo {groupIndex + 1}: R$ {formatToMillions(group[0].value)} - R$ {formatToMillions(group[group.length - 1].value)}
+                            </div>
+                            {group.map((option) => (
+                              <SelectItem 
+                                key={option.value} 
+                                value={option.value.toString()}
+                                className="hover:bg-orange-900/50 hover:text-white focus:bg-orange-900/50 focus:text-white cursor-pointer my-0.5 text-zinc-300"
+                              >
+                                <div className="flex justify-between items-center w-full py-1">
+                                  <span className="font-medium group-hover:text-white">R$ {option.label}</span>
+                                  <span className="text-zinc-500 text-sm font-mono group-hover:text-zinc-400">
+                                    {option.value.toLocaleString('pt-BR')}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {/* Input customizado */}
+                      <div className="mt-2 pt-2 border-t border-zinc-700/60">
+                        <div className="px-3 pb-2">
+                          <p className="text-xs text-zinc-400 mb-1 font-medium">Valor personalizado (acima de R$ {formatToMillions(bidOptions[bidOptions.length - 1]?.value || 0)})</p>
+                          <input
+                            type="number"
+                            placeholder="Digite o valor desejado"
+                            className="w-full bg-zinc-900/80 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 shadow-md"
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value)
+                              if (!isNaN(value) && value > 0) {
+                                setSelectedBid(value)
+                              }
+                            }}
+                          />
                         </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="text-sm text-yellow-400 text-center p-2 bg-yellow-500/10 rounded">
-                💰 <strong>Lance mínimo:</strong> R$ {formatToMillions(auction.current_bid + 1000000)}
-              </div>
+                      </div>
+                    </SelectContent>
+                  </Select>
 
-              {selectedBid && (
-                <div className="p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <span className="text-blue-300">Seu lance:</span>
-                    <span className="font-bold text-white text-lg">
-                      R$ {formatToMillions(selectedBid)}
-                    </span>
+                  {selectedBid && (
+                    <div className="p-4 bg-gradient-to-r from-orange-900/40 to-red-900/40 border border-orange-600/30 rounded-lg shadow-md">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 bg-gradient-to-r from-orange-600/30 to-orange-700/30 rounded-lg">
+                            <TrendingUp className="w-4 h-4 text-orange-400" />
+                          </div>
+                          <span className="text-orange-400 font-medium">Seu lance</span>
+                        </div>
+                        <span className="font-bold text-white text-xl tracking-tight">
+                          R$ {formatToMillions(selectedBid)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setBidModalOpen(false)}
+                      className="flex-1 border-zinc-700/60 hover:bg-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-600 shadow-md"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handlePlaceBid}
+                      disabled={!selectedBid}
+                      className={cn(
+                        "flex-1 font-medium border shadow-lg",
+                        styles.highlight.primary,
+                        "hover:" + styles.highlight.primaryHover,
+                        "text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      )}
+                    >
+                      <Flame className="w-4 h-4 mr-2" />
+                      Confirmar Lance
+                    </Button>
                   </div>
                 </div>
-              )}
-              
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setBidModalOpen(false)}
-                  className="flex-1 border-zinc-600"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handlePlaceBid}
-                  disabled={!selectedBid}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                >
-                  Dar Lance
-                </Button>
               </div>
             </div>
           ) : (
             <Button
               onClick={() => setBidModalOpen(true)}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3"
-              disabled={!team || type === 'finished' || hasReservedBalance}
+              className={cn(
+                "w-full font-bold py-3 px-4 border shadow-lg rounded-lg",
+                styles.highlight.primary,
+                "hover:" + styles.highlight.primaryHover,
+                "text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              )}
+              disabled={!team || hasReservedBalance}
+              size="lg"
             >
               {!team ? (
-                'Sem Time'
-              ) : type === 'finished' ? (
-                <>
-                  <Trophy className="w-5 h-5 mr-2" />
-                  Leilão Finalizado
-                </>
+                <div className="flex items-center gap-2 justify-center">
+                  <Users className="w-5 h-5" />
+                  <span>Sem Time</span>
+                </div>
               ) : hasReservedBalance ? (
-                <>
-                  <Lock className="w-5 h-5 mr-2" />
-                  Lance Reservado
-                </>
+                <div className="flex items-center gap-2 justify-center">
+                  <Lock className="w-5 h-5" />
+                  <span>Já está participando</span>
+                </div>
               ) : (
-                <>
-                  <DollarSign className="w-5 h-5 mr-2" />
-                  Fazer Lance
-                </>
+                <div className="flex items-center gap-2 justify-center">
+                  <Flame className="w-5 h-5" />
+                  <span>Fazer Lance</span>
+                </div>
               )}
             </Button>
           )
         )}
 
+        {/* Histórico de lances */}
+        {(type === 'active' || type === 'finished') && bids.length > 0 && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowBidHistory(!showBidHistory)}
+              className="flex items-center justify-between w-full p-3 bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 rounded-lg hover:from-zinc-700/80 hover:to-zinc-800/80 transition-all duration-200 group border border-zinc-700/60 hover:border-zinc-600 shadow-md"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-zinc-700/60 rounded-lg group-hover:bg-zinc-600/60 transition-all duration-200">
+                  <History className="w-4 h-4 text-zinc-400" />
+                </div>
+                <div className="text-left">
+                  <p className="font-medium text-zinc-300 group-hover:text-white">Histórico de Lances</p>
+                  <p className="text-xs text-zinc-500 group-hover:text-zinc-400">{bids.length} lance{bids.length !== 1 ? 's' : ''} registrado{bids.length !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+              <ChevronRight className={cn(
+                "w-5 h-5 text-zinc-500 transition-all duration-300",
+                showBidHistory && "rotate-90 text-zinc-400"
+              )} />
+            </button>
+
+            {showBidHistory && (
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {bids.map((bid, index) => (
+                  <div 
+                    key={bid.id} 
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border shadow-md transition-all duration-200 hover:shadow-lg",
+                      index === 0 ? "bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border-yellow-600/30" :
+                      index < 3 ? "bg-gradient-to-r from-orange-900/30 to-red-900/30 border-orange-600/30" :
+                      "bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 border-zinc-700/60"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 shadow-md",
+                        index === 0 ? "bg-gradient-to-r from-yellow-600/20 to-yellow-700/20 text-yellow-300 border border-yellow-600/30" :
+                        index < 3 ? "bg-gradient-to-r from-orange-600/20 to-orange-700/20 text-orange-300 border border-orange-600/30" :
+                        "bg-gradient-to-r from-zinc-700/60 to-zinc-800/60 text-zinc-300 border border-zinc-600/30"
+                      )}>
+                        <span className="text-xs font-bold">#{index + 1}</span>
+                      </div>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {bid.team?.logo_url ? (
+                          <img 
+                            src={bid.team.logo_url} 
+                            alt={bid.team.name}
+                            className="w-6 h-6 rounded-full border border-zinc-600 shadow-md flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-zinc-700/60 border border-zinc-600 shadow-md flex-shrink-0" />
+                        )}
+                        <span className="text-sm font-medium text-zinc-300 truncate">
+                          {bid.team?.name || 'Time'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                      <span className="font-bold text-white text-right text-lg">
+                        R$ {formatToMillions(bid.amount)}
+                      </span>
+                      <span className="text-xs text-zinc-400 text-right font-medium">
+                        {formatDateTime(bid.created_at)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Ações administrativas */}
         {isAdmin && type !== 'finished' && (
-          <div className="flex gap-2">
-            {type === 'pending' && onStartAuction && (
-              <Button
-                onClick={() => onStartAuction(auction.id)}
-                className="flex-1 bg-orange-600 hover:bg-orange-700"
-              >
-                <Play className="w-4 h-4 mr-2" />
-                Iniciar
-              </Button>
-            )}
-            {onCancelAuction && (
-              <Button
-                variant="outline"
-                onClick={() => onCancelAuction(auction.id)}
-                className="flex-1 bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30"
-              >
-                <Minus className="w-4 h-4 mr-2" />
-                Cancelar
-              </Button>
-            )}
+          <div className="pt-3 border-t border-zinc-700/50">
+            <div className="flex flex-col sm:flex-row gap-2">
+              {type === 'pending' && onStartAuction && (
+                <Button
+                  onClick={() => onStartAuction(auction.id)}
+                  className={cn(
+                    "flex-1 font-medium border shadow-lg",
+                    styles.highlight.primary,
+                    "hover:" + styles.highlight.primaryHover,
+                    "text-white"
+                  )}
+                >
+                  <Play className="w-4 h-4 mr-2" />
+                  Iniciar Leilão
+                </Button>
+              )}
+              {onCancelAuction && (
+                <Button
+                  variant="outline"
+                  onClick={handleCancel}
+                  disabled={isCancelling}
+                  className="flex-1 bg-gradient-to-r from-red-900/30 to-red-800/30 border-red-600/50 text-red-300 hover:from-red-800/40 hover:to-red-700/40 hover:text-red-200 hover:border-red-500/50 shadow-md"
+                >
+                  {isCancelling ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin mr-2" />
+                      Cancelando...
+                    </div>
+                  ) : (
+                    <>
+                      <X className="w-4 h-4 mr-2" />
+                      Cancelar Leilão
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Status do time atual */}
+        {team && (type === 'active' || type === 'finished') && (
+          <div className={cn(
+            "rounded-lg p-4 border shadow-md transition-all duration-200",
+            isWinning ? "bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border-yellow-600/30" :
+            isParticipating ? "bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-green-600/30" :
+            cn("bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 border-zinc-700/60", styles.valueBorder)
+          )}>
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {isWinning ? (
+                    <>
+                      <div className="p-1.5 bg-gradient-to-r from-yellow-600/20 to-yellow-700/20 rounded-lg">
+                        <Trophy className="w-4 h-4 text-yellow-400" />
+                      </div>
+                      <span className="text-sm font-medium text-yellow-300">
+                        Você está liderando!
+                      </span>
+                    </>
+                  ) : isParticipating ? (
+                    <>
+                      <div className="p-1.5 bg-gradient-to-r from-green-600/20 to-green-700/20 rounded-lg">
+                        <Award className="w-4 h-4 text-green-400" />
+                      </div>
+                      <span className="text-sm font-medium text-green-300">
+                        Você está participando
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="p-1.5 bg-gradient-to-r from-zinc-700/60 to-zinc-800/60 rounded-lg">
+                        <Shield className="w-4 h-4 text-zinc-400" />
+                      </div>
+                      <span className="text-sm font-medium text-zinc-400">
+                        Você não está participando
+                      </span>
+                    </>
+                  )}
+                </div>
+                
+                {type === 'active' && getSaldoReservadoParaLeilao && (
+                  <Badge variant="outline" className="text-xs bg-gradient-to-r from-green-900/30 to-emerald-900/30 border-green-600/30 text-green-300">
+                    Reservado: R$ {formatToMillions(getSaldoReservadoParaLeilao(auction.id))}
+                  </Badge>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

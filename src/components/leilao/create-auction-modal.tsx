@@ -32,6 +32,19 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
   const [freePlayers, setFreePlayers] = useState<Player[]>([])
   const [creating, setCreating] = useState(false)
 
+  // Durações disponíveis (em minutos)
+  const durationOptions = [
+    { value: '5', label: '5 minutos' },
+    { value: '10', label: '10 minutos' },
+    { value: '15', label: '15 minutos' },
+    { value: '30', label: '30 minutos' },
+    { value: '60', label: '60 minutos' },
+    { value: '120', label: '2 horas' },
+    { value: '360', label: '6 horas' },
+    { value: '720', label: '12 horas' },
+    { value: '1440', label: '24 horas' }
+  ]
+
   useEffect(() => {
     if (open) {
       loadFreePlayers()
@@ -171,6 +184,21 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
 
   const timeOptions = generateTimeOptions()
 
+  // Função para formatar a duração para exibição amigável
+  const formatDurationLabel = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} minutos`
+    } else if (minutes === 60) {
+      return '1 hora'
+    } else if (minutes < 1440) {
+      const hours = minutes / 60
+      return `${hours} horas`
+    } else {
+      const days = minutes / 1440
+      return `${days} dia`
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md">
@@ -259,18 +287,18 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
 
           <div>
             <label className="text-zinc-400 text-sm font-medium mb-2 block">
-              Duração
+              Duração do Leilão
             </label>
             <Select value={auctionDuration} onValueChange={setAuctionDuration}>
               <SelectTrigger className="bg-zinc-800/50 border-zinc-600">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="5">5 minutos</SelectItem>
-                <SelectItem value="10">10 minutos</SelectItem>
-                <SelectItem value="15">15 minutos</SelectItem>
-                <SelectItem value="30">30 minutos</SelectItem>
-                <SelectItem value="60">60 minutos</SelectItem>
+                {durationOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {formatDurationLabel(parseInt(option.value))}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
