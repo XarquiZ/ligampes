@@ -1,7 +1,7 @@
 // src/components/Sidebar.tsx
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
@@ -73,7 +73,30 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState(true) // Começa encolhido
+  const [isCollapsed, setIsCollapsed] = useState<boolean | null>(null) // Inicia como null
+
+  // Efeito para carregar o estado salvo do localStorage
+  useEffect(() => {
+    // Verificar se estamos no cliente
+    if (typeof window !== 'undefined') {
+      const savedState = localStorage.getItem('sidebar-collapsed')
+      if (savedState !== null) {
+        // Carrega o estado salvo
+        setIsCollapsed(JSON.parse(savedState))
+      } else {
+        // Se não houver estado salvo, inicia como true (fechado)
+        setIsCollapsed(true)
+      }
+    }
+  }, [])
+
+  // Efeito para salvar o estado no localStorage quando mudar
+  useEffect(() => {
+    if (isCollapsed !== null && typeof window !== 'undefined') {
+      localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed))
+      console.log('Sidebar state saved:', isCollapsed) // Para debug
+    }
+  }, [isCollapsed])
 
   const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
@@ -97,6 +120,24 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
   const handleLogoClick = () => {
     router.push('/dashboard')
     setIsMobileOpen(false)
+  }
+
+  // Mostra loading enquanto carrega o estado
+  if (isCollapsed === null) {
+    return (
+      <>
+        {/* Mobile Menu Button */}
+        <button
+          onClick={toggleMobileMenu}
+          className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-zinc-800 rounded-lg text-white"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+        
+        {/* Sidebar skeleton */}
+        <div className="fixed lg:sticky top-0 left-0 h-screen bg-zinc-900 border-r border-white/10 w-16 z-40 animate-pulse" />
+      </>
+    )
   }
 
   return (

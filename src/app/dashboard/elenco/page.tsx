@@ -715,13 +715,16 @@ export default function ElencoPage() {
     }
   }, [activeSection, players, favoritePlayers])
 
-  // Aplicar filtros
+  // Aplicar filtros - ATUALIZADO PARA INCLUIR POSIÇÕES ALTERNATIVAS
   useEffect(() => {
     let f = [...playersToShow]
     if (search) f = f.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
     
     if (selectedPositions.length > 0) {
-      f = f.filter(p => selectedPositions.includes(p.position))
+      f = f.filter(p => 
+        selectedPositions.includes(p.position) || 
+        (p.alternative_positions && p.alternative_positions.some(altPos => selectedPositions.includes(altPos)))
+      )
     }
     
     if (selectedPlaystyles.length > 0) {

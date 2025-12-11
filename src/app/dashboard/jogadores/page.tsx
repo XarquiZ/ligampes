@@ -537,8 +537,12 @@ export default function ListaJogadores() {
   const filteredPlayers = useMemo(() => {
     return jogadores.filter(j => {
       const name = j.name.toLowerCase().includes(searchName.toLowerCase())
-      // Filtro de posições (múltipla seleção)
-      const pos = selectedPositions.length === 0 || selectedPositions.includes(j.position)
+      
+      // Filtro de posições (múltipla seleção) - ATUALIZADO PARA INCLUIR POSIÇÕES ALTERNATIVAS
+      const pos = selectedPositions.length === 0 || 
+                 selectedPositions.includes(j.position) || 
+                 (j.alternative_positions && j.alternative_positions.some(altPos => selectedPositions.includes(altPos)))
+      
       // Filtro de playstyles (múltipla seleção)
       const playstyle = selectedPlaystyles.length === 0 || (j.playstyle && selectedPlaystyles.includes(j.playstyle))
       const foot = filterFoot === 'Todos' || j.preferred_foot === filterFoot

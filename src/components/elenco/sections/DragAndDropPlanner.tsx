@@ -105,7 +105,7 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
           <Button
             variant="outline"
             onClick={onClose}
-            className="border-zinc-600 hover:bg-zinc-800 flex-1"
+            className="border-zinc-600 text-black hover:text-white hover:bg-zinc-800 flex-1"
           >
             Cancelar
           </Button>
@@ -586,6 +586,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
   const handleMouseDown = (e: React.MouseEvent, slotId: string) => {
     e.preventDefault()
+    e.stopPropagation()
     
     // Começar arrasto após um pequeno delay (para distinguir de click)
     dragTimeoutRef.current = setTimeout(() => {
@@ -604,6 +605,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
   const handleMouseUp = (e: React.MouseEvent, slotId: string) => {
     e.preventDefault()
+    e.stopPropagation()
     
     // Se estava arrastando, não fazer nada
     if (dragging.isDragging) return
@@ -1180,17 +1182,44 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                   onDragStart={(e) => !dragging.isDragging && handleDragStart(e, slot.id, false)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDropOnField(e, slot.id)}
-                  onMouseDown={(e) => slot.player && handleMouseDown(e, slot.id)}
-                  onMouseUp={(e) => {
-                    // Verifica se o clique foi no jogador (ícone circular) e não nas opções
+                  onMouseDown={(e) => {
+                    // Verificar se o clique foi no ícone do jogador
                     const target = e.target as HTMLElement;
                     const clickedOnPlayerIcon = 
                       target.closest('.player-icon-container') || 
                       target.classList.contains('player-icon-container');
                     
-                    if (slot.player && clickedOnPlayerIcon && !dragging.isDragging) {
+                    if (slot.player && clickedOnPlayerIcon) {
+                      // Não iniciar arrasto imediatamente ao clicar no jogador
+                      // Só arrasta se segurar o mouse
+                      handleMouseDown(e, slot.id)
+                    }
+                  }}
+                  onMouseUp={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    
+                    // Se estava arrastando, não fazer nada
+                    if (dragging.isDragging) return
+                    
+                    // Cancelar timeout de arrasto
+                    if (dragTimeoutRef.current) {
+                      clearTimeout(dragTimeoutRef.current)
+                    }
+                    
+                    // Verifica se o clique foi no jogador (ícone circular)
+                    const target = e.target as HTMLElement;
+                    const clickedOnPlayerIcon = 
+                      target.closest('.player-icon-container') || 
+                      target.classList.contains('player-icon-container');
+                    
+                    if (slot.player && clickedOnPlayerIcon) {
                       setSelectedSlot(slot)
                       setShowPositionModal(true)
+                    } else if (slot) {
+                      // Slot vazio - abrir modal de seleção de jogador
+                      setSelectedSlot(slot)
+                      setShowPlayerModal(true)
                     }
                   }}
                   onMouseEnter={() => slot.player && handleMouseEnter(slot.id)}
@@ -1220,7 +1249,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             onMouseEnter={() => handleMouseEnter(slot.id)}
                             onMouseLeave={handleMouseLeave}
                           >
-                            {/* Remover jogador - ATUALIZADO: usa onMouseDown em vez de onClick */}
+                            {/* Remover jogador */}
                             <button
                               onMouseDown={(e) => {
                                 e.preventDefault()
@@ -1233,7 +1262,10 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                                 // Chamar função de remoção
                                 handleRemovePlayerWithConfirmation(slot.id, e)
                               }}
-                              onClick={(e) => e.preventDefault()} // Prevenir clique duplo
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                              }}
                               className="w-8 h-8 rounded-lg bg-red-500/20 border border-red-500/50 flex items-center justify-center hover:bg-red-500/30 transition-colors group/btn"
                               title="Remover jogador"
                             >
@@ -1255,25 +1287,17 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                                 setShowPositionModal(true)
                                 setHovering({ isHovering: false, slotId: null, showOptions: false })
                               }}
-                              onClick={(e) => e.preventDefault()} // Prevenir clique duplo
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                              }}
                               className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/50 flex items-center justify-center hover:bg-blue-500/30 transition-colors group/btn"
                               title="Mudar posição"
                             >
                               <Edit2 className="w-3 h-3 text-blue-400 group-hover/btn:text-blue-300" />
                             </button>
                             
-                            {/* Arrastar */}
-                            <button
-                              onMouseDown={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                handleMouseDown(e, slot.id)
-                              }}
-                              className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center hover:bg-emerald-500/30 transition-colors cursor-grab active:cursor-grabbing group/btn"
-                              title="Segure para arrastar"
-                            >
-                              <GripVertical className="w-3 h-3 text-emerald-400 group-hover/btn:text-emerald-300" />
-                            </button>
+        
                           </div>
                         )}
                         
@@ -1339,7 +1363,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                         <span className="font-bold text-white">{slot.position || '?'}</span>
                       </div>
                       <div 
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation()
                           setSelectedSlot(slot)
                           setShowPlayerModal(true)
                         }}

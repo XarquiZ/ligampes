@@ -57,7 +57,14 @@ const OVERALL_VALUE_MAP = [
   { ovr: 70, value: 4_000_000 },   { ovr: 0,   value: 1_000 },
 ]
 
-const calculateBasePrice = (ovr: number) => OVERALL_VALUE_MAP.find(e => ovr >= e.ovr)?.value || 1_000
+const calculateBasePrice = (ovr: number, position: string) => {
+  // Se a posição for GO (goleiro), retorna valor fixo de 1 milhão
+  if (position === 'GO') {
+    return 1_000_000;
+  }
+  // Para outras posições, usa a tabela normal
+  return OVERALL_VALUE_MAP.find(e => ovr >= e.ovr)?.value || 1_000;
+}
 
 // Posições OBRIGATÓRIAS (sem "Nenhum")
 const POSITIONS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA','MLE','MLD', 'PTE', 'PTD', 'CA'] as const
@@ -311,8 +318,8 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
   })
 
   const overall = form.watch('overall') || 0
-  const basePrice = useMemo(() => calculateBasePrice(overall), [overall])
   const position = form.watch('position')
+  const basePrice = useMemo(() => calculateBasePrice(overall, position), [overall, position])
   const isGK = position === 'GO'
 
   useEffect(() => {
@@ -497,6 +504,17 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
               <div className="p-6 bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-2xl border border-purple-700 text-center">
                 <p className="text-purple-300 text-lg">Valor Base Calculado</p>
                 <p className="text-4xl font-black text-white mt-2">R$ {basePrice.toLocaleString('pt-BR')}</p>
+                {isGK && (
+                  <p className="text-yellow-300 text-sm mt-2">
+                    <Target className="w-4 h-4 inline mr-1" />
+                    Goleiro - Valor fixo de R$ 1.000.000
+                  </p>
+                )}
+                {!isGK && (
+                  <p className="text-zinc-300 text-sm mt-2">
+                    Baseado no Overall ({overall}) e posição ({position})
+                  </p>
+                )}
               </div>
 
               <FormField control={form.control} name="photo_url" render={({ field }) => (
