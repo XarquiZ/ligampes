@@ -3,11 +3,13 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { 
   CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
   Calendar, Users, ArrowRightLeft, X, Ban, ShoppingCart, 
-  Gavel, User, UserPlus, Users as UsersIcon, Image as ImageIcon
+  Gavel, User, UserPlus, Users as UsersIcon, Image as ImageIcon,
+  Filter
 } from 'lucide-react'
 import ExchangePlayers from './ExchangePlayers'
 import { Transfer, formatBalance, formatDateTime, isAuction } from './types'
@@ -31,6 +33,8 @@ interface TransferCardProps {
   exchangePlayersDetails: { [key: string]: any[] }
   aprovar: (transferId: string, type: 'seller' | 'buyer' | 'admin') => void
   rejeitarTransferencia: (transferId: string) => void
+  onFilterByTeam?: (teamId: string | null) => void
+  selectedTeamFilter?: string | null
 }
 
 export default function TransferCard({
@@ -40,7 +44,9 @@ export default function TransferCard({
   isAdmin,
   exchangePlayersDetails,
   aprovar,
-  rejeitarTransferencia
+  rejeitarTransferencia,
+  onFilterByTeam,
+  selectedTeamFilter
 }: TransferCardProps) {
   const isDismissal = !transfer.to_team_id || transfer.transfer_type === 'dismiss'
   const isAuctionTransfer = isAuction(transfer.transfer_type)
@@ -120,6 +126,20 @@ export default function TransferCard({
   const getPlayerOverall = (playerId: string): number => {
     const playerDetails = getPlayerDetails(playerId)
     return playerDetails?.overall || 0
+  }
+
+  // Verifica se o transfer card deve ser mostrado com base no filtro
+  const shouldShowTransfer = () => {
+    if (activeTab !== 'completed' || !selectedTeamFilter) return true
+    
+    // Verifica se a transferência envolve o time selecionado
+    return transfer.from_team_id === selectedTeamFilter || 
+           transfer.to_team_id === selectedTeamFilter
+  }
+
+  // Se não deve mostrar o card, retorna null
+  if (!shouldShowTransfer()) {
+    return null
   }
 
   return (

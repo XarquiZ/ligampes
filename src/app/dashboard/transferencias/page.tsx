@@ -20,6 +20,29 @@ import {
   type Transfer
 } from '@/components/transferencias'
 
+// Importando componentes do filtro
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Filter, X, ArrowUpDown, Check } from 'lucide-react'
+
+// Definindo as posições disponíveis
+const POSITIONS = [
+  { value: 'GO', label: 'GO' },
+  { value: 'ZC', label: 'ZC' },
+  { value: 'LE', label: 'LE' },
+  { value: 'LD', label: 'LD' },
+  { value: 'VOL', label: 'VOL' },
+  { value: 'MLG', label: 'MLG' },
+  { value: 'MLE', label: 'MLE' },
+  { value: 'MLD', label: 'MLD' },
+  { value: 'MAT', label: 'MAT' }, 
+  { value: 'PTE', label: 'PTE' },
+  { value: 'PTD', label: 'PTD' },
+  { value: 'SA', label: 'SA' },
+  { value: 'CA', label: 'CA' }
+]
+
 export default function PaginaTransferencias() {
   const router = useRouter()
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
@@ -35,6 +58,11 @@ export default function PaginaTransferencias() {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [team, setTeam] = useState<Team | null>(null)
+
+  // Estados para o filtro de times
+  const [teams, setTeams] = useState<Team[]>([])
+  const [selectedTeamFilter, setSelectedTeamFilter] = useState<string | null>(null)
+  const [loadingTeams, setLoadingTeams] = useState(false)
 
   // Estados para o chat
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -55,6 +83,11 @@ export default function PaginaTransferencias() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [showDescriptionModal, setShowDescriptionModal] = useState(false)
   const [priceOptions, setPriceOptions] = useState<{ value: number; label: string }[]>([])
+
+  // Estados para os filtros do mercado
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([])
+  const [selectedPriceSort, setSelectedPriceSort] = useState<string>('cheapest')
+  const [filteredMarketPlayers, setFilteredMarketPlayers] = useState<MarketPlayer[]>([])
 
   // Carregar dados do usuário e time
   useEffect(() => {
@@ -85,6 +118,31 @@ export default function PaginaTransferencias() {
       subscription.unsubscribe()
     }
   }, [supabase, activeView])
+
+  // Carregar times para o filtro
+  useEffect(() => {
+    const loadTeams = async () => {
+      setLoadingTeams(true)
+      try {
+        const { data, error } = await supabase
+          .from('teams')
+          .select('id, name, logo_url')
+          .order('name')
+        
+        if (error) {
+          console.error('Erro ao carregar times:', error)
+        } else {
+          setTeams(data || [])
+        }
+      } catch (error) {
+        console.error('Erro:', error)
+      } finally {
+        setLoadingTeams(false)
+      }
+    }
+    
+    loadTeams()
+  }, [])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -157,6 +215,54 @@ export default function PaginaTransferencias() {
       setMarketPrice(`R$ ${basePrice.toLocaleString('pt-BR')}`)
     }
   }, [selectedPlayer])
+
+  // Filtrar transferências com base no time selecionado
+  useEffect(() => {
+    if (allTransfers.length > 0) {
+      let filtered = activeTab === 'pending' 
+        ? allTransfers.filter(t => t.status === 'pending')
+        : allTransfers.filter(t => t.status === 'approved')
+
+      // Aplicar filtro de time apenas na aba "completed"
+      if (activeTab === 'completed' && selectedTeamFilter) {
+        filtered = filtered.filter(transfer => 
+          transfer.from_team_id === selectedTeamFilter || 
+          transfer.to_team_id === selectedTeamFilter
+        )
+      }
+      
+      setTransfers(filtered)
+    }
+  }, [activeTab, allTransfers, selectedTeamFilter])
+
+  // Filtrar jogadores do mercado com base nos filtros selecionados
+  useEffect(() => {
+    if (marketPlayers.length > 0) {
+      let filtered = [...marketPlayers]
+
+      // Aplicar filtro de posições (multi-select)
+      if (selectedPositions.length > 0) {
+        filtered = filtered.filter(player => {
+          // Verificar se o jogador tem posição no player object
+          if (player.player && player.player.position) {
+            return selectedPositions.includes(player.player.position)
+          }
+          return false
+        })
+      }
+
+      // Aplicar ordenação por preço
+      if (selectedPriceSort === 'cheapest') {
+        filtered.sort((a, b) => a.price - b.price)
+      } else if (selectedPriceSort === 'expensive') {
+        filtered.sort((a, b) => b.price - a.price)
+      }
+
+      setFilteredMarketPlayers(filtered)
+    } else {
+      setFilteredMarketPlayers([])
+    }
+  }, [marketPlayers, selectedPositions, selectedPriceSort])
 
   const loadUserData = async () => {
     try {
@@ -248,9 +354,17 @@ export default function PaginaTransferencias() {
       }
       setExchangePlayersDetails(exchangeDetails)
       
-      const filtered = activeTab === 'pending' 
+      let filtered = activeTab === 'pending' 
         ? safeTransferData.filter(t => t.status === 'pending')
         : safeTransferData.filter(t => t.status === 'approved')
+
+      // Aplicar filtro de time apenas na aba "completed"
+      if (activeTab === 'completed' && selectedTeamFilter) {
+        filtered = filtered.filter(transfer => 
+          transfer.from_team_id === selectedTeamFilter || 
+          transfer.to_team_id === selectedTeamFilter
+        )
+      }
       
       setTransfers(filtered)
     } catch (error) {
@@ -261,16 +375,6 @@ export default function PaginaTransferencias() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    if (allTransfers.length > 0) {
-      const filtered = activeTab === 'pending' 
-        ? allTransfers.filter(t => t.status === 'pending')
-        : allTransfers.filter(t => t.status === 'approved')
-      
-      setTransfers(filtered)
-    }
-  }, [activeTab, allTransfers])
 
   const checkAndExecuteTransfer = async (transfer: Transfer) => {
     try {
@@ -1014,6 +1118,44 @@ export default function PaginaTransferencias() {
     setMarketDescription('')
   }
 
+  // Função para limpar filtro
+  const clearTeamFilter = () => {
+    setSelectedTeamFilter(null)
+  }
+
+  // Função para lidar com mudança de aba
+  const handleTabChange = (tab: 'pending' | 'completed') => {
+    setActiveTab(tab)
+    // Limpar filtro ao mudar para a aba "pending"
+    if (tab === 'pending') {
+      setSelectedTeamFilter(null)
+    }
+  }
+
+  // Função para limpar filtros do mercado
+  const clearMarketFilters = () => {
+    setSelectedPositions([])
+    setSelectedPriceSort('cheapest')
+  }
+
+  // Função para alternar posição no multi-select
+  const togglePosition = (position: string) => {
+    setSelectedPositions(prev =>
+      prev.includes(position)
+        ? prev.filter(p => p !== position)
+        : [...prev, position]
+    )
+  }
+
+  // Função para selecionar/desselecionar todas as posições
+  const toggleAllPositions = () => {
+    if (selectedPositions.length === POSITIONS.length) {
+      setSelectedPositions([])
+    } else {
+      setSelectedPositions(POSITIONS.map(p => p.value))
+    }
+  }
+
   const chatUser = {
     id: user?.id || '',
     name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
@@ -1049,51 +1191,321 @@ export default function PaginaTransferencias() {
             <ViewSwitch activeView={activeView} setActiveView={setActiveView} />
 
             {activeView === 'transferencias' ? (
-              <TransferenciasView
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                transfers={transfers}
-                allTransfers={allTransfers}
-                userTeamId={userTeamId}
-                isAdmin={isAdmin}
-                exchangePlayersDetails={exchangePlayersDetails}
-                aprovar={aprovar}
-                rejeitarTransferencia={rejeitarTransferencia}
-                loading={loading}
-              />
+              <>
+{/* Filtro de times - Apenas para transferências finalizadas */}
+{activeTab === 'completed' && (
+  <div className="mb-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-700/50">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-2">
+        <Filter className="w-4 h-4 text-purple-400" />
+        <span className="text-sm text-zinc-300">Filtrar por time:</span>
+      </div>
+      
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+        <Select 
+          value={selectedTeamFilter || "all"} 
+          onValueChange={(value) => setSelectedTeamFilter(value === "all" ? null : value)}
+        >
+          <SelectTrigger className="w-full sm:w-[250px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
+            <SelectValue placeholder="Selecione um time" />
+          </SelectTrigger>
+          <SelectContent className="bg-zinc-900 border-zinc-700">
+            <SelectItem 
+              value="all" 
+              className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                  <Filter className="w-3 h-3 text-white" />
+                </div>
+                <span className="truncate">Todos os times</span>
+              </div>
+            </SelectItem>
+            {loadingTeams ? (
+              <SelectItem value="loading" disabled className="text-white">
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+                  <span>Carregando times...</span>
+                </div>
+              </SelectItem>
             ) : (
-              <MercadoView
-                marketTab={marketTab}
-                setMarketTab={setMarketTab}
-                marketPlayers={marketPlayers}
-                myMarketPlayers={myMarketPlayers}
-                availablePlayers={availablePlayers}
-                loadingMarket={loadingMarket}
-                showAddForm={showAddForm}
-                setShowAddForm={setShowAddForm}
-                selectedPlayer={selectedPlayer}
-                setSelectedPlayer={setSelectedPlayer}
-                marketPrice={marketPrice}
-                setMarketPrice={setMarketPrice}
-                marketDescription={marketDescription}
-                setMarketDescription={setMarketDescription}
-                editingDescription={editingDescription}
-                setEditingDescription={setEditingDescription}
-                editDescriptionText={editDescriptionText}
-                setEditDescriptionText={setEditDescriptionText}
-                priceOptions={priceOptions}
-                handlePriceChange={handlePriceChange}
-                handleOpenDescriptionModal={handleOpenDescriptionModal}
-                handleAddToMarket={handleAddToMarket}
-                handleRemoveFromMarket={handleRemoveFromMarket}
-                handleBuyPlayer={handleBuyPlayer}
-                handleMakeProposal={handleMakeProposal} // NOVA PROP
-                handleStartEditDescription={handleStartEditDescription}
-                handleUpdateDescription={handleUpdateDescription}
-                handleCancelEdit={handleCancelEdit}
-                addingPlayer={addingPlayer}
-                handleCancelAdd={handleCancelAdd} // NOVA PROP
-              />
+              teams.map((team) => (
+                <SelectItem 
+                  key={team.id} 
+                  value={team.id}
+                  className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
+                >
+                  <div className="flex items-center gap-2">
+                    {team.logo_url ? (
+                      <img 
+                        src={team.logo_url} 
+                        alt={team.name}
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                        <span className="text-[10px] font-bold text-white">
+                          {team.name?.substring(0, 2) || 'TM'}
+                        </span>
+                      </div>
+                    )}
+                    <span className="truncate">{team.name}</span>
+                  </div>
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+
+        {selectedTeamFilter && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={clearTeamFilter}
+            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700"
+          >
+            <X className="w-4 h-4 mr-1" />
+            Limpar filtro
+          </Button>
+        )}
+      </div>
+    </div>
+    
+    {selectedTeamFilter && (
+      <div className="mt-3 pt-3 border-t border-zinc-700/30">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-zinc-400">Mostrando transferências envolvendo:</span>
+          <div className="flex items-center gap-1">
+            {(() => {
+              const selectedTeam = teams.find(t => t.id === selectedTeamFilter)
+              if (selectedTeam) {
+                return (
+                  <>
+                    {selectedTeam.logo_url ? (
+                      <img 
+                        src={selectedTeam.logo_url} 
+                        alt={selectedTeam.name}
+                        className="w-4 h-4 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                        <span className="text-[8px] font-bold text-white">
+                          {selectedTeam.name?.substring(0, 2) || 'TM'}
+                        </span>
+                      </div>
+                    )}
+                    <span className="text-white text-sm font-medium">{selectedTeam.name}</span>
+                  </>
+                )
+              }
+              return null
+            })()}
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
+                <TransferenciasView
+                  activeTab={activeTab}
+                  setActiveTab={handleTabChange}
+                  transfers={transfers}
+                  allTransfers={allTransfers}
+                  userTeamId={userTeamId}
+                  isAdmin={isAdmin}
+                  exchangePlayersDetails={exchangePlayersDetails}
+                  aprovar={aprovar}
+                  rejeitarTransferencia={rejeitarTransferencia}
+                  loading={loading}
+                  selectedTeamFilter={selectedTeamFilter}
+                />
+              </>
+            ) : (
+              <>
+                {/* Filtros do Mercado - Apenas para jogadores disponíveis */}
+                {marketTab === 'disponiveis' && (
+                  <div className="mb-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-700/50">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-blue-400" />
+                        <span className="text-sm text-zinc-300">Filtrar jogadores disponíveis:</span>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                        {/* Filtro de Posições (Multi-select) */}
+                        <div className="w-full sm:w-auto">
+                          <Select>
+                            <SelectTrigger className="w-full sm:w-[280px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
+                              <div className="flex items-center gap-2">
+                                <span className="text-white">Posições:</span>
+                                <SelectValue placeholder={
+                                  selectedPositions.length === 0 
+                                    ? "Todas as posições" 
+                                    : `${selectedPositions.length} posição(ões) selecionadas`
+                                } />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-zinc-700 max-h-96">
+                              {/* Botão para selecionar/desselecionar todas */}
+                              <div 
+                                className="flex items-center justify-between px-2 py-2 cursor-pointer hover:bg-blue-600/30 rounded-md"
+                                onClick={toggleAllPositions}
+                              >
+                                <span className="text-white text-sm">
+                                  {selectedPositions.length === POSITIONS.length 
+                                    ? "Desselecionar todas" 
+                                    : "Selecionar todas"}
+                                </span>
+                                <Check className={`w-4 h-4 ${selectedPositions.length === POSITIONS.length ? 'text-green-400' : 'text-zinc-500'}`} />
+                              </div>
+                              
+                              <div className="border-t border-zinc-700 my-2"></div>
+                              
+                              {/* Lista de posições */}
+                              {POSITIONS.map((position) => (
+                                <div
+                                  key={position.value}
+                                  className={`flex items-center justify-between px-2 py-2 cursor-pointer rounded-md ${
+                                    selectedPositions.includes(position.value)
+                                      ? 'bg-blue-600 text-white'
+                                      : 'hover:bg-zinc-800'
+                                  }`}
+                                  onClick={() => togglePosition(position.value)}
+                                >
+                                  <span className="text-sm text-white">{position.label}</span>
+                                  {selectedPositions.includes(position.value) && (
+                                    <Check className="w-4 h-4" />
+                                  )}
+                                </div>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Filtro de Ordenação por Preço */}
+                        <div className="w-full sm:w-auto">
+                          <Select 
+                            value={selectedPriceSort} 
+                            onValueChange={setSelectedPriceSort}
+                          >
+                            <SelectTrigger className="w-full sm:w-[180px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
+                              <div className="flex items-center gap-2">
+                                <ArrowUpDown className="w-4 h-4 text-blue-400" />
+                                <SelectValue placeholder="Ordenar por preço" />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-zinc-700">
+                              <SelectItem 
+                                value="cheapest" 
+                                className="focus:bg-blue-600 focus:text-white hover:bg-blue-600 hover:text-white transition-colors cursor-pointer text-white"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span>Mais baratos</span>
+                                </div>
+                              </SelectItem>
+                              <SelectItem 
+                                value="expensive" 
+                                className="focus:bg-blue-600 focus:text-white hover:bg-blue-600 hover:text-white transition-colors cursor-pointer text-white"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span>Mais caros</span>
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Botão para limpar filtros */}
+                        {(selectedPositions.length > 0 || selectedPriceSort !== 'cheapest') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={clearMarketFilters}
+                            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700"
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Limpar filtros
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {(selectedPositions.length > 0 || selectedPriceSort !== 'cheapest') && (
+                      <div className="mt-3 pt-3 border-t border-zinc-700/30">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-zinc-400">Mostrando jogadores:</span>
+                          </div>
+                          
+                          {/* Badges das posições selecionadas */}
+                          {selectedPositions.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {selectedPositions.map((position) => {
+                                const posInfo = POSITIONS.find(p => p.value === position)
+                                return (
+                                  <Badge 
+                                    key={position}
+                                    variant="outline" 
+                                    className="bg-blue-500/10 text-blue-400 border-blue-500/30"
+                                  >
+                                    {posInfo?.label || position}
+                                  </Badge>
+                                )
+                              })}
+                            </div>
+                          )}
+                          
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            {selectedPriceSort !== 'cheapest' && (
+                              <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30">
+                                {selectedPriceSort === 'expensive' ? 'Mais caros' : 'Mais baratos'}
+                              </Badge>
+                            )}
+                            
+                            <span className="text-xs text-zinc-400">
+                              ({filteredMarketPlayers.length} de {marketPlayers.length} jogadores)
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <MercadoView
+                  marketTab={marketTab}
+                  setMarketTab={setMarketTab}
+                  marketPlayers={marketTab === 'disponiveis' ? filteredMarketPlayers : marketPlayers}
+                  myMarketPlayers={myMarketPlayers}
+                  availablePlayers={availablePlayers}
+                  loadingMarket={loadingMarket}
+                  showAddForm={showAddForm}
+                  setShowAddForm={setShowAddForm}
+                  selectedPlayer={selectedPlayer}
+                  setSelectedPlayer={setSelectedPlayer}
+                  marketPrice={marketPrice}
+                  setMarketPrice={setMarketPrice}
+                  marketDescription={marketDescription}
+                  setMarketDescription={setMarketDescription}
+                  editingDescription={editingDescription}
+                  setEditingDescription={setEditingDescription}
+                  editDescriptionText={editDescriptionText}
+                  setEditDescriptionText={setEditDescriptionText}
+                  priceOptions={priceOptions}
+                  handlePriceChange={handlePriceChange}
+                  handleOpenDescriptionModal={handleOpenDescriptionModal}
+                  handleAddToMarket={handleAddToMarket}
+                  handleRemoveFromMarket={handleRemoveFromMarket}
+                  handleBuyPlayer={handleBuyPlayer}
+                  handleMakeProposal={handleMakeProposal}
+                  handleStartEditDescription={handleStartEditDescription}
+                  handleUpdateDescription={handleUpdateDescription}
+                  handleCancelEdit={handleCancelEdit}
+                  addingPlayer={addingPlayer}
+                  handleCancelAdd={handleCancelAdd}
+                />
+              </>
             )}
           </div>
         </div>
