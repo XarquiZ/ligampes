@@ -245,21 +245,27 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     return cashValue >= requiredMoneyToBalance
   }, [player, requiredMoneyToBalance, exchangeValue])
 
-  // Verificar se a troca pode prosseguir
+  // Verificar se a troca pode prosseguir - CORREÇÃO AQUI
   const canProceedWithExchange = useMemo(() => {
-    if (!player || exchangePlayers.length === 0) return false
+    if (!player) return false
     
-    // 1. Deve estar equilibrada
+    // Se não há jogadores oferecidos e nem dinheiro, não pode prosseguir
+    if (exchangePlayers.length === 0 && parseFloat(exchangeValue.replace(/\./g, '').replace(',', '.')) === 0) return false
+    
+    // 1. Deve estar equilibrada (valor líquido >= valor do jogador)
     if (!isExchangeBalanced) return false
     
     // 2. Direção do dinheiro deve estar correta
     if (!isMoneyDirectionCorrect) return false
     
-    // 3. Valor do dinheiro deve ser suficiente (se necessário)
-    if (!isMoneyAmountSufficient) return false
+    // 3. Se tem dinheiro envolvido, o valor deve ser >= ao mínimo necessário
+    //    AGORA PERMITE VALORES MAIORES QUE O MÍNIMO
+    if (parseFloat(exchangeValue.replace(/\./g, '').replace(',', '.')) > 0) {
+      if (!isMoneyAmountSufficient) return false
+    }
     
     return true
-  }, [player, isExchangeBalanced, isMoneyDirectionCorrect, isMoneyAmountSufficient, exchangePlayers])
+  }, [player, isExchangeBalanced, isMoneyDirectionCorrect, isMoneyAmountSufficient, exchangePlayers, exchangeValue])
 
   // Verificar se deve mostrar alerta de valor insuficiente
   const shouldShowInsufficientValueAlert = useMemo(() => {
@@ -367,7 +373,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         }
         
         if (!isMoneyAmountSufficient) {
-          setError(`Valor de dinheiro insuficiente! Você precisa ${moneyDirection === 'send' ? 'mandar' : 'receber'} R$ ${requiredMoneyToBalance.toLocaleString('pt-BR')} para equilibrar.`)
+          setError(`Valor de dinheiro insuficiente! Você precisa ${moneyDirection === 'send' ? 'mandar' : 'receber'} pelo menos R$ ${requiredMoneyToBalance.toLocaleString('pt-BR')} para equilibrar.`)
           return
         }
         
@@ -1025,7 +1031,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                                     <p>{'\u2022'} Jogadores oferecidos valem mais! Você deve <span className="font-bold">MANDAR</span> dinheiro.</p>
                                   )
                                 ) : !isMoneyAmountSufficient ? (
-                                  <p>{'\u2022'} Valor de dinheiro insuficiente! Precisa {moneyDirection === 'send' ? 'mandar' : 'receber'} R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
+                                  <p>{'\u2022'} Valor de dinheiro insuficiente! Precisa {moneyDirection === 'send' ? 'mandar' : 'receber'} pelo menos R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
                                 ) : !isExchangeBalanced ? (
                                   <p>{'\u2022'} Valor total insuficiente! Precisa adicionar R$ {Math.abs(exchangeDifference).toLocaleString('pt-BR')}</p>
                                 ) : null}
@@ -1068,7 +1074,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                           {isMyPlayerHigherValue && (
                             <div className="text-sm text-zinc-300 space-y-1">
                               <p>{'\u2022'} Você deve <span className="text-emerald-400 font-bold">RECEBER</span> dinheiro</p>
-                              <p>{'\u2022'} Valor necessário: R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
+                              <p>{'\u2022'} Valor mínimo necessário: R$ {requiredMoneyToBalance.toLocaleString('pt-BR')} (pode receber mais)</p>
                               <p>{'\u2022'} Configure "Receber" no campo de dinheiro</p>
                               {selectedExchangeTeamInfo && (
                                 <p className="text-emerald-400">
@@ -1088,7 +1094,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                           {isTotalOfferedValueHigher && (
                             <div className="text-sm text-zinc-300 space-y-1">
                               <p>{'\u2022'} Você deve <span className="text-red-400 font-bold">MANDAR</span> dinheiro</p>
-                              <p>{'\u2022'} Valor necessário: R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
+                              <p>{'\u2022'} Valor mínimo necessário: R$ {requiredMoneyToBalance.toLocaleString('pt-BR')} (pode mandar mais)</p>
                               <p>{'\u2022'} Configure "Mandar" no campo de dinheiro</p>
                               <p className="text-red-400 font-medium">
                                 O outro time está te dando jogadores mais valiosos!
@@ -1220,7 +1226,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                                 ) : !isMoneyAmountSufficient ? (
                                   <>
                                     <p>{'\u2022'} Valor de dinheiro insuficiente: R$ {formatCurrency(exchangeValue)}</p>
-                                    <p>{'\u2022'} Necessário: R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
+                                    <p>{'\u2022'} Mínimo necessário: R$ {requiredMoneyToBalance.toLocaleString('pt-BR')} (pode adicionar mais)</p>
                                     <p className="font-bold">{'\u2022'} Aumente o valor para {moneyDirection === 'send' ? 'mandar' : 'receber'}</p>
                                   </>
                                 ) : !isExchangeBalanced ? (
@@ -1247,7 +1253,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                         <ul className="list-disc pl-4 space-y-1">
                           <li><span className="text-purple-400">Seu jogador vale mais</span>: Configure para <span className="text-emerald-400">RECEBER</span> dinheiro</li>
                           <li><span className="text-blue-400">Jogadores oferecidos valem mais</span>: Configure para <span className="text-red-400">MANDAR</span> dinheiro</li>
-                          <li>Valor do dinheiro deve ser igual ou maior que a diferença</li>
+                          <li>Valor do dinheiro deve ser igual ou maior que a diferença mínima</li>
                           <li>A troca só é liberada quando todos os critérios são atendidos</li>
                           <li>Valor mínimo: R$ {player.base_price.toLocaleString('pt-BR')}</li>
                         </ul>
@@ -1315,20 +1321,20 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                         <>
                           <p>{'\u2022'} Seu jogador: R$ {player.base_price.toLocaleString('pt-BR')}</p>
                           <p>{'\u2022'} Jogadores oferecidos: R$ {offeredPlayersValue.toLocaleString('pt-BR')}</p>
-                          <p className="font-bold mt-1">{'\u2022'} Mude para "Receber" dinheiro e adicione R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
+                          <p className="font-bold mt-1">{'\u2022'} Mude para "Receber" dinheiro e adicione pelo menos R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
                         </>
                       ) : (
                         <>
                           <p>{'\u2022'} Seu jogador: R$ {player.base_price.toLocaleString('pt-BR')}</p>
                           <p>{'\u2022'} Jogadores oferecidos: R$ {offeredPlayersValue.toLocaleString('pt-BR')}</p>
-                          <p className="font-bold mt-1">{'\u2022'} Mude para "Mandar" dinheiro e adicione R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
+                          <p className="font-bold mt-1">{'\u2022'} Mude para "Mandar" dinheiro e adicione pelo menos R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
                         </>
                       )
                     ) : !isMoneyAmountSufficient ? (
                       <>
-                        <p>{'\u2022'} Diferença necessária: R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
+                        <p>{'\u2022'} Diferença mínima necessária: R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
                         <p>{'\u2022'} Valor atual: R$ {formatCurrency(exchangeValue)}</p>
-                        <p className="font-bold mt-1">{'\u2022'} Aumente o valor para {moneyDirection === 'send' ? 'mandar' : 'receber'} mais dinheiro</p>
+                        <p className="font-bold mt-1">{'\u2022'} Aumente o valor para {moneyDirection === 'send' ? 'mandar' : 'receber'} pelo menos R$ {requiredMoneyToBalance.toLocaleString('pt-BR')}</p>
                       </>
                     ) : !isExchangeBalanced ? (
                       <>
