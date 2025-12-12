@@ -16,7 +16,8 @@ import {
   Home,
   Menu,
   X,
-  ChevronLeft
+  ChevronLeft,
+  Trophy
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -66,6 +67,12 @@ const navigationItems = [
     href: '/dashboard/jogadores', 
     icon: Users, 
     color: 'text-pink-400' 
+  },
+  { 
+    name: 'Transferências', 
+    href: '/dashboard/transferencias', 
+    icon: ArrowLeftRight, 
+    color: 'text-purple-400' 
   },
 ]
 
@@ -224,7 +231,8 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
           <nav className="flex-1 p-2 space-y-1">
             {navigationItems.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href
+              const isActive = pathname === item.href || 
+                (pathname.startsWith(item.href) && item.href !== '/dashboard')
               
               return (
                 <Link

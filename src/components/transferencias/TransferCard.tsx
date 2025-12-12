@@ -422,12 +422,78 @@ export default function TransferCard({
           <div className="flex items-center justify-between mb-4 px-2">
             {/* Vendedor */}
             <div className="text-center group relative">
-              <CheckCircle2
-                className={cn(
-                  "h-8 w-8 transition-all",
-                  transfer.approved_by_seller ? "text-green-400" : "text-zinc-600"
-                )}
-              />
+              <div className="group relative">
+                <CheckCircle2
+                  className={cn(
+                    "h-8 w-8 transition-all cursor-help",
+                    transfer.approved_by_seller ? "text-green-400" : "text-zinc-600"
+                  )}
+                />
+                {/* Tooltip para Vendedor */}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+                  <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
+                    <div className="flex items-center gap-2">
+                      {transfer.approved_by_seller ? (
+                        <>
+                          {isAuctionTransfer ? (
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
+                              <Gavel className="w-3 h-3 text-white" />
+                            </div>
+                          ) : transfer.from_team?.logo_url ? (
+                            <img 
+                              src={transfer.from_team.logo_url} 
+                              alt={transfer.from_team.name}
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                              <span className="text-[8px] font-bold text-white">
+                                {transfer.from_team?.name?.substring(0, 2) || 'VD'}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold">
+                              {isAuctionTransfer ? 'Sistema de Leilão' : transfer.from_team?.name || 'Vendedor'}
+                            </p>
+                            <p className="text-green-400 text-[10px]">✓ Aprovado</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {isAuctionTransfer ? (
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
+                              <Gavel className="w-3 h-3 text-white" />
+                            </div>
+                          ) : transfer.from_team?.logo_url ? (
+                            <img 
+                              src={transfer.from_team.logo_url} 
+                              alt={transfer.from_team.name}
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                              <span className="text-[8px] font-bold text-white">
+                                {transfer.from_team?.name?.substring(0, 2) || 'VD'}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold">
+                              {isAuctionTransfer ? 'Sistema de Leilão' : transfer.from_team?.name || 'Vendedor'}
+                            </p>
+                            <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {/* Seta do tooltip */}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                    <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
+                  </div>
+                </div>
+              </div>
               <p className="text-xs text-zinc-400 mt-1">
                 {isAuctionTransfer ? 'Sistema' : 'Vendedor'}
               </p>
@@ -435,23 +501,111 @@ export default function TransferCard({
 
             {/* Comprador */}
             <div className="text-center group relative">
-              <CheckCircle2
-                className={cn(
-                  "h-8 w-8 transition-all",
-                  transfer.approved_by_buyer ? "text-green-400" : "text-zinc-600"
-                )}
-              />
+              <div className="group relative">
+                <CheckCircle2
+                  className={cn(
+                    "h-8 w-8 transition-all cursor-help",
+                    transfer.approved_by_buyer ? "text-green-400" : "text-zinc-600"
+                  )}
+                />
+                {/* Tooltip para Comprador */}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+                  <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
+                    <div className="flex items-center gap-2">
+                      {transfer.approved_by_buyer ? (
+                        <>
+                          {transfer.to_team?.logo_url ? (
+                            <img 
+                              src={transfer.to_team.logo_url} 
+                              alt={transfer.to_team.name}
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                              <span className="text-[8px] font-bold text-white">
+                                {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold">{transfer.to_team?.name || 'Comprador'}</p>
+                            <p className="text-green-400 text-[10px]">✓ Aprovado</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {transfer.to_team?.logo_url ? (
+                            <img 
+                              src={transfer.to_team.logo_url} 
+                              alt={transfer.to_team.name}
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                              <span className="text-[8px] font-bold text-white">
+                                {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-semibold">{transfer.to_team?.name || 'Comprador'}</p>
+                            <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {/* Seta do tooltip */}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                    <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
+                  </div>
+                </div>
+              </div>
               <p className="text-xs text-zinc-400 mt-1">Comprador</p>
             </div>
 
             {/* Admin */}
             <div className="text-center group relative">
-              <CheckCircle2
-                className={cn(
-                  "h-8 w-8 transition-all",
-                  transfer.approved_by_admin ? "text-green-400" : "text-zinc-600"
-                )}
-              />
+              <div className="group relative">
+                <CheckCircle2
+                  className={cn(
+                    "h-8 w-8 transition-all cursor-help",
+                    transfer.approved_by_admin ? "text-green-400" : "text-zinc-600"
+                  )}
+                />
+                {/* Tooltip para Admin */}
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+                  <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
+                    <div className="flex items-center gap-2">
+                      {transfer.approved_by_admin ? (
+                        <>
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                            <UsersIcon className="w-3 h-3 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-semibold">Administração</p>
+                            <p className="text-green-400 text-[10px]">✓ Aprovado</p>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                            <UsersIcon className="w-3 h-3 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-semibold">Administração</p>
+                            <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {/* Seta do tooltip */}
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                    <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
+                  </div>
+                </div>
+              </div>
               <p className="text-xs text-zinc-400 mt-1">Admin</p>
             </div>
           </div>

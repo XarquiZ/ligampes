@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA
+// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA COM TABELA
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import {
   DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight,
   Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown,
-  Building2, Target, Footprints, Clock, AlertTriangle, X
+  Building2, Target, Footprints, Clock, AlertTriangle, X,
+  Trophy, BarChart2, CalendarDays
 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -43,11 +44,61 @@ interface Player {
   team_id: string | null;
 }
 
+interface LeagueTable {
+  id: string;
+  team_id: string;
+  team_name: string;
+  position: number;
+  points: number;
+  matches_played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals_for: number;
+  goals_against: number;
+  goal_difference: number;
+}
+
+interface MatchSchedule {
+  id: string;
+  home_team_id: string;
+  away_team_id: string;
+  home_team_name: string;
+  away_team_name: string;
+  date: string;
+  time: string;
+  stadium: string;
+  status: 'scheduled' | 'ongoing' | 'completed';
+  home_score?: number;
+  away_score?: number;
+}
+
+interface TeamStats {
+  team_id: string;
+  team_name: string;
+  form: string;
+  next_match: string;
+  last_5_matches: string[];
+}
+
 function formatBalance(value: number): string {
   if (value >= 1_000_000_000) return `R$ ${(value / 1_000_000_000).toFixed(1).replace('.0', '')}B`
   if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1).replace('.0', '')}M`
   if (value >= 1_000) return `R$ ${(value / 1_000).toFixed(0)} mil`
   return `R$ ${value.toLocaleString('pt-BR')}`
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+}
+
+function formatTime(timeString: string): string {
+  return timeString;
 }
 
 // Componente Modal para avisos
@@ -211,6 +262,12 @@ export default function Dashboard() {
   const [pendingTransfers, setPendingTransfers] = useState(0)
   const [completedTransfers, setCompletedTransfers] = useState(0)
 
+  // Estados para o tile TABELA
+  const [leagueTable, setLeagueTable] = useState<LeagueTable[]>([])
+  const [matchSchedule, setMatchSchedule] = useState<MatchSchedule[]>([])
+  const [teamStats, setTeamStats] = useState<TeamStats | null>(null)
+  const [teamPosition, setTeamPosition] = useState<number | null>(null)
+
   // Redirecionar se não autenticado
   useEffect(() => {
     if (!authLoading && !user) {
@@ -326,6 +383,9 @@ export default function Dashboard() {
       loadActiveAuctions()
       loadPendingTransfers()
       loadCompletedTransfers()
+      loadLeagueTable()
+      loadMatchSchedule()
+      loadTeamStatistics()
     }
   }, [team?.id])
 
@@ -461,6 +521,115 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Erro ao carregar transferências completadas:', error)
+    }
+  }
+
+  // Função para carregar tabela do campeonato
+  const loadLeagueTable = async () => {
+    try {
+      // Em um cenário real, você teria uma tabela 'league_table' no banco
+      // Por enquanto, vamos criar dados mockados
+      const mockTable: LeagueTable[] = [
+        { id: '1', team_id: 'team1', team_name: 'Real Madrid', position: 1, points: 72, matches_played: 28, wins: 22, draws: 6, losses: 0, goals_for: 68, goals_against: 20, goal_difference: 48 },
+        { id: '2', team_id: 'team2', team_name: 'Barcelona', position: 2, points: 68, matches_played: 28, wins: 21, draws: 5, losses: 2, goals_for: 65, goals_against: 25, goal_difference: 40 },
+        { id: '3', team_id: 'team3', team_name: 'Atlético de Madrid', position: 3, points: 62, matches_played: 28, wins: 18, draws: 8, losses: 2, goals_for: 52, goals_against: 28, goal_difference: 24 },
+        { id: '4', team_id: 'team4', team_name: team?.name || 'Seu Time', position: 4, points: 58, matches_played: 28, wins: 17, draws: 7, losses: 4, goals_for: 48, goals_against: 30, goal_difference: 18 },
+        { id: '5', team_id: 'team5', team_name: 'Sevilla', position: 5, points: 55, matches_played: 28, wins: 16, draws: 7, losses: 5, goals_for: 45, goals_against: 32, goal_difference: 13 },
+      ]
+      
+      setLeagueTable(mockTable)
+      
+      // Encontrar posição do time atual
+      const teamPosition = mockTable.find(t => t.team_id === team?.id || t.team_name === team?.name)?.position || null
+      setTeamPosition(teamPosition)
+    } catch (error) {
+      console.error('Erro ao carregar tabela:', error)
+    }
+  }
+
+  // Função para carregar agenda de jogos
+  const loadMatchSchedule = async () => {
+    try {
+      // Em um cenário real, você teria uma tabela 'matches' no banco
+      const mockMatches: MatchSchedule[] = [
+        { 
+          id: '1', 
+          home_team_id: 'team4', 
+          away_team_id: 'team1',
+          home_team_name: team?.name || 'Seu Time', 
+          away_team_name: 'Real Madrid',
+          date: '2024-03-15', 
+          time: '21:00',
+          stadium: 'Santiago Bernabéu',
+          status: 'scheduled'
+        },
+        { 
+          id: '2', 
+          home_team_id: 'team3', 
+          away_team_id: 'team4',
+          home_team_name: 'Atlético de Madrid', 
+          away_team_name: team?.name || 'Seu Time',
+          date: '2024-03-22', 
+          time: '19:30',
+          stadium: 'Wanda Metropolitano',
+          status: 'scheduled'
+        },
+        { 
+          id: '3', 
+          home_team_id: 'team4', 
+          away_team_id: 'team2',
+          home_team_name: team?.name || 'Seu Time', 
+          away_team_name: 'Barcelona',
+          date: '2024-04-05', 
+          time: '20:45',
+          stadium: 'Camp Nou',
+          status: 'scheduled'
+        },
+        { 
+          id: '4', 
+          home_team_id: 'team5', 
+          away_team_id: 'team4',
+          home_team_name: 'Sevilla', 
+          away_team_name: team?.name || 'Seu Time',
+          date: '2024-04-12', 
+          time: '18:00',
+          stadium: 'Ramón Sánchez Pizjuán',
+          status: 'scheduled'
+        },
+        { 
+          id: '5', 
+          home_team_id: 'team4', 
+          away_team_id: 'team3',
+          home_team_name: team?.name || 'Seu Time', 
+          away_team_name: 'Atlético de Madrid',
+          date: '2024-04-19', 
+          time: '21:00',
+          stadium: 'Estádio do seu time',
+          status: 'scheduled'
+        },
+      ]
+      
+      setMatchSchedule(mockMatches)
+    } catch (error) {
+      console.error('Erro ao carregar agenda:', error)
+    }
+  }
+
+  // Função para carregar estatísticas do time
+  const loadTeamStatistics = async () => {
+    try {
+      // Em um cenário real, você teria uma tabela 'team_stats' no banco
+      const mockStats: TeamStats = {
+        team_id: team?.id || '',
+        team_name: team?.name || 'Seu Time',
+        form: 'V-V-E-D-V',
+        next_match: '15/03/2024',
+        last_5_matches: ['V', 'E', 'V', 'D', 'V']
+      }
+      
+      setTeamStats(mockStats)
+    } catch (error) {
+      console.error('Erro ao carregar estatísticas do time:', error)
     }
   }
 
@@ -624,7 +793,7 @@ export default function Dashboard() {
   }
 
   // Calcular estatísticas do time
-  const teamStats = {
+  const teamStatistics = {
     totalPlayers: players.length,
     averageOverall: players.length > 0 
       ? Math.round(players.reduce((sum, player) => sum + player.overall, 0) / players.length)
@@ -686,6 +855,16 @@ export default function Dashboard() {
       buttonText: 'Ver jogadores',
       preview: 'jogadores'
     },
+    { 
+      title: 'TRANSFERÊNCIAS', 
+      icon: ArrowLeftRight, 
+      color: 'purple', 
+      value: 'Mercado', 
+      subtitle: 'negociações ativas', 
+      link: '/dashboard/transferencias',
+      buttonText: 'Ver mercado',
+      preview: 'transferencias'
+    }
   ]
 
   // Função para renderizar o preview baseado no tile
@@ -757,23 +936,23 @@ export default function Dashboard() {
               <span className={`font-bold text-lg ${getPlayerCountColor()}`}>{players.length}/28</span>
             </div>
             
-            {teamStats.topPlayer && (
+            {teamStatistics.topPlayer && (
               <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-white font-semibold text-sm">Melhor Jogador</div>
-                    <div className="text-blue-400 text-xs">{teamStats.topPlayer.name}</div>
+                    <div className="text-blue-400 text-xs">{teamStatistics.topPlayer.name}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-yellow-400 font-bold">{teamStats.topPlayer.overall} OVR</div>
-                    <div className="text-zinc-400 text-xs">{teamStats.topPlayer.position}</div>
+                    <div className="text-yellow-400 font-bold">{teamStatistics.topPlayer.overall} OVR</div>
+                    <div className="text-zinc-400 text-xs">{teamStatistics.topPlayer.position}</div>
                   </div>
                 </div>
               </div>
             )}
 
             <div className="grid grid-cols-3 gap-2 text-xs">
-              {Object.entries(teamStats.positions).slice(0, 6).map(([position, count]) => (
+              {Object.entries(teamStatistics.positions).slice(0, 6).map(([position, count]) => (
                 <div key={position} className="bg-zinc-800/50 p-2 rounded border border-zinc-700 text-center">
                   <div className="text-white font-semibold">{count}</div>
                   <div className="text-zinc-400 text-[10px]">{position}</div>
@@ -835,127 +1014,157 @@ export default function Dashboard() {
           </div>
         )
       
-      case 'LEILÃO':
-        const hasActiveAuctions = activeAuctions.length > 0
-        const activeAuction = hasActiveAuctions ? activeAuctions[0] : null
-        
+      case 'TABELA':
+        const teamInTable = leagueTable.find(t => t.team_id === team?.id || t.team_name === team?.name)
+        const top5Table = leagueTable.slice(0, 5)
+        const nextMatches = matchSchedule.slice(0, 3)
+
         return (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-              <span className="text-red-400 text-sm font-semibold">
-                {hasActiveAuctions ? 'Leilão Ativo' : 'Próximo Leilão'}
-              </span>
-              <span className="text-red-400 font-bold text-lg">
-                {hasActiveAuctions ? 'AO VIVO' : 'EM BREVE'}
-              </span>
-            </div>
-            
-            <div className="space-y-2 text-sm">
-              {hasActiveAuctions ? (
-                <div className="space-y-3">
-                  {/* Preview do leilão ativo */}
-                  <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="text-orange-400 font-semibold text-sm">Leilão Ativo</div>
-                        <div className="text-white text-xs mt-1">Participando agora</div>
-                      </div>
-                      <div className="bg-red-500/20 px-2 py-1 rounded-full">
-                        <span className="text-red-400 text-xs font-bold">AO VIVO</span>
-                      </div>
-                    </div>
-                    
-                    {/* Informações do lance atual */}
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div className="text-center">
-                        <DollarSign className="w-4 h-4 text-yellow-400 mx-auto mb-1" />
-                        <div className="text-yellow-400 font-bold text-sm">
-                          {formatBalance(activeAuction.current_bid || activeAuction.start_price)}
-                        </div>
-                        <div className="text-zinc-400 text-xs">Lance Atual</div>
-                      </div>
-                      <div className="text-center">
-                        <Clock className="w-4 h-4 text-blue-400 mx-auto mb-1" />
-                        <div className="text-blue-400 font-bold text-sm">
-                          {activeAuction.end_time ? 
-                            new Date(activeAuction.end_time).toLocaleTimeString('pt-BR', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            }) : 'Indefinido'
-                          }
-                        </div>
-                        <div className="text-zinc-400 text-xs">Termina às</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Estatísticas rápidas */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-zinc-800/30 p-2 rounded text-center">
-                      <Target className="w-3 h-3 text-green-400 mx-auto mb-1" />
-                      <div className="text-white font-semibold">{activeAuctions.length}</div>
-                      <div className="text-zinc-400">Ativos</div>
-                    </div>
-                    <div className="bg-zinc-800/30 p-2 rounded text-center">
-                      <TrendingUp className="w-3 h-3 text-emerald-400 mx-auto mb-1" />
-                      <div className="text-white font-semibold">
-                        {activeAuction.current_bidder ? 'Sim' : 'Não'}
-                      </div>
-                      <div className="text-zinc-400">Com Lances</div>
-                    </div>
-                  </div>
-
-                  {/* Call to action */}
-                  <div className="bg-gradient-to-r from-red-500/20 to-orange-500/20 p-2 rounded-lg border border-red-500/30 text-center">
-                    <div className="text-white text-xs font-semibold">
-                      Participe agora do leilão!
-                    </div>
-                  </div>
+          <div className="space-y-4">
+            {/* Estatísticas do Time */}
+            <div className="bg-gradient-to-r from-yellow-500/10 to-amber-500/10 rounded-lg border border-yellow-500/20 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-yellow-400" />
+                  <span className="text-yellow-400 font-semibold text-sm">Posição Atual</span>
                 </div>
-              ) : (
-                <div className="bg-zinc-800/50 p-4 rounded-lg border border-zinc-700 text-center">
-                  <Calendar className="w-8 h-8 text-orange-400 mx-auto mb-2" />
-                  <div className="text-orange-400 font-semibold">Aguardando Início</div>
-                  <div className="text-zinc-400 text-xs mt-1">Novos leilões em breve</div>
+                <div className="text-white font-bold text-xl">{teamPosition}º Lugar</div>
+              </div>
+              
+              {teamInTable && (
+                <div className="grid grid-cols-3 gap-2 text-xs mt-3">
+                  <div className="text-center bg-zinc-800/30 p-2 rounded">
+                    <div className="text-white font-bold">{teamInTable.points}</div>
+                    <div className="text-zinc-400">Pontos</div>
+                  </div>
+                  <div className="text-center bg-zinc-800/30 p-2 rounded">
+                    <div className="text-white font-bold">{teamInTable.matches_played}</div>
+                    <div className="text-zinc-400">Jogos</div>
+                  </div>
+                  <div className="text-center bg-zinc-800/30 p-2 rounded">
+                    <div className="text-white font-bold">+{teamInTable.goal_difference}</div>
+                    <div className="text-zinc-400">Saldo</div>
+                  </div>
                 </div>
               )}
             </div>
-          </div>
-        )
-      
-      case 'TRANSFERÊNCIAS':
-        return (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-              <span className="text-purple-400 text-sm font-semibold">Mercado de Transferências</span>
-              <span className="text-purple-400 font-bold text-lg">{pendingTransfers}</span>
-            </div>
-            
-            <div className="space-y-2 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
-                  <Clock className="w-4 h-4 text-blue-400 mx-auto mb-1" />
-                  <div className="text-blue-400 font-semibold">{pendingTransfers}</div>
-                  <div className="text-zinc-400 text-xs">Pendentes</div>
+
+            {/* Tabela do Campeonato (Top 5) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart2 className="w-4 h-4 text-orange-400" />
+                  <span className="text-zinc-400 text-sm font-semibold">Top 5 da Liga</span>
                 </div>
-                <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
-                  <TrendingUp className="w-4 h-4 text-green-400 mx-auto mb-1" />
-                  <div className="text-green-400 font-semibold">{completedTransfers}</div>
-                  <div className="text-zinc-400 text-xs">Concluídas</div>
-                </div>
+                <span className="text-zinc-500 text-xs">Pts J V E D</span>
               </div>
               
-              <div className="bg-zinc-800/30 p-2 rounded text-center">
-                <div className="text-zinc-400 text-xs">
-                  {pendingTransfers > 0 
-                    ? `${pendingTransfers} negociação${pendingTransfers > 1 ? 'ões' : ''} aguardando aprovação`
-                    : completedTransfers > 0
-                    ? `${completedTransfers} transferência${completedTransfers > 1 ? 's' : ''} concluída${completedTransfers > 1 ? 's' : ''}`
-                    : 'Nenhuma negociação pendente'
-                  }
-                </div>
+              <div className="space-y-1">
+                {top5Table.map((teamTable) => (
+                  <div 
+                    key={teamTable.id}
+                    className={`flex items-center justify-between p-2 rounded text-xs ${
+                      (teamTable.team_id === team?.id || teamTable.team_name === team?.name) 
+                        ? 'bg-yellow-500/10 border border-yellow-500/20' 
+                        : 'bg-zinc-800/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`w-6 text-center font-bold ${
+                        teamTable.position === 1 ? 'text-yellow-400' :
+                        teamTable.position === 2 ? 'text-zinc-300' :
+                        teamTable.position === 3 ? 'text-amber-700' :
+                        'text-zinc-400'
+                      }`}>
+                        {teamTable.position}º
+                      </span>
+                      <span className={`font-medium ${
+                        (teamTable.team_id === team?.id || teamTable.team_name === team?.name) 
+                          ? 'text-yellow-300' 
+                          : 'text-white'
+                      }`}>
+                        {teamTable.team_name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-zinc-300">
+                      <span className="w-8 text-center font-bold">{teamTable.points}</span>
+                      <span className="w-4 text-center">{teamTable.matches_played}</span>
+                      <span className="w-4 text-center text-green-400">{teamTable.wins}</span>
+                      <span className="w-4 text-center text-yellow-400">{teamTable.draws}</span>
+                      <span className="w-4 text-center text-red-400">{teamTable.losses}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
+
+            {/* Próximos Jogos */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-blue-400" />
+                <span className="text-zinc-400 text-sm font-semibold">Próximos Jogos</span>
+              </div>
+              
+              <div className="space-y-2">
+                {nextMatches.map((match) => (
+                  <div key={match.id} className="bg-zinc-800/30 p-2 rounded text-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-zinc-500 text-[10px]">
+                        {formatDate(match.date)} • {match.time}
+                      </span>
+                      <span className="text-zinc-500 text-[10px]">{match.stadium}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${
+                          match.home_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
+                        }`} />
+                        <span className={`${
+                          match.home_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
+                        }`}>
+                          {match.home_team_name}
+                        </span>
+                      </div>
+                      <span className="text-zinc-500 mx-2">×</span>
+                      <div className="flex items-center gap-1">
+                        <span className={`${
+                          match.away_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
+                        }`}>
+                          {match.away_team_name}
+                        </span>
+                        <div className={`w-2 h-2 rounded-full ${
+                          match.away_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
+                        }`} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Forma do Time */}
+            {teamStats && (
+              <div className="bg-zinc-800/30 rounded p-2">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-zinc-400">Forma:</span>
+                    <div className="flex gap-1">
+                      {teamStats.last_5_matches.map((result, index) => (
+                        <span key={index} className={`
+                          w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold
+                          ${result === 'V' ? 'bg-green-500/30 text-green-400' : 
+                            result === 'E' ? 'bg-yellow-500/30 text-yellow-400' : 
+                            'bg-red-500/30 text-red-400'}
+                        `}>
+                          {result}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <span className="text-blue-400">Próximo: {teamStats.next_match}</span>
+                </div>
+              </div>
+            )}
           </div>
         )
       
@@ -1071,7 +1280,7 @@ export default function Dashboard() {
             </div>
 
             {/* Grid de Tiles */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 auto-rows-min">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 auto-rows-min">
               {tiles.map((tile, index) => (
                 <Card
                   key={tile.title}
@@ -1163,7 +1372,7 @@ export default function Dashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-zinc-400 text-xs">OVR Médio</p>
-                      <p className="text-white font-bold text-xl">{teamStats.averageOverall}</p>
+                      <p className="text-white font-bold text-xl">{teamStatistics.averageOverall}</p>
                     </div>
                     <Target className="w-8 h-8 text-blue-400" />
                   </div>
@@ -1181,15 +1390,15 @@ export default function Dashboard() {
                   </div>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-orange-600/20 to-red-600/20 border-orange-500/30 p-4">
+                <Card className="bg-gradient-to-br from-yellow-600/20 to-orange-600/20 border-yellow-500/30 p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-zinc-400 text-xs">Melhor Jogador</p>
+                      <p className="text-zinc-400 text-xs">Posição</p>
                       <p className="text-white font-bold text-xl">
-                        {teamStats.topPlayer ? teamStats.topPlayer.overall : '0'}
+                        {teamPosition || '0'}º
                       </p>
                     </div>
-                    <Footprints className="w-8 h-8 text-orange-400" />
+                    <Trophy className="w-8 h-8 text-yellow-400" />
                   </div>
                 </Card>
               </div>
