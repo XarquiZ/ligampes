@@ -167,99 +167,44 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     )
   }, [exchangePlayers])
 
-  // Verificar se a troca está equilibrada
-  const isExchangeBalanced = useMemo(() => {
-    if (!player) return false
-    
-    // Para troca estar equilibrada, o valor líquido recebido deve ser >= valor do jogador
-    return exchangeNetValue >= player.base_price
-  }, [player, exchangeNetValue])
-
-  // Verificar se o meu jogador tem maior valor do que os oferecidos
-  const isMyPlayerHigherValue = useMemo(() => {
-    if (!player || exchangePlayers.length === 0) return false
-    
-    // Se meu jogador vale mais que todos os jogadores oferecidos combinados
-    return player.base_price > offeredPlayersValue
-  }, [player, offeredPlayersValue])
-
-  // Verificar se há jogador oferecido com valor mais alto
-  const hasHigherValuePlayer = useMemo(() => {
-    if (!player || exchangePlayers.length === 0) return false
-    
-    // Se algum jogador oferecido vale mais que meu jogador
-    return exchangePlayers.some(p => p.base_price > player.base_price)
-  }, [player, exchangePlayers])
-
-  // Verificar se o valor total oferecido é maior
-  const isTotalOfferedValueHigher = useMemo(() => {
-    if (!player) return false
-    return offeredPlayersValue > player.base_price
-  }, [player, offeredPlayersValue])
-
-  // Calcular quanto dinheiro é necessário para equilibrar
+  // ==================== LÓGICA CORRIGIDA DO DINHEIRO ====================
   const requiredMoneyToBalance = useMemo(() => {
     if (!player) return 0
-    
-    // Se meu jogador vale mais que os jogadores oferecidos
-    if (player.base_price > offeredPlayersValue) {
-      // Eu preciso receber dinheiro
-      return player.base_price - offeredPlayersValue
-    } 
-    // Se os jogadores oferecidos valem mais que meu jogador
-    else if (offeredPlayersValue > player.base_price) {
-      // Eu preciso mandar dinheiro
-      return offeredPlayersValue - player.base_price
-    }
-    
+    if (player.base_price > offeredPlayersValue) return player.base_price - offeredPlayersValue   // preciso receber
+    if (offeredPlayersValue > player.base_price) return offeredPlayersValue - player.base_price   // preciso mandar
     return 0
   }, [player, offeredPlayersValue])
 
-  // Verificar se a direção do dinheiro está correta
   const isMoneyDirectionCorrect = useMemo(() => {
-    if (!player || requiredMoneyToBalance === 0) return true
-    
-    // Se meu jogador vale mais, devo RECEBER dinheiro
-    if (player.base_price > offeredPlayersValue) {
-      return moneyDirection === 'receive'
-    }
-    // Se os jogadores oferecidos valem mais, devo MANDAR dinheiro
-    else if (offeredPlayersValue > player.base_price) {
-      return moneyDirection === 'send'
-    }
-    
+    if (requiredMoneyToBalance === 0) return true
+    if (player?.base_price > offeredPlayersValue) return moneyDirection === 'receive'
+    if (offeredPlayersValue > player?.base_price) return moneyDirection === 'send'
     return true
   }, [player, offeredPlayersValue, moneyDirection, requiredMoneyToBalance])
+
+  // AQUI ESTÁ A CORREÇÃO PRINCIPAL: permite mandar qualquer valor >= ao mínimo
+  const isMoneyAmountSufficient = useMemo(() => {
+    if (requiredMoneyToBalance === 0) return true
+    const cash = parseFloat(exchangeValue.replace(/\./g, '').replace(',', '.')) || 0
+    // Qualquer valor maior ou igual ao mínimo é aceito (inclusive quando manda mais)
+    return cash >= requiredMoneyToBalance
+  }, [exchangeValue, requiredMoneyToBalance])
+
+  const isExchangeBalanced = useMemo(() => {
+    if (!player) return false
+    return exchangeNetValue >= player.base_price
+  }, [exchangeNetValue, player])
+
+  const canProceedWithExchange = useMemo(() => {
+    if (!player || exchangePlayers.length === 0) return false
+    return isExchangeBalanced && isMoneyDirectionCorrect && isMoneyAmountSufficient
+  }, [player, exchangePlayers.length, isExchangeBalanced, isMoneyDirectionCorrect, isMoneyAmountSufficient])
+  // =====================================================================
 
   // Verificar se o usuário está mandando dinheiro quando deveria receber
   const isWrongMoneyDirection = useMemo(() => {
     return !isMoneyDirectionCorrect
   }, [isMoneyDirectionCorrect])
-
-  // Verificar se o valor de dinheiro é suficiente
-  const isMoneyAmountSufficient = useMemo(() => {
-    if (!player || requiredMoneyToBalance === 0) return true
-    
-    const cashValue = parseFloat(exchangeValue.replace(/\./g, '').replace(',', '.')) || 0
-    
-    return cashValue >= requiredMoneyToBalance
-  }, [player, requiredMoneyToBalance, exchangeValue])
-
-  // Verificar se a troca pode prosseguir
-  const canProceedWithExchange = useMemo(() => {
-    if (!player || exchangePlayers.length === 0) return false
-    
-    // 1. Deve estar equilibrada
-    if (!isExchangeBalanced) return false
-    
-    // 2. Direção do dinheiro deve estar correta
-    if (!isMoneyDirectionCorrect) return false
-    
-    // 3. Valor do dinheiro deve ser suficiente (se necessário)
-    if (!isMoneyAmountSufficient) return false
-    
-    return true
-  }, [player, isExchangeBalanced, isMoneyDirectionCorrect, isMoneyAmountSufficient, exchangePlayers])
 
   // Verificar se deve mostrar alerta de valor insuficiente
   const shouldShowInsufficientValueAlert = useMemo(() => {
@@ -268,6 +213,24 @@ export const TransferModal: React.FC<TransferModalProps> = ({
     // Se não está equilibrada OU tem direção errada OU valor insuficiente
     return !isExchangeBalanced || !isMoneyDirectionCorrect || !isMoneyAmountSufficient
   }, [player, isExchangeBalanced, isMoneyDirectionCorrect, isMoneyAmountSufficient, exchangePlayers])
+
+  // Verificar se o meu jogador tem maior valor do que os oferecidos
+  const isMyPlayerHigherValue = useMemo(() => {
+    if (!player || exchangePlayers.length === 0) return false
+    return player.base_price > offeredPlayersValue
+  }, [player, offeredPlayersValue])
+
+  // Verificar se há jogador oferecido com valor mais alto
+  const hasHigherValuePlayer = useMemo(() => {
+    if (!player || exchangePlayers.length === 0) return false
+    return exchangePlayers.some(p => p.base_price > player.base_price)
+  }, [player, exchangePlayers])
+
+  // Verificar se o valor total oferecido é maior
+  const isTotalOfferedValueHigher = useMemo(() => {
+    if (!player) return false
+    return offeredPlayersValue > player.base_price
+  }, [player, offeredPlayersValue])
 
   if (!isOpen || !player) return null
 
