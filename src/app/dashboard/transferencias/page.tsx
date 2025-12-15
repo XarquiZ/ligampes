@@ -24,7 +24,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Filter, X, ArrowUpDown, Check } from 'lucide-react'
+import { Filter, X, ArrowUpDown, Check, BarChart } from 'lucide-react'
 
 // Definindo as posições disponíveis
 const POSITIONS = [
@@ -41,6 +41,18 @@ const POSITIONS = [
   { value: 'PTD', label: 'PTD' },
   { value: 'SA', label: 'SA' },
   { value: 'CA', label: 'CA' }
+]
+
+// Opções de Overall
+const OVERALL_OPTIONS = [
+  { value: 'all', label: 'Todos' },
+  { value: '60', label: '60+' },
+  { value: '65', label: '65+' },
+  { value: '70', label: '70+' },
+  { value: '75', label: '75+' },
+  { value: '80', label: '80+' },
+  { value: '85', label: '85+' },
+  { value: '90', label: '90+' },
 ]
 
 export default function PaginaTransferencias() {
@@ -86,7 +98,8 @@ export default function PaginaTransferencias() {
 
   // Estados para os filtros do mercado
   const [selectedPositions, setSelectedPositions] = useState<string[]>([])
-  const [selectedPriceSort, setSelectedPriceSort] = useState<string>('cheapest')
+  const [selectedSort, setSelectedSort] = useState<string>('recent') // Padrão: Mais recentes
+  const [selectedMinOverall, setSelectedMinOverall] = useState<string>('all')
   const [filteredMarketPlayers, setFilteredMarketPlayers] = useState<MarketPlayer[]>([])
 
   // Carregar dados do usuário e time
@@ -240,10 +253,9 @@ export default function PaginaTransferencias() {
     if (marketPlayers.length > 0) {
       let filtered = [...marketPlayers]
 
-      // Aplicar filtro de posições (multi-select)
+      // 1. Filtro de Posições
       if (selectedPositions.length > 0) {
         filtered = filtered.filter(player => {
-          // Verificar se o jogador tem posição no player object
           if (player.player && player.player.position) {
             return selectedPositions.includes(player.player.position)
           }
@@ -251,18 +263,47 @@ export default function PaginaTransferencias() {
         })
       }
 
-      // Aplicar ordenação por preço
-      if (selectedPriceSort === 'cheapest') {
-        filtered.sort((a, b) => a.price - b.price)
-      } else if (selectedPriceSort === 'expensive') {
-        filtered.sort((a, b) => b.price - a.price)
+      // 2. Filtro de Overall Mínimo
+      if (selectedMinOverall !== 'all') {
+        const minOvr = parseInt(selectedMinOverall)
+        filtered = filtered.filter(item => {
+          return item.player && item.player.overall >= minOvr
+        })
       }
+
+      // 3. Ordenação
+      filtered.sort((a, b) => {
+        switch (selectedSort) {
+          case 'recent':
+            // Mais recentes primeiro
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          
+          case 'cheapest':
+            // Menor preço primeiro
+            return a.price - b.price
+          
+          case 'expensive':
+            // Maior preço primeiro
+            return b.price - a.price
+          
+          case 'highest_overall':
+            // Maior Overall primeiro
+            return (b.player?.overall || 0) - (a.player?.overall || 0)
+            
+          case 'lowest_overall':
+            // Menor Overall primeiro
+            return (a.player?.overall || 0) - (b.player?.overall || 0)
+            
+          default:
+            return 0
+        }
+      })
 
       setFilteredMarketPlayers(filtered)
     } else {
       setFilteredMarketPlayers([])
     }
-  }, [marketPlayers, selectedPositions, selectedPriceSort])
+  }, [marketPlayers, selectedPositions, selectedSort, selectedMinOverall])
 
   const loadUserData = async () => {
     try {
@@ -844,20 +885,17 @@ export default function PaginaTransferencias() {
     setMarketDescription(text)
   }
 
-  // FUNÇÃO MODIFICADA: Adicionar ao mercado (sem mudar tipo no banco)
   const handleAddToMarket = async (saleMode: 'fixed_price' | 'negotiable') => {
     if (!selectedPlayer || !team?.id) {
       alert('Selecione um jogador')
       return
     }
 
-    // Validação de preço para modo Fixar Preço
     if (saleMode === 'fixed_price' && !marketPrice) {
       alert('Informe o preço para venda com preço fixo')
       return
     }
 
-    // Para modo negociável, usa o preço atual como sugestão
     const priceMatch = marketPrice.match(/R\$\s?([\d.,]+)/)
     if (!priceMatch) {
       alert('Preço inválido')
@@ -877,11 +915,9 @@ export default function PaginaTransferencias() {
       return
     }
 
-    // Adicionar prefixo na descrição para modo negociável
     let finalDescription = marketDescription.trim()
     if (saleMode === 'negotiable') {
       const prefix = '[Aceita Propostas] '
-      // Adiciona prefixo se não tiver já
       if (!finalDescription.startsWith(prefix)) {
         finalDescription = prefix + (finalDescription || 'Disponível para negociação')
       }
@@ -904,7 +940,6 @@ export default function PaginaTransferencias() {
 
       if (error) throw error
 
-      // Limpar formulário
       setSelectedPlayer(null)
       setMarketPrice('')
       setMarketDescription('')
@@ -916,7 +951,6 @@ export default function PaginaTransferencias() {
         : '✅ Jogador anunciado para negociação no mercado!'
       )
       
-      // Recarregar dados
       await Promise.all([
         loadMarketData(),
         loadMyPlayers()
@@ -992,20 +1026,17 @@ export default function PaginaTransferencias() {
     setEditDescriptionText('')
   }
 
-  // NOVA FUNÇÃO: Abrir chat para negociação
   const handleMakeProposal = async (listing: MarketPlayer) => {
     if (!team?.id || !user?.id) {
       alert('Você precisa estar logado para enviar propostas')
       return
     }
 
-    // Verificar se é um anúncio negociável (pela descrição)
     const isNegotiable = listing.description?.includes('[Aceita Propostas]') || 
                         listing.description?.toLowerCase().includes('negoci') ||
                         listing.description?.toLowerCase().includes('proposta')
 
     if (isNegotiable) {
-      // Para negociáveis, abrir chat com o vendedor
       try {
         const { data: sellerProfile } = await supabase
           .from('profiles')
@@ -1019,7 +1050,6 @@ export default function PaginaTransferencias() {
           .single()
 
         if (sellerProfile) {
-          // Disparar evento para abrir chat com o vendedor
           window.dispatchEvent(new CustomEvent('openChatWithUser', {
             detail: {
               userId: sellerProfile.id,
@@ -1031,7 +1061,6 @@ export default function PaginaTransferencias() {
             }
           }))
 
-          // Abre o chat popup
           setIsChatOpen(true)
         }
       } catch (error) {
@@ -1039,7 +1068,6 @@ export default function PaginaTransferencias() {
         alert('Não foi possível iniciar a conversa com o vendedor.')
       }
     } else {
-      // Para preço fixo, usar a função original de compra
       handleBuyPlayer(listing)
     }
   }
@@ -1094,7 +1122,6 @@ export default function PaginaTransferencias() {
 
       if (transferError) throw transferError
 
-      // Remover do mercado
       await supabase
         .from('market_listings')
         .delete()
@@ -1110,7 +1137,6 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // NOVA FUNÇÃO: Cancelar adição
   const handleCancelAdd = () => {
     setShowAddForm(false)
     setSelectedPlayer(null)
@@ -1118,27 +1144,23 @@ export default function PaginaTransferencias() {
     setMarketDescription('')
   }
 
-  // Função para limpar filtro
   const clearTeamFilter = () => {
     setSelectedTeamFilter(null)
   }
 
-  // Função para lidar com mudança de aba
   const handleTabChange = (tab: 'pending' | 'completed') => {
     setActiveTab(tab)
-    // Limpar filtro ao mudar para a aba "pending"
     if (tab === 'pending') {
       setSelectedTeamFilter(null)
     }
   }
 
-  // Função para limpar filtros do mercado
   const clearMarketFilters = () => {
     setSelectedPositions([])
-    setSelectedPriceSort('cheapest')
+    setSelectedSort('recent')
+    setSelectedMinOverall('all')
   }
 
-  // Função para alternar posição no multi-select
   const togglePosition = (position: string) => {
     setSelectedPositions(prev =>
       prev.includes(position)
@@ -1147,7 +1169,6 @@ export default function PaginaTransferencias() {
     )
   }
 
-  // Função para selecionar/desselecionar todas as posições
   const toggleAllPositions = () => {
     if (selectedPositions.length === POSITIONS.length) {
       setSelectedPositions([])
@@ -1192,120 +1213,119 @@ export default function PaginaTransferencias() {
 
             {activeView === 'transferencias' ? (
               <>
-{/* Filtro de times - Apenas para transferências finalizadas */}
-{activeTab === 'completed' && (
-  <div className="mb-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-700/50">
-    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-      <div className="flex items-center gap-2">
-        <Filter className="w-4 h-4 text-purple-400" />
-        <span className="text-sm text-zinc-300">Filtrar por time:</span>
-      </div>
-      
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-        <Select 
-          value={selectedTeamFilter || "all"} 
-          onValueChange={(value) => setSelectedTeamFilter(value === "all" ? null : value)}
-        >
-          <SelectTrigger className="w-full sm:w-[250px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
-            <SelectValue placeholder="Selecione um time" />
-          </SelectTrigger>
-          <SelectContent className="bg-zinc-900 border-zinc-700">
-            <SelectItem 
-              value="all" 
-              className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                  <Filter className="w-3 h-3 text-white" />
-                </div>
-                <span className="truncate">Todos os times</span>
-              </div>
-            </SelectItem>
-            {loadingTeams ? (
-              <SelectItem value="loading" disabled className="text-white">
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
-                  <span>Carregando times...</span>
-                </div>
-              </SelectItem>
-            ) : (
-              teams.map((team) => (
-                <SelectItem 
-                  key={team.id} 
-                  value={team.id}
-                  className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
-                >
-                  <div className="flex items-center gap-2">
-                    {team.logo_url ? (
-                      <img 
-                        src={team.logo_url} 
-                        alt={team.name}
-                        className="w-5 h-5 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
-                        <span className="text-[10px] font-bold text-white">
-                          {team.name?.substring(0, 2) || 'TM'}
-                        </span>
+                {activeTab === 'completed' && (
+                  <div className="mb-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-700/50">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-purple-400" />
+                        <span className="text-sm text-zinc-300">Filtrar por time:</span>
                       </div>
-                    )}
-                    <span className="truncate">{team.name}</span>
-                  </div>
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
+                      
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                        <Select 
+                          value={selectedTeamFilter || "all"} 
+                          onValueChange={(value) => setSelectedTeamFilter(value === "all" ? null : value)}
+                        >
+                          <SelectTrigger className="w-full sm:w-[250px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
+                            <SelectValue placeholder="Selecione um time" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-900 border-zinc-700">
+                            <SelectItem 
+                              value="all" 
+                              className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                                  <Filter className="w-3 h-3 text-white" />
+                                </div>
+                                <span className="truncate">Todos os times</span>
+                              </div>
+                            </SelectItem>
+                            {loadingTeams ? (
+                              <SelectItem value="loading" disabled className="text-white">
+                                <div className="flex items-center gap-2">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+                                  <span>Carregando times...</span>
+                                </div>
+                              </SelectItem>
+                            ) : (
+                              teams.map((team) => (
+                                <SelectItem 
+                                  key={team.id} 
+                                  value={team.id}
+                                  className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {team.logo_url ? (
+                                      <img 
+                                        src={team.logo_url} 
+                                        alt={team.name}
+                                        className="w-5 h-5 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                                        <span className="text-[10px] font-bold text-white">
+                                          {team.name?.substring(0, 2) || 'TM'}
+                                        </span>
+                                      </div>
+                                    )}
+                                    <span className="truncate">{team.name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
 
-        {selectedTeamFilter && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={clearTeamFilter}
-            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700"
-          >
-            <X className="w-4 h-4 mr-1" />
-            Limpar filtro
-          </Button>
-        )}
-      </div>
-    </div>
-    
-    {selectedTeamFilter && (
-      <div className="mt-3 pt-3 border-t border-zinc-700/30">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-zinc-400">Mostrando transferências envolvendo:</span>
-          <div className="flex items-center gap-1">
-            {(() => {
-              const selectedTeam = teams.find(t => t.id === selectedTeamFilter)
-              if (selectedTeam) {
-                return (
-                  <>
-                    {selectedTeam.logo_url ? (
-                      <img 
-                        src={selectedTeam.logo_url} 
-                        alt={selectedTeam.name}
-                        className="w-4 h-4 rounded-full"
-                      />
-                    ) : (
-                      <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
-                        <span className="text-[8px] font-bold text-white">
-                          {selectedTeam.name?.substring(0, 2) || 'TM'}
-                        </span>
+                        {selectedTeamFilter && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={clearTeamFilter}
+                            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700"
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Limpar filtro
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {selectedTeamFilter && (
+                      <div className="mt-3 pt-3 border-t border-zinc-700/30">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-zinc-400">Mostrando transferências envolvendo:</span>
+                          <div className="flex items-center gap-1">
+                            {(() => {
+                              const selectedTeam = teams.find(t => t.id === selectedTeamFilter)
+                              if (selectedTeam) {
+                                return (
+                                  <>
+                                    {selectedTeam.logo_url ? (
+                                      <img 
+                                        src={selectedTeam.logo_url} 
+                                        alt={selectedTeam.name}
+                                        className="w-4 h-4 rounded-full"
+                                      />
+                                    ) : (
+                                      <div className="w-4 h-4 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                                        <span className="text-[8px] font-bold text-white">
+                                          {selectedTeam.name?.substring(0, 2) || 'TM'}
+                                        </span>
+                                      </div>
+                                    )}
+                                    <span className="text-white text-sm font-medium">{selectedTeam.name}</span>
+                                  </>
+                                )
+                              }
+                              return null
+                            })()}
+                          </div>
+                        </div>
                       </div>
                     )}
-                    <span className="text-white text-sm font-medium">{selectedTeam.name}</span>
-                  </>
-                )
-              }
-              return null
-            })()}
-          </div>
-        </div>
-      </div>
-    )}
-  </div>
-)}
+                  </div>
+                )}
 
                 <TransferenciasView
                   activeTab={activeTab}
@@ -1326,144 +1346,132 @@ export default function PaginaTransferencias() {
                 {/* Filtros do Mercado - Apenas para jogadores disponíveis */}
                 {marketTab === 'disponiveis' && (
                   <div className="mb-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-700/50">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
                       <div className="flex items-center gap-2">
                         <Filter className="w-4 h-4 text-blue-400" />
                         <span className="text-sm text-zinc-300">Filtrar jogadores disponíveis:</span>
                       </div>
                       
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                      <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 w-full xl:w-auto">
+                        
                         {/* Filtro de Posições (Multi-select) */}
                         <div className="w-full sm:w-auto">
                           <Select>
-                            <SelectTrigger className="w-full sm:w-[280px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
-                              <div className="flex items-center gap-2">
-                                <span className="text-white">Posições:</span>
-                                <SelectValue placeholder={
-                                  selectedPositions.length === 0 
-                                    ? "Todas as posições" 
-                                    : `${selectedPositions.length} posição(ões) selecionadas`
-                                } />
+                            <SelectTrigger className="w-full sm:w-[220px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800 h-10">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">Pos:</span>
+                                <span className="truncate text-white text-sm">
+                                  {selectedPositions.length === 0 ? "Todas" : `${selectedPositions.length} selecionadas`}
+                                </span>
                               </div>
                             </SelectTrigger>
                             <SelectContent className="bg-zinc-900 border-zinc-700 max-h-96">
-                              {/* Botão para selecionar/desselecionar todas */}
                               <div 
                                 className="flex items-center justify-between px-2 py-2 cursor-pointer hover:bg-blue-600/30 rounded-md"
                                 onClick={toggleAllPositions}
                               >
                                 <span className="text-white text-sm">
-                                  {selectedPositions.length === POSITIONS.length 
-                                    ? "Desselecionar todas" 
-                                    : "Selecionar todas"}
+                                  {selectedPositions.length === POSITIONS.length ? "Desselecionar todas" : "Selecionar todas"}
                                 </span>
                                 <Check className={`w-4 h-4 ${selectedPositions.length === POSITIONS.length ? 'text-green-400' : 'text-zinc-500'}`} />
                               </div>
-                              
                               <div className="border-t border-zinc-700 my-2"></div>
-                              
-                              {/* Lista de posições */}
                               {POSITIONS.map((position) => (
                                 <div
                                   key={position.value}
-                                  className={`flex items-center justify-between px-2 py-2 cursor-pointer rounded-md ${
-                                    selectedPositions.includes(position.value)
-                                      ? 'bg-blue-600 text-white'
-                                      : 'hover:bg-zinc-800'
-                                  }`}
+                                  className={`flex items-center justify-between px-2 py-2 cursor-pointer rounded-md ${selectedPositions.includes(position.value) ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'}`}
                                   onClick={() => togglePosition(position.value)}
                                 >
                                   <span className="text-sm text-white">{position.label}</span>
-                                  {selectedPositions.includes(position.value) && (
-                                    <Check className="w-4 h-4" />
-                                  )}
+                                  {selectedPositions.includes(position.value) && <Check className="w-4 h-4" />}
                                 </div>
                               ))}
                             </SelectContent>
                           </Select>
                         </div>
 
-                        {/* Filtro de Ordenação por Preço */}
+                        {/* Filtro de Overall Mínimo (NOVO) */}
                         <div className="w-full sm:w-auto">
-                          <Select 
-                            value={selectedPriceSort} 
-                            onValueChange={setSelectedPriceSort}
-                          >
-                            <SelectTrigger className="w-full sm:w-[180px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
+                          <Select value={selectedMinOverall} onValueChange={setSelectedMinOverall}>
+                            <SelectTrigger className="w-full sm:w-[160px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800 h-10">
                               <div className="flex items-center gap-2">
-                                <ArrowUpDown className="w-4 h-4 text-blue-400" />
-                                <SelectValue placeholder="Ordenar por preço" />
+                                <BarChart className="w-4 h-4 text-blue-400" />
+                                <span className="text-zinc-400 text-xs uppercase tracking-wider font-bold">OVR:</span>
+                                <SelectValue />
                               </div>
                             </SelectTrigger>
                             <SelectContent className="bg-zinc-900 border-zinc-700">
-                              <SelectItem 
-                                value="cheapest" 
-                                className="focus:bg-blue-600 focus:text-white hover:bg-blue-600 hover:text-white transition-colors cursor-pointer text-white"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span>Mais baratos</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem 
-                                value="expensive" 
-                                className="focus:bg-blue-600 focus:text-white hover:bg-blue-600 hover:text-white transition-colors cursor-pointer text-white"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span>Mais caros</span>
-                                </div>
-                              </SelectItem>
+                              {OVERALL_OPTIONS.map(opt => (
+                                <SelectItem key={opt.value} value={opt.value} className="text-white focus:bg-blue-600 cursor-pointer">
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
 
-                        {/* Botão para limpar filtros */}
-                        {(selectedPositions.length > 0 || selectedPriceSort !== 'cheapest') && (
+                        {/* Ordenação (ATUALIZADO) */}
+                        <div className="w-full sm:w-auto">
+                          <Select value={selectedSort} onValueChange={setSelectedSort}>
+                            <SelectTrigger className="w-full sm:w-[220px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800 h-10">
+                              <div className="flex items-center gap-2">
+                                <ArrowUpDown className="w-4 h-4 text-blue-400" />
+                                <SelectValue placeholder="Ordenar" />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-zinc-700">
+                              <SelectItem value="recent" className="text-white focus:bg-blue-600 cursor-pointer">Mais recentes</SelectItem>
+                              <SelectItem value="cheapest" className="text-white focus:bg-blue-600 cursor-pointer">Menor preço</SelectItem>
+                              <SelectItem value="expensive" className="text-white focus:bg-blue-600 cursor-pointer">Maior preço</SelectItem>
+                              <SelectItem value="highest_overall" className="text-white focus:bg-blue-600 cursor-pointer">Melhor Overall</SelectItem>
+                              <SelectItem value="lowest_overall" className="text-white focus:bg-blue-600 cursor-pointer">Pior Overall</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Botão Limpar */}
+                        {(selectedPositions.length > 0 || selectedSort !== 'recent' || selectedMinOverall !== 'all') && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={clearMarketFilters}
-                            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700"
+                            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700 h-10"
                           >
                             <X className="w-4 h-4 mr-1" />
-                            Limpar filtros
+                            Limpar
                           </Button>
                         )}
                       </div>
                     </div>
                     
-                    {(selectedPositions.length > 0 || selectedPriceSort !== 'cheapest') && (
+                    {(selectedPositions.length > 0 || selectedSort !== 'recent' || selectedMinOverall !== 'all') && (
                       <div className="mt-3 pt-3 border-t border-zinc-700/30">
                         <div className="flex flex-col gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-zinc-400">Mostrando jogadores:</span>
-                          </div>
-                          
-                          {/* Badges das posições selecionadas */}
-                          {selectedPositions.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {selectedPositions.map((position) => {
-                                const posInfo = POSITIONS.find(p => p.value === position)
-                                return (
-                                  <Badge 
-                                    key={position}
-                                    variant="outline" 
-                                    className="bg-blue-500/10 text-blue-400 border-blue-500/30"
-                                  >
-                                    {posInfo?.label || position}
-                                  </Badge>
-                                )
-                              })}
-                            </div>
-                          )}
-                          
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            {selectedPriceSort !== 'cheapest' && (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-zinc-400">Filtros ativos:</span>
+                            
+                            {selectedPositions.length > 0 && (
+                              <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30">
+                                {selectedPositions.length} Posições
+                              </Badge>
+                            )}
+
+                            {selectedMinOverall !== 'all' && (
+                              <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30">
+                                OVR {selectedMinOverall}+
+                              </Badge>
+                            )}
+
+                            {selectedSort !== 'recent' && (
                               <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30">
-                                {selectedPriceSort === 'expensive' ? 'Mais caros' : 'Mais baratos'}
+                                {selectedSort === 'cheapest' && 'Menor Preço'}
+                                {selectedSort === 'expensive' && 'Maior Preço'}
+                                {selectedSort === 'highest_overall' && 'Melhor OVR'}
+                                {selectedSort === 'lowest_overall' && 'Pior OVR'}
                               </Badge>
                             )}
                             
-                            <span className="text-xs text-zinc-400">
+                            <span className="text-xs text-zinc-500 ml-auto">
                               ({filteredMarketPlayers.length} de {marketPlayers.length} jogadores)
                             </span>
                           </div>

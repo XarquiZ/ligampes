@@ -380,13 +380,11 @@ export default function Assistencias() {
       <div className="mt-8 pt-6 border-t border-gray-700/30">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="text-sm text-gray-400">
-            <span className="text-blue-400 font-semibold">Fonte:</span> Tabela player_stats (assistencias)
             {assistentes.length > 0 && (
               <span className="ml-2 text-green-400">
                 • {assistentes.length} jogadores
               </span>
             )}
-            <span className="ml-2">• Divisão: {divisaoAtiva === "A" ? "Série A" : "Série B"}</span>
           </div>
           
           <div className="flex items-center gap-3">

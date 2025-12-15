@@ -505,9 +505,9 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         case 5: position = 'VOL'; x = 25; y = 50; break; // Volante
         case 6: position = 'MLG'; x = 50; y = 45; break; // Meia central
         case 7: position = 'MLG'; x = 75; y = 50; break; // Meia central
-        case 8: position = 'PTD'; x = 20; y = 20; break; // Ponta direita
+        case 8: position = 'PTE'; x = 20; y = 20; break; // Ponta direita
         case 9: position = 'CA'; x = 50; y = 15; break;  // Centroavante
-        case 10: position = 'PTE'; x = 80; y = 20; break; // Ponta esquerda
+        case 10: position = 'PTD'; x = 80; y = 20; break; // Ponta esquerda
       }
       
       return {

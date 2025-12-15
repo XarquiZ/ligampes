@@ -79,11 +79,12 @@ export const PlayerSelectionModal: React.FC<PlayerSelectionModalProps> = ({
         setLoadingAllPlayers(true)
         
         // Buscar todos os jogadores com join na tabela de times
+        // AQUI ESTÁ A MUDANÇA: 'teams' em vez de 'teams!inner' permite jogadores sem time (LEFT JOIN)
         const { data: playersData, error } = await supabase
           .from('players')
           .select(`
             *,
-            teams!inner (
+            teams (
               id,
               name,
               logo_url
@@ -110,12 +111,12 @@ export const PlayerSelectionModal: React.FC<PlayerSelectionModalProps> = ({
         }
         
         if (playersData) {
-          // Processar dados dos jogadores
+          // Processar dados dos jogadores, lidando com times nulos
           const processedPlayers = playersData.map(player => ({
             ...player,
             club: player.teams?.name || 'Sem time',
-            team_id: player.teams?.id,
-            team_logo: player.teams?.logo_url
+            team_id: player.teams?.id || null, // Garante que team_id nulo seja tratado
+            team_logo: player.teams?.logo_url || null
           }))
           
           setAllPlayersWithTeams(processedPlayers as Player[])
@@ -147,13 +148,14 @@ export const PlayerSelectionModal: React.FC<PlayerSelectionModalProps> = ({
         }
         
         // Buscar favoritos com join nas tabelas de times
+        // Mantendo !inner aqui para favoritos, mas se quiser ver sem time, tire o !inner
         const { data: favorites, error: favoritesError } = await supabase
           .from('player_favorites')
           .select(`
             player_id,
             players (
               *,
-              teams!inner (
+              teams (
                 id,
                 name,
                 logo_url

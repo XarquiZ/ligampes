@@ -158,32 +158,11 @@ export default function Calendario() {
         </div>
       </div>
 
-      {/* Info da rodada */}
-      <Card className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border-purple-500/20">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-bold text-lg">
-                Rodada {rodada} - {serie === 'A' ? 'Série A' : 'Série B'}
-              </h3>
-              <p className="text-sm text-zinc-400">
-                Total de jogos: {jogos.length}
-              </p>
-            </div>
-            <div className="text-sm text-zinc-400">
-              {maxRodadas > 0 && (
-                <>Rodadas restantes: {maxRodadas - rodada}</>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Lista de jogos */}
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-yellow-600" />
-          <span className="ml-2">Carregando jogos...</span>
+          <span className="ml-2 text-white">Carregando jogos...</span>
         </div>
       ) : jogos.length === 0 ? (
         <Card className="bg-white/5 border-white/10">

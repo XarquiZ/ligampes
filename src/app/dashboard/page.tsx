@@ -1,4 +1,4 @@
-// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA COM TABELA
+// src/app/dashboard/page.tsx - VERSÃO COMPLETA ATUALIZADA COM DADOS REAIS
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -34,6 +34,7 @@ interface Team {
   name: string;
   logo_url?: string;
   balance?: number;
+  divisao?: string;
 }
 
 interface Player {
@@ -57,6 +58,8 @@ interface LeagueTable {
   goals_for: number;
   goals_against: number;
   goal_difference: number;
+  divisao?: string;
+  posse_media?: number;
 }
 
 interface MatchSchedule {
@@ -65,20 +68,44 @@ interface MatchSchedule {
   away_team_id: string;
   home_team_name: string;
   away_team_name: string;
+  home_team_logo?: string;
+  away_team_logo?: string;
   date: string;
   time: string;
   stadium: string;
-  status: 'scheduled' | 'ongoing' | 'completed';
+  status: 'scheduled' | 'in_progress' | 'finished';
   home_score?: number;
   away_score?: number;
+  round: number;
+  divisao: string;
+  possession_home?: number;
+  possession_away?: number;
+  shots_home?: number;
+  shots_away?: number;
+  shots_on_target_home?: number;
+  shots_on_target_away?: number;
+  corners_home?: number;
+  corners_away?: number;
+  fouls_home?: number;
+  fouls_away?: number;
 }
 
 interface TeamStats {
   team_id: string;
   team_name: string;
+  divisao?: string;
   form: string;
   next_match: string;
   last_5_matches: string[];
+  pontos?: number;
+  jogos?: number;
+  vitorias?: number;
+  empates?: number;
+  derrotas?: number;
+  gols_marcados?: number;
+  gols_sofridos?: number;
+  posse_media?: number;
+  saldo?: number;
 }
 
 function formatBalance(value: number): string {
@@ -99,6 +126,37 @@ function formatDate(dateString: string): string {
 
 function formatTime(timeString: string): string {
   return timeString;
+}
+
+// Componente para mostrar resultado da partida
+function MatchResult({ match }: { match: MatchSchedule }) {
+  if (match.status === 'scheduled') {
+    return (
+      <div className="flex items-center justify-center gap-1">
+        <span className="text-zinc-500">×</span>
+      </div>
+    )
+  }
+  
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <span className={`font-bold ${
+        match.home_score && match.away_score && match.home_score > match.away_score 
+          ? 'text-green-400' 
+          : 'text-zinc-300'
+      }`}>
+        {match.home_score}
+      </span>
+      <span className="text-zinc-500">-</span>
+      <span className={`font-bold ${
+        match.home_score && match.away_score && match.away_score > match.home_score 
+          ? 'text-green-400' 
+          : 'text-zinc-300'
+      }`}>
+        {match.away_score}
+      </span>
+    </div>
+  )
 }
 
 // Componente Modal para avisos
@@ -262,7 +320,7 @@ export default function Dashboard() {
   const [pendingTransfers, setPendingTransfers] = useState(0)
   const [completedTransfers, setCompletedTransfers] = useState(0)
 
-  // Estados para o tile TABELA
+  // Estados para o tile TABELA - DADOS REAIS
   const [leagueTable, setLeagueTable] = useState<LeagueTable[]>([])
   const [matchSchedule, setMatchSchedule] = useState<MatchSchedule[]>([])
   const [teamStats, setTeamStats] = useState<TeamStats | null>(null)
@@ -524,112 +582,301 @@ export default function Dashboard() {
     }
   }
 
-  // Função para carregar tabela do campeonato
+  // FUNÇÃO ATUALIZADA: Carregar tabela do campeonato com dados REAIS
   const loadLeagueTable = async () => {
     try {
-      // Em um cenário real, você teria uma tabela 'league_table' no banco
-      // Por enquanto, vamos criar dados mockados
-      const mockTable: LeagueTable[] = [
-        { id: '1', team_id: 'team1', team_name: 'Real Madrid', position: 1, points: 72, matches_played: 28, wins: 22, draws: 6, losses: 0, goals_for: 68, goals_against: 20, goal_difference: 48 },
-        { id: '2', team_id: 'team2', team_name: 'Barcelona', position: 2, points: 68, matches_played: 28, wins: 21, draws: 5, losses: 2, goals_for: 65, goals_against: 25, goal_difference: 40 },
-        { id: '3', team_id: 'team3', team_name: 'Atlético de Madrid', position: 3, points: 62, matches_played: 28, wins: 18, draws: 8, losses: 2, goals_for: 52, goals_against: 28, goal_difference: 24 },
-        { id: '4', team_id: 'team4', team_name: team?.name || 'Seu Time', position: 4, points: 58, matches_played: 28, wins: 17, draws: 7, losses: 4, goals_for: 48, goals_against: 30, goal_difference: 18 },
-        { id: '5', team_id: 'team5', team_name: 'Sevilla', position: 5, points: 55, matches_played: 28, wins: 16, draws: 7, losses: 5, goals_for: 45, goals_against: 32, goal_difference: 13 },
-      ]
-      
-      setLeagueTable(mockTable)
+      if (!team?.id) return;
+
+      // Primeiro, determinar a divisão do time
+      const divisao = team?.divisao || 'A';
+
+      // Buscar estatísticas dos times da mesma divisão
+      const { data: statsData, error: statsError } = await supabase
+        .from('team_stats')
+        .select(`
+          *,
+          teams!inner (
+            id,
+            name,
+            logo_url,
+            divisao
+          )
+        `)
+        .eq('teams.divisao', divisao)
+        .order('pontos', { ascending: false })
+        .order('saldo', { ascending: false })
+        .order('gols_marcados', { ascending: false })
+
+      if (statsError) {
+        console.error('Erro ao carregar estatísticas do time:', statsError);
+        return;
+      }
+
+      // Transformar os dados para o formato da tabela
+      const tableData: LeagueTable[] = statsData.map((stat, index) => ({
+        id: stat.id,
+        team_id: stat.team_id,
+        team_name: stat.teams?.name || 'Time Desconhecido',
+        position: index + 1,
+        points: stat.pontos || 0,
+        matches_played: stat.jogos || 0,
+        wins: stat.vitorias || 0,
+        draws: stat.empates || 0,
+        losses: stat.derrotas || 0,
+        goals_for: stat.gols_marcados || 0,
+        goals_against: stat.gols_sofridos || 0,
+        goal_difference: stat.saldo || 0,
+        divisao: stat.teams?.divisao,
+        posse_media: stat.posse_media || 0
+      }));
+
+      setLeagueTable(tableData);
       
       // Encontrar posição do time atual
-      const teamPosition = mockTable.find(t => t.team_id === team?.id || t.team_name === team?.name)?.position || null
-      setTeamPosition(teamPosition)
+      const currentTeamPosition = tableData.find(t => t.team_id === team.id)?.position || null;
+      setTeamPosition(currentTeamPosition);
+      
     } catch (error) {
-      console.error('Erro ao carregar tabela:', error)
+      console.error('Erro ao carregar tabela:', error);
     }
   }
 
-  // Função para carregar agenda de jogos
+  // FUNÇÃO ATUALIZADA: Carregar agenda de jogos com dados REAIS - 1 último finished + 2 próximos scheduled
   const loadMatchSchedule = async () => {
     try {
-      // Em um cenário real, você teria uma tabela 'matches' no banco
-      const mockMatches: MatchSchedule[] = [
-        { 
-          id: '1', 
-          home_team_id: 'team4', 
-          away_team_id: 'team1',
-          home_team_name: team?.name || 'Seu Time', 
-          away_team_name: 'Real Madrid',
-          date: '2024-03-15', 
-          time: '21:00',
-          stadium: 'Santiago Bernabéu',
-          status: 'scheduled'
-        },
-        { 
-          id: '2', 
-          home_team_id: 'team3', 
-          away_team_id: 'team4',
-          home_team_name: 'Atlético de Madrid', 
-          away_team_name: team?.name || 'Seu Time',
-          date: '2024-03-22', 
-          time: '19:30',
-          stadium: 'Wanda Metropolitano',
-          status: 'scheduled'
-        },
-        { 
-          id: '3', 
-          home_team_id: 'team4', 
-          away_team_id: 'team2',
-          home_team_name: team?.name || 'Seu Time', 
-          away_team_name: 'Barcelona',
-          date: '2024-04-05', 
-          time: '20:45',
-          stadium: 'Camp Nou',
-          status: 'scheduled'
-        },
-        { 
-          id: '4', 
-          home_team_id: 'team5', 
-          away_team_id: 'team4',
-          home_team_name: 'Sevilla', 
-          away_team_name: team?.name || 'Seu Time',
-          date: '2024-04-12', 
-          time: '18:00',
-          stadium: 'Ramón Sánchez Pizjuán',
-          status: 'scheduled'
-        },
-        { 
-          id: '5', 
-          home_team_id: 'team4', 
-          away_team_id: 'team3',
-          home_team_name: team?.name || 'Seu Time', 
-          away_team_name: 'Atlético de Madrid',
-          date: '2024-04-19', 
-          time: '21:00',
-          stadium: 'Estádio do seu time',
-          status: 'scheduled'
-        },
-      ]
+      if (!team?.id) return;
+
+      // Buscar o último jogo finalizado
+      const { data: lastFinishedMatch, error: lastFinishedError } = await supabase
+        .from('matches')
+        .select(`
+          *,
+          home_team:teams!matches_home_team_id_fkey (
+            id,
+            name,
+            logo_url
+          ),
+          away_team:teams!matches_away_team_id_fkey (
+            id,
+            name,
+            logo_url
+          )
+        `)
+        .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+        .eq('status', 'finished')
+        .order('date', { ascending: false })
+        .order('time', { ascending: false })
+        .limit(1)
+        .single();
+
+      // Buscar os próximos 2 jogos agendados
+      const { data: nextScheduledMatches, error: scheduledError } = await supabase
+        .from('matches')
+        .select(`
+          *,
+          home_team:teams!matches_home_team_id_fkey (
+            id,
+            name,
+            logo_url
+          ),
+          away_team:teams!matches_away_team_id_fkey (
+            id,
+            name,
+            logo_url
+          )
+        `)
+        .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+        .eq('status', 'scheduled')
+        .order('date', { ascending: true })
+        .order('time', { ascending: true })
+        .limit(2);
+
+      if (scheduledError && !lastFinishedError) {
+        console.error('Erro ao carregar jogos agendados:', scheduledError);
+      }
+
+      // Combinar os resultados: 1 último finished + 2 próximos scheduled
+      let scheduleData: MatchSchedule[] = [];
+
+      // Adicionar último jogo finalizado (se existir)
+      if (lastFinishedMatch) {
+        scheduleData.push({
+          id: lastFinishedMatch.id,
+          home_team_id: lastFinishedMatch.home_team_id,
+          away_team_id: lastFinishedMatch.away_team_id,
+          home_team_name: lastFinishedMatch.home_team?.name || 'Time Desconhecido',
+          away_team_name: lastFinishedMatch.away_team?.name || 'Time Desconhecido',
+          home_team_logo: lastFinishedMatch.home_team?.logo_url,
+          away_team_logo: lastFinishedMatch.away_team?.logo_url,
+          date: lastFinishedMatch.date,
+          time: lastFinishedMatch.time,
+          stadium: lastFinishedMatch.stadium || 'Estádio Virtual Parsec',
+          status: 'finished' as const,
+          home_score: lastFinishedMatch.home_score,
+          away_score: lastFinishedMatch.away_score,
+          round: lastFinishedMatch.round,
+          divisao: lastFinishedMatch.divisao,
+          possession_home: lastFinishedMatch.possession_home,
+          possession_away: lastFinishedMatch.possession_away,
+          shots_home: lastFinishedMatch.shots_home,
+          shots_away: lastFinishedMatch.shots_away,
+          shots_on_target_home: lastFinishedMatch.shots_on_target_home,
+          shots_on_target_away: lastFinishedMatch.shots_on_target_away,
+          corners_home: lastFinishedMatch.corners_home,
+          corners_away: lastFinishedMatch.corners_away,
+          fouls_home: lastFinishedMatch.fouls_home,
+          fouls_away: lastFinishedMatch.fouls_away
+        });
+      }
+
+      // Adicionar próximos jogos agendados (se existirem)
+      if (nextScheduledMatches) {
+        nextScheduledMatches.forEach(match => {
+          scheduleData.push({
+            id: match.id,
+            home_team_id: match.home_team_id,
+            away_team_id: match.away_team_id,
+            home_team_name: match.home_team?.name || 'Time Desconhecido',
+            away_team_name: match.away_team?.name || 'Time Desconhecido',
+            home_team_logo: match.home_team?.logo_url,
+            away_team_logo: match.away_team?.logo_url,
+            date: match.date,
+            time: match.time,
+            stadium: match.stadium || 'Estádio Virtual Parsec',
+            status: 'scheduled' as const,
+            home_score: match.home_score,
+            away_score: match.away_score,
+            round: match.round,
+            divisao: match.divisao,
+            possession_home: match.possession_home,
+            possession_away: match.possession_away,
+            shots_home: match.shots_home,
+            shots_away: match.shots_away,
+            shots_on_target_home: match.shots_on_target_home,
+            shots_on_target_away: match.shots_on_target_away,
+            corners_home: match.corners_home,
+            corners_away: match.corners_away,
+            fouls_home: match.fouls_home,
+            fouls_away: match.fouls_away
+          });
+        });
+      }
+
+      // Se não houver jogos, buscar apenas próximos agendados (para mostrar algo)
+      if (scheduleData.length === 0 && nextScheduledMatches) {
+        scheduleData = nextScheduledMatches.map(match => ({
+          id: match.id,
+          home_team_id: match.home_team_id,
+          away_team_id: match.away_team_id,
+          home_team_name: match.home_team?.name || 'Time Desconhecido',
+          away_team_name: match.away_team?.name || 'Time Desconhecido',
+          home_team_logo: match.home_team?.logo_url,
+          away_team_logo: match.away_team?.logo_url,
+          date: match.date,
+          time: match.time,
+          stadium: match.stadium || 'Estádio Virtual Parsec',
+          status: 'scheduled' as const,
+          home_score: match.home_score,
+          away_score: match.away_score,
+          round: match.round,
+          divisao: match.divisao,
+          possession_home: match.possession_home,
+          possession_away: match.possession_away,
+          shots_home: match.shots_home,
+          shots_away: match.shots_away,
+          shots_on_target_home: match.shots_on_target_home,
+          shots_on_target_away: match.shots_on_target_away,
+          corners_home: match.corners_home,
+          corners_away: match.corners_away,
+          fouls_home: match.fouls_home,
+          fouls_away: match.fouls_away
+        }));
+      }
+
+      // Ordenar: primeiro finished (mais recente), depois scheduled (próximos)
+      scheduleData.sort((a, b) => {
+        if (a.status === 'finished' && b.status === 'scheduled') return -1;
+        if (a.status === 'scheduled' && b.status === 'finished') return 1;
+        
+        if (a.status === 'finished' && b.status === 'finished') {
+          // Ordenar por data decrescente (mais recente primeiro)
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        }
+        
+        // Ordenar por data crescente (próximos primeiro)
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      });
+
+      // Limitar a 3 jogos no total
+      const limitedScheduleData = scheduleData.slice(0, 3);
+
+      setMatchSchedule(limitedScheduleData);
       
-      setMatchSchedule(mockMatches)
     } catch (error) {
-      console.error('Erro ao carregar agenda:', error)
+      console.error('Erro ao carregar agenda:', error);
     }
   }
 
-  // Função para carregar estatísticas do time
+  // FUNÇÃO ATUALIZADA: Carregar estatísticas do time com dados REAIS - usando ultimos_jogos
   const loadTeamStatistics = async () => {
     try {
-      // Em um cenário real, você teria uma tabela 'team_stats' no banco
-      const mockStats: TeamStats = {
-        team_id: team?.id || '',
-        team_name: team?.name || 'Seu Time',
-        form: 'V-V-E-D-V',
-        next_match: '15/03/2024',
-        last_5_matches: ['V', 'E', 'V', 'D', 'V']
+      if (!team?.id) return;
+
+      // Buscar estatísticas do time específico
+      const { data: statsData, error: statsError } = await supabase
+        .from('team_stats')
+        .select(`
+          *,
+          teams!inner (
+            id,
+            name,
+            divisao
+          )
+        `)
+        .eq('team_id', team.id)
+        .single();
+
+      if (statsError) {
+        console.error('Erro ao carregar estatísticas do time:', statsError);
+        return;
       }
+
+      // Usar os últimos jogos da coluna ultimos_jogos (já calculados no banco)
+      const last5Results = statsData.ultimos_jogos || [];
+
+      // Buscar próximo jogo agendado
+      const { data: nextMatchData } = await supabase
+        .from('matches')
+        .select('*')
+        .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+        .eq('status', 'scheduled')
+        .order('date', { ascending: true })
+        .order('time', { ascending: true })
+        .limit(1)
+        .single();
+
+      const teamStats: TeamStats = {
+        team_id: team.id,
+        team_name: team.name,
+        divisao: statsData.teams?.divisao,
+        form: last5Results.join(''),
+        next_match: nextMatchData ? formatDate(nextMatchData.date) : 'Sem jogo agendado',
+        last_5_matches: last5Results,
+        pontos: statsData.pontos,
+        jogos: statsData.jogos,
+        vitorias: statsData.vitorias,
+        empates: statsData.empates,
+        derrotas: statsData.derrotas,
+        gols_marcados: statsData.gols_marcados,
+        gols_sofridos: statsData.gols_sofridos,
+        posse_media: statsData.posse_media,
+        saldo: statsData.saldo
+      };
+
+      setTeamStats(teamStats);
       
-      setTeamStats(mockStats)
     } catch (error) {
-      console.error('Erro ao carregar estatísticas do time:', error)
+      console.error('Erro ao carregar estatísticas do time:', error);
     }
   }
 
@@ -789,7 +1036,8 @@ export default function Dashboard() {
   // Criar objeto team compatível com os componentes de chat
   const chatTeam = {
     id: team?.id || '',
-    name: team?.name || 'Sem time'
+    name: team?.name || 'Sem time',
+    divisao: team?.divisao || 'A'
   }
 
   // Calcular estatísticas do time
@@ -874,6 +1122,16 @@ export default function Dashboard() {
       link: '/dashboard/leilao',
       buttonText: 'Ver leilão',
       preview: 'leilao'
+    },
+    { 
+      title: 'TABELA', 
+      icon: Trophy, 
+      color: 'yellow', 
+      value: teamPosition ? `${teamPosition}º` : 'N/A', 
+      subtitle: 'classificação atual', 
+      link: '/dashboard/tabela',
+      buttonText: 'Ver classificação',
+      preview: 'tabela'
     },
   ]
 
@@ -1025,7 +1283,7 @@ export default function Dashboard() {
         )
       
       case 'TABELA':
-        const teamInTable = leagueTable.find(t => t.team_id === team?.id || t.team_name === team?.name)
+        const teamInTable = leagueTable.find(t => t.team_id === team?.id)
         const top5Table = leagueTable.slice(0, 5)
         const nextMatches = matchSchedule.slice(0, 3)
 
@@ -1038,11 +1296,18 @@ export default function Dashboard() {
                   <Trophy className="w-5 h-5 text-yellow-400" />
                   <span className="text-yellow-400 font-semibold text-sm">Posição Atual</span>
                 </div>
-                <div className="text-white font-bold text-xl">{teamPosition}º Lugar</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-white font-bold text-xl">{teamPosition}º Lugar</div>
+                  {team?.divisao && (
+                    <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-bold rounded-full border border-yellow-500/30">
+                      {team.divisao}
+                    </span>
+                  )}
+                </div>
               </div>
               
               {teamInTable && (
-                <div className="grid grid-cols-3 gap-2 text-xs mt-3">
+                <div className="grid grid-cols-4 gap-2 text-xs mt-3">
                   <div className="text-center bg-zinc-800/30 p-2 rounded">
                     <div className="text-white font-bold">{teamInTable.points}</div>
                     <div className="text-zinc-400">Pontos</div>
@@ -1055,6 +1320,10 @@ export default function Dashboard() {
                     <div className="text-white font-bold">+{teamInTable.goal_difference}</div>
                     <div className="text-zinc-400">Saldo</div>
                   </div>
+                  <div className="text-center bg-zinc-800/30 p-2 rounded">
+                    <div className="text-white font-bold">{teamInTable.posse_media?.toFixed(1) || '0'}%</div>
+                    <div className="text-zinc-400">Posse</div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1065,6 +1334,11 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   <BarChart2 className="w-4 h-4 text-orange-400" />
                   <span className="text-zinc-400 text-sm font-semibold">Top 5 da Liga</span>
+                  {team?.divisao && (
+                    <span className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-xs font-bold rounded-full border border-zinc-700">
+                      Série {team.divisao}
+                    </span>
+                  )}
                 </div>
                 <span className="text-zinc-500 text-xs">Pts J V E D</span>
               </div>
@@ -1074,7 +1348,7 @@ export default function Dashboard() {
                   <div 
                     key={teamTable.id}
                     className={`flex items-center justify-between p-2 rounded text-xs ${
-                      (teamTable.team_id === team?.id || teamTable.team_name === team?.name) 
+                      teamTable.team_id === team?.id
                         ? 'bg-yellow-500/10 border border-yellow-500/20' 
                         : 'bg-zinc-800/30'
                     }`}
@@ -1089,7 +1363,7 @@ export default function Dashboard() {
                         {teamTable.position}º
                       </span>
                       <span className={`font-medium ${
-                        (teamTable.team_id === team?.id || teamTable.team_name === team?.name) 
+                        teamTable.team_id === team?.id
                           ? 'text-yellow-300' 
                           : 'text-white'
                       }`}>
@@ -1110,45 +1384,78 @@ export default function Dashboard() {
 
             {/* Próximos Jogos */}
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-blue-400" />
-                <span className="text-zinc-400 text-sm font-semibold">Próximos Jogos</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-blue-400" />
+                  <span className="text-zinc-400 text-sm font-semibold">Próximos Jogos</span>
+                </div>
+                <span className="text-zinc-500 text-xs">Resultado</span>
               </div>
               
               <div className="space-y-2">
-                {nextMatches.map((match) => (
-                  <div key={match.id} className="bg-zinc-800/30 p-2 rounded text-xs">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-zinc-500 text-[10px]">
-                        {formatDate(match.date)} • {match.time}
-                      </span>
-                      <span className="text-zinc-500 text-[10px]">{match.stadium}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <div className={`w-2 h-2 rounded-full ${
-                          match.home_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
-                        }`} />
-                        <span className={`${
-                          match.home_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
-                        }`}>
-                          {match.home_team_name}
+                {nextMatches.length > 0 ? (
+                  nextMatches.map((match) => (
+                    <div key={match.id} className="bg-zinc-800/30 p-2 rounded text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-zinc-500 text-[10px]">
+                          Rodada {match.round} • {formatDate(match.date)} • {match.time}
                         </span>
+                        <span className="text-zinc-500 text-[10px]">{match.stadium}</span>
                       </div>
-                      <span className="text-zinc-500 mx-2">×</span>
-                      <div className="flex items-center gap-1">
-                        <span className={`${
-                          match.away_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
-                        }`}>
-                          {match.away_team_name}
-                        </span>
-                        <div className={`w-2 h-2 rounded-full ${
-                          match.away_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
-                        }`} />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className={`w-2 h-2 rounded-full ${
+                            match.home_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
+                          }`} />
+                          <span className={`${
+                            match.home_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
+                          }`}>
+                            {match.home_team_name}
+                          </span>
+                        </div>
+                        
+                        <div className="mx-2">
+                          <MatchResult match={match} />
+                        </div>
+                        
+                        <div className="flex items-center gap-2 flex-1 justify-end">
+                          <span className={`${
+                            match.away_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
+                          }`}>
+                            {match.away_team_name}
+                          </span>
+                          <div className={`w-2 h-2 rounded-full ${
+                            match.away_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
+                          }`} />
+                        </div>
                       </div>
+                      
+                      {/* Estatísticas da partida (se finalizada) */}
+                      {match.status === 'finished' && (
+                        <div className="mt-2 pt-2 border-t border-zinc-700/50">
+                          <div className="grid grid-cols-3 gap-1 text-[10px] text-zinc-400">
+                            <div className="text-center">
+                              <div>Posse</div>
+                              <div className="text-white">{match.possession_home || '0'}%</div>
+                            </div>
+                            <div className="text-center">
+                              <div>Finalizações</div>
+                              <div className="text-white">{match.shots_on_target_home || '0'}/{match.shots_home || '0'}</div>
+                            </div>
+                            <div className="text-center">
+                              <div>Escanteios</div>
+                              <div className="text-white">{match.corners_home || '0'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 bg-zinc-800/20 rounded border border-zinc-700/50">
+                    <p className="text-zinc-500 text-sm">Nenhum jogo agendado</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -1164,7 +1471,8 @@ export default function Dashboard() {
                           w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold
                           ${result === 'V' ? 'bg-green-500/30 text-green-400' : 
                             result === 'E' ? 'bg-yellow-500/30 text-yellow-400' : 
-                            'bg-red-500/30 text-red-400'}
+                            result === 'D' ? 'bg-red-500/30 text-red-400' :
+                            'bg-zinc-700 text-zinc-400'}
                         `}>
                           {result}
                         </span>
@@ -1280,6 +1588,11 @@ export default function Dashboard() {
                 </div>
                 <p className="mt-1 lg:mt-2 text-lg lg:text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                   {team?.name || 'Sem time ainda'}
+                  {team?.divisao && (
+                    <span className="ml-2 px-2 py-1 bg-purple-500/20 text-purple-300 text-sm font-bold rounded-full border border-purple-500/30">
+                      Série {team.divisao}
+                    </span>
+                  )}
                 </p>
                 {isAdmin && (
                   <p className="mt-1 lg:mt-2 text-xs lg:text-sm font-medium text-yellow-500 flex items-center justify-center md:justify-start gap-1 lg:gap-2">

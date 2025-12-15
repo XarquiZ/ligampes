@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { Edit } from "lucide-react";
+import { Edit, Youtube, PlayCircle } from "lucide-react"; // Importei novos ícones
 import { Button } from "@/components/ui/button";
 import AdminMatchModal from "./AdminMatchModal";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,48 +31,59 @@ interface JogoCardProps {
     status: 'agendado' | 'em_andamento' | 'finalizado';
     placar_casa?: number;
     placar_fora?: number;
+    video_url?: string; // Novo campo opcional
   };
 }
+
+// Cache global para evitar N requisições (uma por card)
+const adminCheckCache = new Map<string, Promise<boolean>>();
 
 export default function JogoCard({ jogo }: JogoCardProps) {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  const [loadingAdminCheck, setLoadingAdminCheck] = useState(true);
+  
+  // Removemos o loading state visual que causava "pisca" em todos os cards
+  // Agora o botão apenas aparece quando confirmado
   
   const dataFormatada = format(new Date(jogo.data), "dd 'de' MMMM", { locale: ptBR });
   
-  // Verificar se o usuário é admin
+  // Verificar se o usuário é admin com CACHE
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) {
-        setIsAdmin(false);
-        setLoadingAdminCheck(false);
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+
+    const verifyAdmin = async () => {
+      // Se já temos o resultado para este usuário em memória, usamos imediatamente
+      if (adminCheckCache.has(user.id)) {
+        const isUserAdmin = await adminCheckCache.get(user.id);
+        setIsAdmin(!!isUserAdmin);
         return;
       }
 
-      try {
-        // Verificar na tabela profiles
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
+      // Se não, criamos a promessa e salvamos no cache
+      const checkPromise = supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            return data.role === 'admin';
+          }
+          return false;
+        })
+        .catch(() => false);
 
-        if (!error && profile) {
-          setIsAdmin(profile.role === 'admin');
-        } else {
-          setIsAdmin(false);
-        }
-      } catch (error) {
-        console.error('Erro ao verificar role do admin:', error);
-        setIsAdmin(false);
-      } finally {
-        setLoadingAdminCheck(false);
-      }
+      adminCheckCache.set(user.id, checkPromise);
+      
+      const result = await checkPromise;
+      setIsAdmin(result);
     };
 
-    checkAdminStatus();
+    verifyAdmin();
   }, [user]);
 
   const getStatusColor = () => {
@@ -101,32 +112,28 @@ export default function JogoCard({ jogo }: JogoCardProps) {
     }
   };
 
-  if (loadingAdminCheck) {
-    return (
-      <Card className="bg-white/5 border-white/10">
-        <CardContent className="p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-zinc-700 rounded w-3/4"></div>
-            <div className="h-8 bg-zinc-700 rounded"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleWatchGame = () => {
+    if (jogo.video_url) {
+      window.open(jogo.video_url, '_blank');
+    }
+  };
 
   return (
     <>
-      <Card className="bg-white/5 border-white/10 hover:border-yellow-600/50 transition-all duration-200 hover:shadow-lg hover:shadow-yellow-600/10 relative">
+      <Card className="bg-white/5 border-white/10 hover:border-yellow-600/50 transition-all duration-200 hover:shadow-lg hover:shadow-yellow-600/10 relative group">
         {/* Botão de edição para admin */}
         {isAdmin && (
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsAdminModalOpen(true)}
-            className="absolute top-2 right-2 z-10 h-8 w-8 bg-zinc-800/80 hover:bg-zinc-700"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsAdminModalOpen(true);
+            }}
+            className="absolute top-2 right-2 z-20 h-8 w-8 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity"
             title="Editar partida (Admin)"
           >
-            <Edit className="h-4 w-4 text-yellow-500" />
+            <Edit className="h-4 w-4" />
           </Button>
         )}
 
@@ -155,7 +162,7 @@ export default function JogoCard({ jogo }: JogoCardProps) {
           </div>
 
           {/* Times e placar */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between relative">
             {/* Time da casa */}
             <div className="flex flex-col items-center w-1/3">
               <div className="relative h-12 w-12 mb-2">
@@ -179,7 +186,7 @@ export default function JogoCard({ jogo }: JogoCardProps) {
             </div>
 
             {/* Placar */}
-            <div className="flex flex-col items-center w-1/3">
+            <div className="flex flex-col items-center w-1/3 z-10">
               <div className="text-2xl font-bold text-white mb-1">
                 {jogo.status === 'agendado' ? 'VS' : `${jogo.placar_casa || 0} - ${jogo.placar_fora || 0}`}
               </div>
@@ -213,11 +220,24 @@ export default function JogoCard({ jogo }: JogoCardProps) {
             </div>
           </div>
 
-          {/* Local (se houver) */}
-          <div className="mt-4 pt-4 border-t border-white/10">
+          {/* Área do Rodapé: Local e Botão de Vídeo */}
+          <div className="mt-4 pt-4 border-t border-white/10 flex flex-col items-center justify-center gap-2">
             <div className="text-xs text-zinc-400 text-center">
               Estádio Virtual Parsec
             </div>
+            
+            {/* Botão de Assistir */}
+            {jogo.video_url && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleWatchGame}
+                className="h-8 gap-2 border-red-900/30 bg-red-950/20 text-red-400 hover:bg-red-900/40 hover:text-red-300 w-full mt-1"
+              >
+                <Youtube className="w-4 h-4" />
+                Assistir Partida
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -232,7 +252,7 @@ export default function JogoCard({ jogo }: JogoCardProps) {
             date: jogo.data,
             time: jogo.hora,
             round: jogo.rodada,
-            divisao: jogo.serie === 'A' ? 'A' : 'B',
+            divisao: 'A', // Assumindo padrão ou vindo de props se disponível
             status: jogo.status === 'agendado' ? 'scheduled' : 
                     jogo.status === 'em_andamento' ? 'in_progress' : 'finished',
             home_score: jogo.placar_casa,
@@ -240,11 +260,12 @@ export default function JogoCard({ jogo }: JogoCardProps) {
             home_team_id: jogo.time_casa.id,
             away_team_id: jogo.time_fora.id,
             time_casa: jogo.time_casa,
-            time_fora: jogo.time_fora
+            time_fora: jogo.time_fora,
+            video_url: jogo.video_url // Passando o video_url para edição
           }}
           currentUser={{
             id: user?.id || '',
-            role: 'admin' // Agora sabemos que é admin
+            role: 'admin'
           }}
         />
       )}

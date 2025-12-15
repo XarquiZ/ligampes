@@ -1,11 +1,12 @@
 "use client"
 
 import React, { useEffect, useState, useCallback, useMemo } from "react"
-import { useRouter, useSearchParams } from 'next/navigation' // Adicione useSearchParams
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from "@/lib/supabase"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox' // Importação adicionada
 import { Loader2, Search, Grid3X3, List, Filter, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
@@ -26,7 +27,7 @@ import { Player, Team, POSITIONS, PLAYSTYLES } from '@/components/elenco/types'
 
 export default function ElencoPage() {
   const router = useRouter()
-  const searchParams = useSearchParams() // Para ler parâmetros da URL
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [favoritePlayers, setFavoritePlayers] = useState<Player[]>([])
@@ -54,10 +55,11 @@ export default function ElencoPage() {
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
   
-  // Estado para armazenar o jogador pré-selecionado para comparação
+  // NOVO ESTADO: Incluir posições secundárias (Padrão: true)
+  const [includeSecondaryPositions, setIncludeSecondaryPositions] = useState(true)
+  
   const [preSelectedPlayerId, setPreSelectedPlayerId] = useState<string | null>(null)
 
-  // Função para obter jogador pré-selecionado do sessionStorage
   const getPreSelectedPlayerFromStorage = useCallback(() => {
     if (typeof window === 'undefined') return null
     
@@ -72,18 +74,15 @@ export default function ElencoPage() {
     }
   }, [])
 
-  // Verificar se há parâmetro de seção na URL
   useEffect(() => {
     const section = searchParams.get('section')
     if (section && ['elenco', 'favoritos', 'comparacao', 'planejador'].includes(section)) {
       setActiveSection(section as any)
       
-      // Se a seção for comparação, verificar se há jogador armazenado
       if (section === 'comparacao') {
         const playerId = getPreSelectedPlayerFromStorage()
         if (playerId) {
           setPreSelectedPlayerId(playerId)
-          // Limpar o storage após usar
           setTimeout(() => {
             sessionStorage.removeItem('comparePlayer1')
           }, 1000)
@@ -92,13 +91,11 @@ export default function ElencoPage() {
     }
   }, [searchParams, getPreSelectedPlayerFromStorage])
 
-  // Funções auxiliares
   const formatHeight = (height: number | null | undefined) => {
     if (height === null || height === undefined) return '-'
     return `${height}cm`
   }
 
-  // Carrega dados do usuário
   useEffect(() => {
     if (authLoading || !user) return
 
@@ -125,7 +122,6 @@ export default function ElencoPage() {
     loadUserData()
   }, [authLoading, user])
 
-  // Carregar todos os jogadores
   const loadAllPlayers = useCallback(async () => {
     try {
       const { data } = await supabase
@@ -139,7 +135,6 @@ export default function ElencoPage() {
     }
   }, [])
 
-  // Carregar favoritos
   const loadFavoritePlayers = useCallback(async () => {
     if (!user) return
 
@@ -161,6 +156,7 @@ export default function ElencoPage() {
         return
       }
 
+      // Buscar jogadores favoritos com estatísticas
       const { data: playersData, error: playersError } = await supabase
         .from('players')
         .select(`
@@ -169,25 +165,76 @@ export default function ElencoPage() {
             id,
             name,
             logo_url
+          ),
+          player_stats (
+            gols,
+            assistencias,
+            cartoes_amarelos,
+            cartoes_vermelhos,
+            jogos,
+            avg_rating
           )
         `)
         .in('id', favoriteIds)
 
       if (!playersError) {
-        const playersWithFavorites = (playersData || []).map(player => ({
-          ...player,
-          is_favorite: true,
-          club: player.teams?.name || 'Sem time',
-          logo_url: player.teams?.logo_url || null
-        }))
+        const playersWithFavorites = (playersData || []).map(player => {
+          const stats = player.player_stats?.[0] || {};
+          
+          return {
+            ...player,
+            is_favorite: true,
+            club: player.teams?.name || 'Sem time',
+            logo_url: player.teams?.logo_url || null,
+            // Incluir estatísticas da tabela player_stats
+            total_goals: stats.gols || 0,
+            total_assists: stats.assistencias || 0,
+            total_yellow_cards: stats.cartoes_amarelos || 0,
+            total_red_cards: stats.cartoes_vermelhos || 0,
+            total_matches: stats.jogos || 0,
+            average_rating: stats.avg_rating || 0
+          }
+        })
         setFavoritePlayers(playersWithFavorites)
       }
     } catch (error) {
       console.error('Erro ao processar favoritos:', error)
+      // Fallback sem estatísticas
+      try {
+        const { data: playersData, error: playersError } = await supabase
+          .from('players')
+          .select(`
+            *,
+            teams (
+              id,
+              name,
+              logo_url
+            )
+          `)
+          .in('id', favoriteIds)
+
+        if (!playersError) {
+          const playersWithFavorites = (playersData || []).map(player => ({
+            ...player,
+            is_favorite: true,
+            club: player.teams?.name || 'Sem time',
+            logo_url: player.teams?.logo_url || null,
+            // Valores padrão caso não encontre estatísticas
+            total_goals: 0,
+            total_assists: 0,
+            total_yellow_cards: 0,
+            total_red_cards: 0,
+            total_matches: 0,
+            average_rating: 0
+          }))
+          setFavoritePlayers(playersWithFavorites)
+        }
+      } catch (fallbackError) {
+        console.error('Erro no fallback de favoritos:', fallbackError)
+      }
     }
   }, [user])
 
-  // Contagem de mensagens
   useEffect(() => {
     if (!user?.id) return
 
@@ -240,35 +287,50 @@ export default function ElencoPage() {
     }
   }, [user])
 
-  // Carregar jogadores do time
   const loadPlayers = useCallback(async () => {
     if (!teamId) { setPlayers([]); setFilteredPlayers([]); return }
     setLoading(true)
     try {
+      // Buscar jogadores com suas estatísticas da tabela player_stats
       const { data } = await supabase
         .from('players')
-        .select('*')
+        .select(`
+          *,
+          player_stats (
+            gols,
+            assistencias,
+            cartoes_amarelos,
+            cartoes_vermelhos,
+            jogos,
+            avg_rating
+          )
+        `)
         .eq('team_id', teamId)
       
-      const mapped = (data || []).map((p: any) => ({
-        ...p,
-        club: p.team_id ? (p.team_id === teamId ? (team?.name ?? 'Meu Time') : 'Outro') : 'Sem Time',
-        logo_url: p.team_id === teamId ? (team?.logo_url ?? null) : p.logo_url ?? null,
-        skills: p.skills || [],
-        alternative_positions: p.alternative_positions || [],
-        preferred_foot: p.preferred_foot || 'Nenhum',
-        playstyle: p.playstyle || null,
-        nationality: p.nationality || 'Desconhecida',
-        height: p.height || null,
-        is_penalty_specialist: p.is_penalty_specialist || false,
-        injury_resistance: p.injury_resistance || null,
-        total_goals: p.total_goals || 0,
-        total_assists: p.total_assists || 0,
-        total_yellow_cards: p.total_yellow_cards || 0,
-        total_red_cards: p.total_red_cards || 0,
-        total_matches: p.total_matches || 0,
-        average_rating: p.average_rating || 0
-      }))
+      const mapped = (data || []).map((p: any) => {
+        const stats = p.player_stats?.[0] || {}; // Pega o primeiro registro de estatísticas
+        
+        return {
+          ...p,
+          club: p.team_id ? (p.team_id === teamId ? (team?.name ?? 'Meu Time') : 'Outro') : 'Sem Time',
+          logo_url: p.team_id === teamId ? (team?.logo_url ?? null) : p.logo_url ?? null,
+          skills: p.skills || [],
+          alternative_positions: p.alternative_positions || [],
+          preferred_foot: p.preferred_foot || 'Nenhum',
+          playstyle: p.playstyle || null,
+          nationality: p.nationality || 'Desconhecida',
+          height: p.height || null,
+          is_penalty_specialist: p.is_penalty_specialist || false,
+          injury_resistance: p.injury_resistance || null,
+          // Atualizar para usar dados da tabela player_stats
+          total_goals: stats.gols || 0,
+          total_assists: stats.assistencias || 0,
+          total_yellow_cards: stats.cartoes_amarelos || 0,
+          total_red_cards: stats.cartoes_vermelhos || 0,
+          total_matches: stats.jogos || 0,
+          average_rating: stats.avg_rating || 0
+        }
+      })
       
       const sortedPlayers = mapped.sort((a, b) => {
         if (b.overall !== a.overall) {
@@ -280,13 +342,54 @@ export default function ElencoPage() {
       setPlayers(sortedPlayers)
       setFilteredPlayers(sortedPlayers)
     } catch (e) {
-      console.error(e)
+      console.error('Erro ao carregar jogadores:', e)
+      // Fallback: buscar sem estatísticas
+      try {
+        const { data } = await supabase
+          .from('players')
+          .select('*')
+          .eq('team_id', teamId)
+        
+        const mapped = (data || []).map((p: any) => ({
+          ...p,
+          club: p.team_id ? (p.team_id === teamId ? (team?.name ?? 'Meu Time') : 'Outro') : 'Sem Time',
+          logo_url: p.team_id === teamId ? (team?.logo_url ?? null) : p.logo_url ?? null,
+          skills: p.skills || [],
+          alternative_positions: p.alternative_positions || [],
+          preferred_foot: p.preferred_foot || 'Nenhum',
+          playstyle: p.playstyle || null,
+          nationality: p.nationality || 'Desconhecida',
+          height: p.height || null,
+          is_penalty_specialist: p.is_penalty_specialist || false,
+          injury_resistance: p.injury_resistance || null,
+          // Valores padrão caso não encontre estatísticas
+          total_goals: 0,
+          total_assists: 0,
+          total_yellow_cards: 0,
+          total_red_cards: 0,
+          total_matches: 0,
+          average_rating: 0
+        }))
+        
+        const sortedPlayers = mapped.sort((a, b) => {
+          if (b.overall !== a.overall) {
+            return b.overall - a.overall
+          }
+          return a.name.localeCompare(b.name)
+        })
+        
+        setPlayers(sortedPlayers)
+        setFilteredPlayers(sortedPlayers)
+      } catch (fallbackError) {
+        console.error('Erro no fallback:', fallbackError)
+        setPlayers([])
+        setFilteredPlayers([])
+      }
     } finally {
       setLoading(false)
     }
   }, [supabase, teamId, team])
 
-  // Carregar times
   const loadAllTeams = useCallback(async () => {
     try {
       const { data } = await supabase
@@ -300,7 +403,6 @@ export default function ElencoPage() {
     }
   }, [supabase])
 
-  // Efeitos iniciais
   useEffect(() => { 
     loadAllTeams()
     loadAllPlayers()
@@ -311,7 +413,6 @@ export default function ElencoPage() {
     loadFavoritePlayers()
   }, [loadPlayers, loadFavoritePlayers])
 
-  // Handlers de ações
   const handleSellPlayer = (player: Player) => {
     setSelectedPlayer(player)
     setTransferModalOpen(true)
@@ -579,11 +680,9 @@ export default function ElencoPage() {
         return
       }
   
-      // Preparar o payload base
       const transferPayload: any = {
         player_id: transferData.playerId,
         player_name: transferData.playerName,
-        // NÃO INVERTER OS IDs - usar os que vieram do modal corretamente
         from_team_id: transferData.fromTeamId,
         to_team_id: transferData.toTeamId,
         value: transferData.value,
@@ -595,23 +694,18 @@ export default function ElencoPage() {
         transfer_type: transferData.type
       }
   
-      // Se for venda múltipla, adicionar os arrays de jogadores
       if (transferData.type === 'multi_sell') {
         transferPayload.transfer_players = transferData.transferPlayers || []
         transferPayload.player_names = transferData.playerNames || []
         transferPayload.player_values = transferData.playerValues || []
         transferPayload.is_exchange = false
       }
-      
-      // Se for troca, adicionar os jogadores da troca E A DIREÇÃO DO DINHEIRO
       else if (transferData.type === 'exchange') {
         transferPayload.exchange_players = transferData.exchangePlayers || []
         transferPayload.exchange_value = transferData.exchangeValue || 0
-        transferPayload.money_direction = transferData.moneyDirection || 'send' // ← ADICIONADO
+        transferPayload.money_direction = transferData.moneyDirection || 'send'
         transferPayload.is_exchange = true
       }
-      
-      // Se for venda única, apenas garantir que não é troca
       else if (transferData.type === 'sell') {
         transferPayload.is_exchange = false
       }
@@ -651,7 +745,6 @@ export default function ElencoPage() {
     }
   }
 
-  // Handlers de filtros
   const togglePosition = (position: string) => {
     setSelectedPositions(prev =>
       prev.includes(position)
@@ -680,7 +773,6 @@ export default function ElencoPage() {
     )
   }, [isTransitioning])
 
-  // Handlers de clique
   const handleGridCardClick = useCallback((player: Player) => {
     if (activeSection === 'elenco') {
       setViewMode('list')
@@ -704,7 +796,6 @@ export default function ElencoPage() {
     }
   }, [activeSection, togglePlayer])
 
-  // Determinar jogadores a mostrar
   const playersToShow = useMemo(() => {
     switch (activeSection) {
       case 'favoritos':
@@ -715,7 +806,7 @@ export default function ElencoPage() {
     }
   }, [activeSection, players, favoritePlayers])
 
-  // Aplicar filtros - ATUALIZADO PARA INCLUIR POSIÇÕES ALTERNATIVAS
+  // Aplicar filtros - ATUALIZADO PARA INCLUIR POSIÇÕES ALTERNATIVAS COM OPÇÃO
   useEffect(() => {
     let f = [...playersToShow]
     if (search) f = f.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
@@ -723,7 +814,7 @@ export default function ElencoPage() {
     if (selectedPositions.length > 0) {
       f = f.filter(p => 
         selectedPositions.includes(p.position) || 
-        (p.alternative_positions && p.alternative_positions.some(altPos => selectedPositions.includes(altPos)))
+        (includeSecondaryPositions && p.alternative_positions && p.alternative_positions.some(altPos => selectedPositions.includes(altPos)))
       )
     }
     
@@ -739,9 +830,8 @@ export default function ElencoPage() {
     })
     
     setFilteredPlayers(f)
-  }, [search, selectedPositions, selectedPlaystyles, playersToShow])
+  }, [search, selectedPositions, selectedPlaystyles, playersToShow, includeSecondaryPositions])
 
-  // Criar objetos para chat
   const chatUser = useMemo(() => ({
     id: user?.id || '',
     name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
@@ -813,7 +903,7 @@ export default function ElencoPage() {
                     </Button>
                     
                     {positionFilterOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-56 lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-3 lg:p-4">
+                      <div className="absolute top-full left-0 mt-2 w-56 lg:w-72 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-3 lg:p-4">
                         <div className="flex justify-between items-center mb-2 lg:mb-3">
                           <h3 className="font-semibold text-sm lg:text-base">Filtrar por Posição</h3>
                           {selectedPositions.length > 0 && (
@@ -827,7 +917,24 @@ export default function ElencoPage() {
                             </Button>
                           )}
                         </div>
-                        <div className="space-y-1 lg:space-y-2 max-h-48 lg:max-h-60 overflow-y-auto">
+
+                        {/* Opção para Incluir Posições Secundárias */}
+                        <div className="flex items-center space-x-2 mb-3 p-2 bg-zinc-800/50 rounded-md border border-zinc-700/50">
+                          <Checkbox 
+                            id="include-secondary-elenco" 
+                            checked={includeSecondaryPositions}
+                            onCheckedChange={(checked) => setIncludeSecondaryPositions(!!checked)}
+                            className="border-zinc-500 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600 w-4 h-4"
+                          />
+                          <label
+                            htmlFor="include-secondary-elenco"
+                            className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-zinc-300 cursor-pointer"
+                          >
+                            Incluir posições secundárias
+                          </label>
+                        </div>
+
+                        <div className="space-y-1 lg:space-y-2 max-h-48 lg:max-h-60 overflow-y-auto custom-scrollbar pr-1">
                           {POSITIONS.map(position => (
                             <CustomCheckbox
                               key={position}

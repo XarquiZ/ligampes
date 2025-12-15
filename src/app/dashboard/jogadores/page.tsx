@@ -129,6 +129,9 @@ export default function ListaJogadores() {
   // Estado para filtro de overall
   const [filterOverall, setFilterOverall] = useState<string>('Todos')
 
+  // ESTADO: Incluir posições secundárias (Padrão: true)
+  const [includeSecondaryPositions, setIncludeSecondaryPositions] = useState(true)
+
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
 
@@ -381,11 +384,9 @@ export default function ListaJogadores() {
       if (typeof window === 'undefined') return;
       
       const hash = window.location.hash;
-      console.log('🔍 Hash detectado:', hash);
       
       if (hash && hash.startsWith('#player-')) {
         const playerId = hash.replace('#player-', '');
-        console.log('🎯 ID do jogador do hash:', playerId);
         
         // Garantir que está na view de lista
         setViewMode('list');
@@ -400,7 +401,6 @@ export default function ListaJogadores() {
           // Scroll para o jogador após abrir o card
           setTimeout(() => {
             const element = document.getElementById(`player-${playerId}`);
-            console.log('🔎 Elemento encontrado:', element);
             
             if (element) {
               // Scroll suave para o elemento
@@ -417,10 +417,7 @@ export default function ListaJogadores() {
               setTimeout(() => {
                 element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
               }, 3000);
-              
-              console.log('✅ Scroll realizado para o jogador:', playerId);
             } else {
-              console.log('❌ Elemento não encontrado, tentando novamente...');
               // Tentar novamente após mais tempo
               setTimeout(() => {
                 const retryElement = document.getElementById(`player-${playerId}`);
@@ -441,16 +438,10 @@ export default function ListaJogadores() {
       }
     };
 
-    // Executar na montagem inicial se já tiver hash
     handleHashChange();
-    
-    // Ouvir mudanças no hash (quando navega via chat)
     window.addEventListener('hashchange', handleHashChange);
-    
-    // Também verificar quando a página termina de carregar
     window.addEventListener('load', handleHashChange);
     
-    // Verificar periodicamente por alguns segundos após carregar (fallback)
     const interval = setInterval(() => {
       if (window.location.hash && window.location.hash.startsWith('#player-')) {
         handleHashChange();
@@ -458,7 +449,7 @@ export default function ListaJogadores() {
       }
     }, 500);
     
-    setTimeout(() => clearInterval(interval), 5000); // Parar após 5 segundos
+    setTimeout(() => clearInterval(interval), 5000);
 
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
@@ -490,7 +481,6 @@ export default function ListaJogadores() {
       setTeams(teamsData || [])
 
       const mapped = (playersData || []).map(p => {
-        // Adicionar "Especialista em Pênaltis" às skills se o jogador for especialista
         const skills = p.skills || []
         if (p.is_penalty_specialist && !skills.includes('Especialista em Pênaltis')) {
           skills.push('Especialista em Pênaltis')
@@ -534,16 +524,17 @@ export default function ListaJogadores() {
     setIsEdicaoOpen(true)
   }, [])
 
+  // FILTERED PLAYERS - LÓGICA ATUALIZADA
   const filteredPlayers = useMemo(() => {
     return jogadores.filter(j => {
       const name = j.name.toLowerCase().includes(searchName.toLowerCase())
       
-      // Filtro de posições (múltipla seleção) - ATUALIZADO PARA INCLUIR POSIÇÕES ALTERNATIVAS
-      const pos = selectedPositions.length === 0 || 
-                 selectedPositions.includes(j.position) || 
-                 (j.alternative_positions && j.alternative_positions.some(altPos => selectedPositions.includes(altPos)))
+      // Filtro de posições (múltipla seleção) - ATUALIZADO PARA RESPEITAR O CHECKBOX
+      const hasPrimaryPosition = selectedPositions.includes(j.position)
+      const hasSecondaryPosition = includeSecondaryPositions && j.alternative_positions && j.alternative_positions.some(altPos => selectedPositions.includes(altPos))
       
-      // Filtro de playstyles (múltipla seleção)
+      const pos = selectedPositions.length === 0 || hasPrimaryPosition || hasSecondaryPosition
+      
       const playstyle = selectedPlaystyles.length === 0 || (j.playstyle && selectedPlaystyles.includes(j.playstyle))
       const foot = filterFoot === 'Todos' || j.preferred_foot === filterFoot
       const team = filterTeam === 'Todos' || (filterTeam === 'Sem Time' ? !j.team_id : j.team_id === filterTeam)
@@ -558,7 +549,7 @@ export default function ListaJogadores() {
       
       return name && pos && playstyle && foot && team && skills && attrs && height && overall
     })
-  }, [jogadores, searchName, selectedPositions, selectedPlaystyles, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight, filterOverall])
+  }, [jogadores, searchName, selectedPositions, selectedPlaystyles, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight, filterOverall, includeSecondaryPositions]) // Adicionado includeSecondaryPositions
 
   const activeAdvancedFilters = [
     selectedPositions.length > 0,
@@ -581,6 +572,7 @@ export default function ListaJogadores() {
     setFilterMinHeight('all')
     setFilterOverall('Todos')
     setAttrFilters(Object.fromEntries(Object.keys(attrFilters).map(k => [k, null])))
+    setIncludeSecondaryPositions(true) // Reseta também essa opção para o padrão
   }, [attrFilters])
 
   // Opções de altura (140cm até 230cm)
@@ -594,11 +586,9 @@ export default function ListaJogadores() {
     }), []
   );
 
-  // HABILIDADES ORGANIZADAS EM ORDEM ALFABÉTICA
   const SKILLS_OPTIONS = useMemo(() => [
     '360 graus', 'Afastamento acrobático', 'Arremesso lateral longo', 'Arremesso longo do GO', 'Cabeçada', 'Chapéu', 'Chute ascendente', 'Chute com o peito do pé', 'Chute de longe', 'Chute de primeira', 'Controle da cavadinha', 'Controle de domínio', 'Corte de calcanhar', 'Cruzamento preciso', 'Curva para fora', 'De letra', 'Elástico', 'Especialista em Pênaltis', 'Espírito guerreiro', 'Finalização acrobática', 'Finta de letra', 'Folha seca', 'Interceptação', 'Liderança', 'Malícia', 'Marcação individual', 'Passe aéreo baixo', 'Passe de primeira', 'Passe em profundidade', 'Passe na medida', 'Passe sem olhar', 'Pedalada simples', 'Pegador de pênaltis', 'Precisão à distância', 'Puxada de letra', 'Reposição alta do GO', 'Reposição baixa do GO', 'Super substituto', 'Toque de calcanhar', 'Toque duplo', 'Volta para marcar'].sort(), []);
 
-  // Criar objetos compatíveis com os componentes de chat
   const chatUser = useMemo(() => ({
     id: user?.id || '',
     name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
@@ -629,7 +619,7 @@ export default function ListaJogadores() {
       <div className="flex-1 transition-all duration-300 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-4 lg:p-6">
           <div className="max-w-7xl mx-auto space-y-6 lg:space-y-8">
-            {/* Header - REMOVIDO O SHEET DAQUI */}
+            {/* Header */}
             <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 mb-6 lg:mb-8">
               <div>
                 <h1 className="text-3xl lg:text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-400">
@@ -674,7 +664,7 @@ export default function ListaJogadores() {
                   </SheetTrigger>
                 </Sheet>
 
-                {/* Botão Novo Jogador - AGORA APENAS O BOTÃO, O SHEET ESTÁ FORA */}
+                {/* Botão Novo Jogador */}
                 {userRole === 'admin' && (
                   <Button 
                     size="lg" 
@@ -711,7 +701,11 @@ export default function ListaJogadores() {
               teams={teams}
               POSITIONS={POSITIONS}
               PLAYSTYLES={PLAYSTYLES}
+              includeSecondaryPositions={includeSecondaryPositions}
+              setIncludeSecondaryPositions={setIncludeSecondaryPositions}
             />
+
+            {/* REMOVIDO CHECKBOX AVULSO DAQUI */}
 
             {loading && (
               <div className="flex justify-center py-20 lg:py-32">
@@ -766,7 +760,7 @@ export default function ListaJogadores() {
               </div>
             )}
 
-            {/* Sheet de Cadastro - AGORA ESTÁ AQUI NA PÁGINA PRINCIPAL */}
+            {/* Sheet de Cadastro */}
             <Sheet open={isCadastroOpen} onOpenChange={setIsCadastroOpen}>
               <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl p-0 overflow-y-auto bg-zinc-950 border-l border-zinc-800">
                 <SheetHeader className="sticky top-0 z-10 bg-zinc-900 border-b border-zinc-800 px-6 py-5">
@@ -813,7 +807,7 @@ export default function ListaJogadores() {
                   </SheetDescription>
                 </SheetHeader>
                 <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                  {/* FILTRO DE OVERALL - ADICIONADO COMO PRIMEIRO */}
+                  {/* FILTRO DE OVERALL */}
                   <div>
                     <label className="text-sm font-semibold text-zinc-300 mb-2 block">Overall</label>
                     <Select value={filterOverall} onValueChange={setFilterOverall}>
@@ -830,7 +824,7 @@ export default function ListaJogadores() {
                     </Select>
                   </div>
 
-                  {/* Filtro de Pé Preferido - AGORA SEGUNDO */}
+                  {/* Filtro de Pé Preferido */}
                   <div>
                     <label className="text-sm font-semibold text-zinc-300 mb-2 block">Pé Preferido</label>
                     <Select value={filterFoot} onValueChange={setFilterFoot}>

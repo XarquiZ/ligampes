@@ -16,12 +16,13 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   onRemoveFavorite,
   onCardClick
 }) => {
+  // Usar os valores das estatísticas que agora vêm do player_stats
   const stats = {
     goals: player.total_goals || 0,
     assists: player.total_assists || 0,
     yellowCards: player.total_yellow_cards || 0,
     redCards: player.total_red_cards || 0,
-    averageRating: player.average_rating ? player.average_rating.toFixed(1) : '0.0'
+    averageRating: player.average_rating ? Number(player.average_rating).toFixed(1) : '0.0'
   }
 
   const handleCardClick = () => {
@@ -92,33 +93,46 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
 
         <p className="text-xs text-zinc-400 text-center">{player.playstyle || 'Nenhum'}</p>
 
+        {/* Grid de estatísticas */}
         <div className="grid grid-cols-5 gap-1 lg:gap-2 py-2 border-y border-zinc-700/50">
           <StatItem
             icon={<Target className="w-3 h-3 lg:w-4 lg:h-4" />}
             value={stats.goals}
             label="Gols"
+            highlight={stats.goals > 0}
           />
           <StatItem
             icon={<Footprints className="w-3 h-3 lg:w-4 lg:h-4" />}
             value={stats.assists}
-            label="Assistências"
+            label="Assist"
+            highlight={stats.assists > 0}
           />
           <StatItem
             icon={<Square className="w-3 h-3 lg:w-4 lg:h-4" style={{ color: '#FFD700' }} />}
             value={stats.yellowCards}
             label="Amarelos"
+            warning={stats.yellowCards > 2}
           />
           <StatItem
             icon={<Square className="w-3 h-3 lg:w-4 lg:h-4" style={{ color: '#FF4444' }} />}
             value={stats.redCards}
             label="Vermelhos"
+            danger={stats.redCards > 0}
           />
           <StatItem
             icon={<Pencil className="w-3 h-3 lg:w-4 lg:h-4" />}
             value={stats.averageRating}
             label="Nota"
+            highlight={parseFloat(stats.averageRating) >= 7.0}
           />
         </div>
+
+        {/* Informação adicional (opcional) */}
+        {player.total_matches > 0 && (
+          <div className="text-center text-xs text-zinc-500">
+            {player.total_matches} jogo{player.total_matches !== 1 ? 's' : ''}
+          </div>
+        )}
 
         <div className="space-y-2">
           <p className="text-center text-lg lg:text-xl font-black text-emerald-400">
@@ -136,7 +150,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                 size="sm"
               >
                 <MessageCircle className="w-3 h-3 lg:w-3.5 lg:h-3.5 mr-1" />
-                
+                Propor
               </Button>
             ) : (
               <>
@@ -150,6 +164,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                     size="sm"
                   >
                     <DollarSign className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                  
                   </Button>
                 )}
                 
@@ -163,6 +178,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                     size="sm"
                   >
                     <X className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                  
                   </Button>
                 )}
               </>

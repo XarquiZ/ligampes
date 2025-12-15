@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox' // Importando Checkbox
 import { cn } from '@/lib/utils'
 import { CustomCheckbox } from './CustomCheckbox'
 
@@ -24,6 +25,9 @@ interface PlayerFiltersProps {
   teams: Array<{ id: string; name: string; logo_url: string | null }>
   POSITIONS: string[]
   PLAYSTYLES: string[]
+  // Novas props para o filtro de posição secundária
+  includeSecondaryPositions: boolean
+  setIncludeSecondaryPositions: (value: boolean) => void
 }
 
 export function PlayerFilters({
@@ -40,7 +44,9 @@ export function PlayerFilters({
   clearAllFilters,
   teams,
   POSITIONS,
-  PLAYSTYLES
+  PLAYSTYLES,
+  includeSecondaryPositions,
+  setIncludeSecondaryPositions
 }: PlayerFiltersProps) {
   const [positionFilterOpen, setPositionFilterOpen] = useState(false)
   const [playstyleFilterOpen, setPlaystyleFilterOpen] = useState(false)
@@ -78,7 +84,7 @@ export function PlayerFilters({
           </Button>
           
           {positionFilterOpen && (
-            <div className="absolute top-full left-0 mt-2 w-full lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-40 p-4">
+            <div className="absolute top-full left-0 mt-2 w-full lg:w-72 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-40 p-4">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-semibold text-base">Filtrar por Posição</h3>
                 {selectedPositions.length > 0 && (
@@ -92,7 +98,24 @@ export function PlayerFilters({
                   </Button>
                 )}
               </div>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
+              
+              {/* Opção para Incluir Posições Secundárias */}
+              <div className="flex items-center space-x-2 mb-4 p-2 bg-zinc-800/50 rounded-md border border-zinc-700/50">
+                <Checkbox 
+                  id="include-secondary" 
+                  checked={includeSecondaryPositions}
+                  onCheckedChange={(checked) => setIncludeSecondaryPositions(checked as boolean)}
+                  className="border-zinc-500 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
+                />
+                <label
+                  htmlFor="include-secondary"
+                  className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-zinc-300 cursor-pointer"
+                >
+                  Incluir posições secundárias
+                </label>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
                 {POSITIONS.map(position => (
                   <CustomCheckbox
                     key={position}
