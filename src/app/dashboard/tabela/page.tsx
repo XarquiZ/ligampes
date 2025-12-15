@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import Sidebar from "@/components/Sidebar";
 import FloatingChatButton from "@/components/FloatingChatButton";
-import ChatPopup from "@/components/ChatPopup";
+import ChatPopup from "@/components/Chatpopup";
 import Classificacao from "@/components/tabela/Classificacao";
 import Estatisticas from "@/components/tabela/Estatisticas";
 import CopaParsec from "@/components/tabela/CopaParsec";
