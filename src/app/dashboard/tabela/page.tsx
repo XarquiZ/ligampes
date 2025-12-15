@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import Sidebar from "@/components/Sidebar";
 import FloatingChatButton from "@/components/FloatingChatButton";
-import ChatPopup from "@/components/Chatpopup";
+import ChatPopup from "@/components/ChatPopup";
 import Classificacao from "@/components/tabela/Classificacao";
 import Estatisticas from "@/components/tabela/Estatisticas";
-import Agenda from "@/components/tabela/Agenda";
 import CopaParsec from "@/components/tabela/CopaParsec";
+import Calendario from "@/components/tabela/Calendario"; // NOVA IMPORT
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabelas";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -212,10 +212,9 @@ export default function TabelaPage() {
                   Acompanhe a classificação, estatísticas e agenda dos campeonatos
                 </p>
               </div>
-
             </div>
 
-            {/* Conteúdo da Tabela (MANTIDO INTACTO) */}
+            {/* Conteúdo da Tabela - ATUALIZADO COM NOVA ABA */}
             <Card className="bg-white/5 border-white/10 p-4 lg:p-6">
               <Tabs defaultValue="classificacao" className="w-full">
                 <TabsList className="grid grid-cols-4 mb-8 bg-zinc-800/50 border border-zinc-600 p-1 rounded-lg">
@@ -232,10 +231,10 @@ export default function TabelaPage() {
                     Estatísticas
                   </TabsTrigger>
                   <TabsTrigger 
-                    value="agenda"
+                    value="calendario"
                     className="text-white data-[state=active]:bg-yellow-600 data-[state=active]:text-white transition-colors"
                   >
-                    Agenda
+                    Calendário
                   </TabsTrigger>
                   <TabsTrigger 
                     value="copa"
@@ -253,8 +252,8 @@ export default function TabelaPage() {
                   <Estatisticas />
                 </TabsContent>
 
-                <TabsContent value="agenda">
-                  <Agenda />
+                <TabsContent value="calendario">
+                  <Calendario />
                 </TabsContent>
 
                 <TabsContent value="copa">

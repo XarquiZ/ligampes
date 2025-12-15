@@ -864,7 +864,27 @@ export default function Dashboard() {
       link: '/dashboard/transferencias',
       buttonText: 'Ver mercado',
       preview: 'transferencias'
-    }
+    },
+    { 
+      title: 'LEILÃO', 
+      icon: Calendar, 
+      color: 'red', 
+      value: activeAuctions.length > 0 ? 'AO VIVO' : 'EM BREVE', 
+      subtitle: activeAuctions.length > 0 ? 'leilão ativo' : 'próximo evento', 
+      link: '/dashboard/leilao',
+      buttonText: 'Ver leilão',
+      preview: 'leilao'
+    },
+    { 
+      title: 'TABELA', 
+      icon: Trophy, 
+      color: 'yellow', 
+      value: teamPosition ? `${teamPosition}º` : 'N/A', 
+      subtitle: 'classificação atual', 
+      link: '/dashboard/tabela',
+      buttonText: 'Ver classificação',
+      preview: 'tabela'
+    },
   ]
 
   // Função para renderizar o preview baseado no tile
