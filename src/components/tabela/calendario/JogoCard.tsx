@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { Edit, Youtube, PlayCircle } from "lucide-react"; // Importei novos ícones
+import { Edit, Youtube, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AdminMatchModal from "./AdminMatchModal";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,7 +31,8 @@ interface JogoCardProps {
     status: 'agendado' | 'em_andamento' | 'finalizado';
     placar_casa?: number;
     placar_fora?: number;
-    video_url?: string; // Novo campo opcional
+    video_url?: string;
+    stadium?: string; // Novo campo para o estádio
   };
 }
 
@@ -42,9 +43,6 @@ export default function JogoCard({ jogo }: JogoCardProps) {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  
-  // Removemos o loading state visual que causava "pisca" em todos os cards
-  // Agora o botão apenas aparece quando confirmado
   
   const dataFormatada = format(new Date(jogo.data), "dd 'de' MMMM", { locale: ptBR });
   
@@ -223,7 +221,8 @@ export default function JogoCard({ jogo }: JogoCardProps) {
           {/* Área do Rodapé: Local e Botão de Vídeo */}
           <div className="mt-4 pt-4 border-t border-white/10 flex flex-col items-center justify-center gap-2">
             <div className="text-xs text-zinc-400 text-center">
-              Estádio Virtual Parsec
+              {/* Usando o estádio do jogo se disponível, caso contrário usa o padrão */}
+              {jogo.stadium || "Estádio Virtual Parsec"}
             </div>
             
             {/* Botão de Assistir */}
@@ -252,7 +251,7 @@ export default function JogoCard({ jogo }: JogoCardProps) {
             date: jogo.data,
             time: jogo.hora,
             round: jogo.rodada,
-            divisao: 'A', // Assumindo padrão ou vindo de props se disponível
+            divisao: 'A',
             status: jogo.status === 'agendado' ? 'scheduled' : 
                     jogo.status === 'em_andamento' ? 'in_progress' : 'finished',
             home_score: jogo.placar_casa,
@@ -261,7 +260,8 @@ export default function JogoCard({ jogo }: JogoCardProps) {
             away_team_id: jogo.time_fora.id,
             time_casa: jogo.time_casa,
             time_fora: jogo.time_fora,
-            video_url: jogo.video_url // Passando o video_url para edição
+            video_url: jogo.video_url,
+            stadium: jogo.stadium // Passando o estádio para edição
           }}
           currentUser={{
             id: user?.id || '',
