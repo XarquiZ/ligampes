@@ -80,12 +80,6 @@ const navigationItems = [
     icon: Calendar, 
     color: 'text-red-400' 
   },
-  { 
-    name: 'Tabela', 
-    href: '/dashboard/tabela', 
-    icon: Trophy, 
-    color: 'text-yellow-400' 
-  },
 ]
 
 export default function Sidebar({ user, profile, team }: SidebarProps) {

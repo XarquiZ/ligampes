@@ -875,16 +875,6 @@ export default function Dashboard() {
       buttonText: 'Ver leilão',
       preview: 'leilao'
     },
-    { 
-      title: 'TABELA', 
-      icon: Trophy, 
-      color: 'yellow', 
-      value: teamPosition ? `${teamPosition}º` : 'N/A', 
-      subtitle: 'classificação atual', 
-      link: '/dashboard/tabela',
-      buttonText: 'Ver classificação',
-      preview: 'tabela'
-    },
   ]
 
   // Função para renderizar o preview baseado no tile
