@@ -4,6 +4,7 @@ import { useState } from "react";
 import Artilharia from "./stats/Artilharia";
 import Assistencias from "./stats/Assistencias";
 import TimeStats from "./stats/TimeStats";
+import PorPosicao from "./stats/PorPosicao"; // NOVO IMPORT
 
 export default function Estatisticas() {
   const [activeTab, setActiveTab] = useState("artilharia");
@@ -33,6 +34,16 @@ export default function Estatisticas() {
         >
           Líder de Assistências
         </button>
+                <button
+          onClick={() => setActiveTab("posicao")}
+          className={`px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
+            activeTab === "posicao"
+              ? "bg-yellow-500 text-black font-semibold"
+              : "bg-gray-900 text-gray-300 hover:bg-gray-700"
+          }`}
+        >
+          Por Posição
+        </button>
         <button
           onClick={() => setActiveTab("times")}
           className={`px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
@@ -43,12 +54,15 @@ export default function Estatisticas() {
         >
           Estatísticas dos Times
         </button>
+
       </div>
 
       <div className="mt-6">
         {activeTab === "artilharia" && <Artilharia />}
         {activeTab === "assistencias" && <Assistencias />}
+        {activeTab === "posicao" && <PorPosicao />}
         {activeTab === "times" && <TimeStats />}
+        
       </div>
     </div>
   );
