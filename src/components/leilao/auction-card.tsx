@@ -254,20 +254,28 @@ export function AuctionCard({
   }, [auction.end_time, auction.start_time, auction.status, type, onForceFinish, auction.id])
 
   // Função corrigida para formatar tempo restante em horas, minutos e segundos
-  const defaultFormatTimeRemaining = (ms: number) => {
-    if (ms <= 0) return '00:00:00'
-    
-    const totalSeconds = Math.floor(ms / 1000)
-    const hours = Math.floor(totalSeconds / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-    
-    if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-    } else {
-      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-    }
+const defaultFormatTimeRemaining = (ms: number) => {
+  if (ms <= 0) return '00:00:00'
+  
+  const totalSeconds = Math.floor(ms / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  
+  // Formato: Dias hh:mm:ss
+  if (days > 0) {
+    return `${days}d ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
+  
+  // Formato: hh:mm:ss (Ex: 10:12:26 em vez de 612:26)
+  if (hours > 0) {
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  } 
+
+  // Formato mm:ss
+  return `00:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+}
 
   const formatTime = formatTimeRemaining || defaultFormatTimeRemaining
 

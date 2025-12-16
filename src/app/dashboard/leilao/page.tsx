@@ -80,31 +80,27 @@ const formatToMillions = (value: number): string => {
 }
 
 // Função para formatar o tempo restante de forma mais legível para durações longas
-const formatTimeRemaining = (milliseconds: number, auctionDuration?: number) => {
-  // Se for um leilão de 24 horas ou mais, mostrar de forma mais detalhada
-  if (auctionDuration && auctionDuration >= 1440) { // 24 horas ou mais
-    const totalSeconds = Math.floor(milliseconds / 1000)
-    const days = Math.floor(totalSeconds / 86400)
-    const hours = Math.floor((totalSeconds % 86400) / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-    
-    if (days > 0) {
-      return `${days}d ${hours}h ${minutes}m`
-    } else if (hours > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`
-    }
-  }
-  
-  // Para durações menores, manter o formato original
+const formatTimeRemaining = (milliseconds: number) => {
+  if (milliseconds <= 0) return '00:00:00'
+
   const totalSeconds = Math.floor(milliseconds / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
   const seconds = totalSeconds % 60
-  
-  if (minutes > 0) {
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`
+
+  // Se tiver mais de 1 dia: Retorna "2d 05:30:00"
+  if (days > 0) {
+    return `${days}d ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
-  return `${seconds}s`
+  
+  // Se tiver horas (menos de 1 dia): Retorna "10:12:26"
+  if (hours > 0) {
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  }
+
+  // Se tiver apenas minutos: Retorna "00:12:26"
+  return `00:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
 }
 
 export default function PaginaLeilao() {
