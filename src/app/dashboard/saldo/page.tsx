@@ -597,7 +597,7 @@ export default function PaginaSaldo() {
 
   if (authLoading || dataLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 ios-safe-area">
         <div className="text-2xl font-semibold text-white animate-pulse">
           Carregando...
         </div>
@@ -607,65 +607,69 @@ export default function PaginaSaldo() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 ios-safe-area">
         <p className="text-2xl text-white animate-pulse">Carregando saldo...</p>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
+    <div className="flex min-h-screen bg-zinc-950 ios-safe-area">
       {/* Sidebar */}
       <Sidebar user={user!} profile={profile} team={team} />
 
       {/* Conteúdo Principal */}
-      <div className="flex-1 transition-all duration-300 lg:ml-0">
-        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-4 lg:p-6">
-          <div className="max-w-6xl mx-auto space-y-6 lg:space-y-8">
+      <div className="flex-1 transition-all duration-300 lg:ml-0 w-full">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-3 sm:p-4 lg:p-6 container-responsive">
+          <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8">
             {/* Header */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 lg:gap-6 mb-6 lg:mb-8">
-              <div>
-                <h1 className="text-3xl lg:text-5xl font-black text-white mb-2">SALDO DO CLUBE</h1>
-                <p className="text-zinc-400 text-sm lg:text-lg">
+            <div className="flex flex-col justify-between items-start gap-3 sm:gap-4 mb-4 sm:mb-6 lg:mb-8">
+              <div className="w-full">
+                <h1 className="text-2xl sm:text-3xl lg:text-5xl font-black text-white mb-1 sm:mb-2 break-words">
+                  SALDO DO CLUBE
+                </h1>
+                <p className="text-zinc-400 text-xs sm:text-sm lg:text-lg">
                   Acompanhe suas finanças e movimentações
                 </p>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
                 <Button
                   onClick={() => team && refreshTeamData(team.id)}
                   variant="outline"
-                  className="bg-zinc-800/50 border-zinc-600 hover:bg-zinc-700/50"
+                  className="bg-zinc-800/50 border-zinc-600 hover:bg-zinc-700/50 text-xs sm:text-sm py-1 h-8 sm:h-9 ios-button"
                 >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Atualizar
+                  <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Atualizar</span>
+                  <span className="sm:hidden">Atual.</span>
                 </Button>
 
                 {isAdmin && (
                   <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
                     <DialogTrigger asChild>
-                      <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm lg:text-base">
-                        <DollarSign className="w-4 h-4 mr-2" />
-                        Gerenciar Saldos
+                      <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm py-1 h-8 sm:h-9 ios-button">
+                        <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                        <span className="hidden sm:inline">Gerenciar</span>
+                        <span className="sm:hidden">Saldo</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-md lg:max-w-lg">
+                    <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-[95vw] sm:max-w-md lg:max-w-lg dialog-content-ios">
                       <DialogHeader>
-                        <DialogTitle className="text-xl lg:text-2xl font-bold">
+                        <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold">
                           Adicionar/Remover Saldo
                         </DialogTitle>
                       </DialogHeader>
 
                       <div className="space-y-3 lg:space-y-4 py-3 lg:py-4">
                         <div>
-                          <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          <label className="text-zinc-400 text-xs sm:text-sm font-medium mb-2 block">
                             Selecione o Clube
                           </label>
                           <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                            <SelectTrigger className="bg-zinc-800/50 border-zinc-600 text-sm">
+                            <SelectTrigger className="bg-zinc-800/50 border-zinc-600 text-xs sm:text-sm ios-button">
                               <SelectValue placeholder="Escolha um clube" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="max-h-[60vh]">
                               {allTeams.map(team => (
                                 <SelectItem key={team.id} value={team.id}>
                                   <div className="flex items-center gap-2">
@@ -673,10 +677,10 @@ export default function PaginaSaldo() {
                                       <img 
                                         src={team.logo_url} 
                                         alt={team.name}
-                                        className="w-5 h-5 lg:w-6 lg:h-6 rounded-full object-contain"
+                                        className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded-full object-contain"
                                       />
                                     )}
-                                    <span className="text-sm">{team.name}</span>
+                                    <span className="text-xs sm:text-sm">{team.name}</span>
                                     <Badge variant="secondary" className="ml-auto text-xs">
                                       {formatBalance(team.balance)}
                                     </Badge>
@@ -688,7 +692,7 @@ export default function PaginaSaldo() {
                         </div>
 
                         <div>
-                          <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          <label className="text-zinc-400 text-xs sm:text-sm font-medium mb-2 block">
                             Tipo de Operação
                           </label>
                           <div className="flex gap-2">
@@ -697,13 +701,13 @@ export default function PaginaSaldo() {
                               variant={transactionType === 'add' ? 'default' : 'outline'}
                               onClick={() => setTransactionType('add')}
                               className={cn(
-                                "flex-1 text-xs lg:text-sm",
+                                "flex-1 text-xs sm:text-sm h-8 sm:h-9 ios-button",
                                 transactionType === 'add' 
                                   ? "bg-emerald-600 hover:bg-emerald-700" 
                                   : "bg-zinc-800/50 border-zinc-600"
                               )}
                             >
-                              <Plus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Adicionar
                             </Button>
                             <Button
@@ -711,42 +715,43 @@ export default function PaginaSaldo() {
                               variant={transactionType === 'remove' ? 'default' : 'outline'}
                               onClick={() => setTransactionType('remove')}
                               className={cn(
-                                "flex-1 text-xs lg:text-sm",
+                                "flex-1 text-xs sm:text-sm h-8 sm:h-9 ios-button",
                                 transactionType === 'remove' 
                                   ? "bg-red-600 hover:bg-red-700" 
                                   : "bg-zinc-800/50 border-zinc-600"
                               )}
                             >
-                              <Minus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                              <Minus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                               Remover
                             </Button>
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          <label className="text-zinc-400 text-xs sm:text-sm font-medium mb-2 block">
                             Valor
                           </label>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3 h-3 lg:w-4 lg:h-4" />
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3 h-3 sm:w-4 sm:h-4" />
                             <Input
                               placeholder="0,00"
                               value={transactionAmount}
                               onChange={handleAmountChange}
-                              className="pl-8 lg:pl-10 bg-zinc-800/50 border-zinc-600 text-sm"
+                              className="pl-8 sm:pl-10 bg-zinc-800/50 border-zinc-600 text-sm ios-input"
+                              inputMode="decimal"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-zinc-400 text-sm font-medium mb-2 block">
+                          <label className="text-zinc-400 text-xs sm:text-sm font-medium mb-2 block">
                             Descrição
                           </label>
                           <Input
                             placeholder="Ex: Premiação do campeonato, Multa, etc."
                             value={transactionDescription}
                             onChange={(e) => setTransactionDescription(e.target.value)}
-                            className="bg-zinc-800/50 border-zinc-600 text-sm"
+                            className="bg-zinc-800/50 border-zinc-600 text-sm ios-input"
                           />
                         </div>
                       </div>
@@ -755,7 +760,7 @@ export default function PaginaSaldo() {
                         <Button
                           variant="outline"
                           onClick={() => setAdminModalOpen(false)}
-                          className="bg-transparent border-zinc-600 text-sm flex-1"
+                          className="bg-transparent border-zinc-600 text-xs sm:text-sm flex-1 ios-button"
                         >
                           Cancelar
                         </Button>
@@ -763,7 +768,7 @@ export default function PaginaSaldo() {
                           onClick={handleAdminTransaction}
                           disabled={processing}
                           className={cn(
-                            "flex-1 text-sm",
+                            "flex-1 text-xs sm:text-sm ios-button",
                             transactionType === 'add' 
                               ? "bg-emerald-600 hover:bg-emerald-700" 
                               : "bg-red-600 hover:bg-red-700"
@@ -779,119 +784,119 @@ export default function PaginaSaldo() {
             </div>
 
             {team ? (
-              <div className="space-y-6 lg:space-y-8">
+              <div className="space-y-4 sm:space-y-6 lg:space-y-8">
                 {/* Cards de Resumo */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                   {/* Saldo Atual */}
-                  <Card className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/30 p-4 lg:p-6">
+                  <Card className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/30 p-3 sm:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-zinc-400 text-xs lg:text-sm">Saldo Atual</p>
-                        <p className="text-xl lg:text-3xl font-bold text-white mt-1 lg:mt-2">
+                        <p className="text-zinc-400 text-xs">Saldo Atual</p>
+                        <p className="text-lg sm:text-xl lg:text-3xl font-bold text-white mt-1">
                           {formatBalance(team.balance)}
                         </p>
                       </div>
-                      <div className="p-2 lg:p-3 bg-purple-500/20 rounded-full">
-                        <DollarSign className="w-6 h-6 lg:w-8 lg:h-8 text-purple-400" />
+                      <div className="p-2 sm:p-3 bg-purple-500/20 rounded-full">
+                        <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-purple-400" />
                       </div>
                     </div>
                   </Card>
 
                   {/* Entradas */}
-                  <Card className="bg-gradient-to-br from-emerald-600/20 to-green-600/20 border-emerald-500/30 p-4 lg:p-6">
+                  <Card className="bg-gradient-to-br from-emerald-600/20 to-green-600/20 border-emerald-500/30 p-3 sm:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-zinc-400 text-xs lg:text-sm">Total de Entradas</p>
-                        <p className="text-xl lg:text-3xl font-bold text-white mt-1 lg:mt-2">
+                        <p className="text-zinc-400 text-xs">Total de Entradas</p>
+                        <p className="text-lg sm:text-xl lg:text-3xl font-bold text-white mt-1">
                           {formatBalance(totalCredits)}
                         </p>
                       </div>
-                      <div className="p-2 lg:p-3 bg-emerald-500/20 rounded-full">
-                        <TrendingUp className="w-6 h-6 lg:w-8 lg:h-8 text-emerald-400" />
+                      <div className="p-2 sm:p-3 bg-emerald-500/20 rounded-full">
+                        <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-emerald-400" />
                       </div>
                     </div>
                   </Card>
 
                   {/* Saídas */}
-                  <Card className="bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/30 p-4 lg:p-6">
+                  <Card className="bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/30 p-3 sm:p-4 lg:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-zinc-400 text-xs lg:text-sm">Total de Saídas</p>
-                        <p className="text-xl lg:text-3xl font-bold text-white mt-1 lg:mt-2">
+                        <p className="text-zinc-400 text-xs">Total de Saídas</p>
+                        <p className="text-lg sm:text-xl lg:text-3xl font-bold text-white mt-1">
                           {formatBalance(totalDebits)}
                         </p>
                       </div>
-                      <div className="p-2 lg:p-3 bg-red-500/20 rounded-full">
-                        <TrendingDown className="w-6 h-6 lg:w-8 lg:h-8 text-red-400" />
+                      <div className="p-2 sm:p-3 bg-red-500/20 rounded-full">
+                        <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-red-400" />
                       </div>
                     </div>
                   </Card>
                 </div>
 
                 {/* Histórico de Transações */}
-                <Card className="bg-white/5 border-white/10 p-4 lg:p-6">
-                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-4 mb-4 lg:mb-6">
+                <Card className="bg-white/5 border-white/10 p-3 sm:p-4 lg:p-6">
+                  <div className="flex flex-col justify-between items-start gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-6">
                     <div>
-                      <h2 className="text-xl lg:text-2xl font-bold text-white">Histórico de Transações</h2>
-                      <p className="text-zinc-400 text-sm">Todas as movimentações do seu clube</p>
+                      <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">Histórico de Transações</h2>
+                      <p className="text-zinc-400 text-xs sm:text-sm">Todas as movimentações do seu clube</p>
                     </div>
 
-                    <div className="flex gap-1 lg:gap-2">
+                    <div className="flex flex-wrap gap-1 sm:gap-2 w-full sm:w-auto">
                       <Button
                         variant={filter === 'all' ? 'default' : 'outline'}
                         onClick={() => setFilter('all')}
                         className={cn(
-                          "text-xs lg:text-sm h-8 lg:h-9",
+                          "text-xs h-7 sm:h-8 sm:h-9 px-2 sm:px-3 flex-1 sm:flex-none ios-button",
                           filter === 'all' ? "bg-purple-600" : "bg-zinc-800/50 border-zinc-600"
                         )}
                       >
-                        <Filter className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                        Todas
+                        <Filter className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                        <span className="hidden xs:inline">Todas</span>
                       </Button>
                       <Button
                         variant={filter === 'credit' ? 'default' : 'outline'}
                         onClick={() => setFilter('credit')}
                         className={cn(
-                          "text-xs lg:text-sm h-8 lg:h-9",
+                          "text-xs h-7 sm:h-8 sm:h-9 px-2 sm:px-3 flex-1 sm:flex-none ios-button",
                           filter === 'credit' ? "bg-emerald-600" : "bg-zinc-800/50 border-zinc-600"
                         )}
                       >
-                        <TrendingUp className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                        Entradas
+                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                        <span className="hidden xs:inline">Entradas</span>
                       </Button>
                       <Button
                         variant={filter === 'debit' ? 'default' : 'outline'}
                         onClick={() => setFilter('debit')}
                         className={cn(
-                          "text-xs lg:text-sm h-8 lg:h-9",
+                          "text-xs h-7 sm:h-8 sm:h-9 px-2 sm:px-3 flex-1 sm:flex-none ios-button",
                           filter === 'debit' ? "bg-red-600" : "bg-zinc-800/50 border-zinc-600"
                         )}
                       >
-                        <TrendingDown className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                        Saídas
+                        <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                        <span className="hidden xs:inline">Saídas</span>
                       </Button>
                       <Button
                         variant={filter === 'exchange' ? 'default' : 'outline'}
                         onClick={() => setFilter('exchange')}
                         className={cn(
-                          "text-xs lg:text-sm h-8 lg:h-9",
+                          "text-xs h-7 sm:h-8 sm:h-9 px-2 sm:px-3 flex-1 sm:flex-none ios-button",
                           filter === 'exchange' ? "bg-blue-600" : "bg-zinc-800/50 border-zinc-600"
                         )}
                       >
-                        <ArrowRightLeft className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
-                        Trocas
+                        <ArrowRightLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                        <span className="hidden xs:inline">Trocas</span>
                       </Button>
                     </div>
                   </div>
 
                   {filteredTransactions.length === 0 ? (
-                    <div className="text-center py-8 lg:py-12">
-                      <DollarSign className="w-12 h-12 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-3 lg:mb-4" />
-                      <p className="text-zinc-400 text-base lg:text-lg">Nenhuma transação encontrada</p>
-                      <p className="text-zinc-500 text-sm">Suas movimentações aparecerão aqui</p>
+                    <div className="text-center py-6 sm:py-8 lg:py-12">
+                      <DollarSign className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-2 sm:mb-3 lg:mb-4" />
+                      <p className="text-zinc-400 text-sm sm:text-base lg:text-lg">Nenhuma transação encontrada</p>
+                      <p className="text-zinc-500 text-xs sm:text-sm">Suas movimentações aparecerão aqui</p>
                     </div>
                   ) : (
-                    <div className="space-y-2 lg:space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {filteredTransactions.map((transaction) => {
                         const colors = getTransactionColor(transaction)
                         const IconComponent = colors.iconComponent
@@ -899,43 +904,43 @@ export default function PaginaSaldo() {
                         return (
                           <div
                             key={transaction.id}
-                            className="flex items-center justify-between p-3 lg:p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors"
+                            className="flex items-center justify-between p-3 sm:p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors"
                           >
-                            <div className="flex items-center gap-3 lg:gap-4">
-                              <div className={cn("p-2 lg:p-3 rounded-full", colors.bg)}>
-                                <IconComponent className="w-4 h-4 lg:w-6 lg:h-6" />
+                            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 flex-1 min-w-0">
+                              <div className={cn("p-2 sm:p-3 rounded-full flex-shrink-0", colors.bg)}>
+                                <IconComponent className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6" />
                               </div>
 
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-semibold text-white text-sm lg:text-base truncate">
+                                <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                                  <p className="font-semibold text-white text-xs sm:text-sm lg:text-base truncate">
                                     {transaction.description}
                                   </p>
                                   {transaction.is_exchange && (
-                                    <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-300 border-blue-500/50">
+                                    <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-500/20 text-blue-300 border-blue-500/50 flex-shrink-0">
                                       {transaction.exchange_only ? 'Troca Jogador' : 'Troca'}
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="flex flex-col lg:flex-row lg:items-center gap-1 lg:gap-4 mt-1 text-xs lg:text-sm text-zinc-400">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 lg:gap-4 mt-1 text-[10px] sm:text-xs lg:text-sm text-zinc-400">
                                   <div className="flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
+                                    <Calendar className="w-2 h-2 sm:w-3 sm:h-3" />
                                     {formatDate(transaction.created_at)}
                                   </div>
                                   {transaction.player_name && (
                                     <div className="flex items-center gap-1">
-                                      <User className="w-3 h-3" />
+                                      <User className="w-2 h-2 sm:w-3 sm:h-3" />
                                       <span className="truncate">{transaction.player_name}</span>
                                     </div>
                                   )}
                                   {transaction.related_team && (
                                     <div className="flex items-center gap-1">
-                                      <Building2 className="w-3 h-3" />
+                                      <Building2 className="w-2 h-2 sm:w-3 sm:h-3" />
                                       <span className="truncate">{transaction.related_team}</span>
                                     </div>
                                   )}
                                   {transaction.exchange_value && transaction.exchange_value > 0 && (
-                                    <Badge variant="outline" className="text-xs bg-purple-500/20 text-purple-300 border-purple-500/50">
+                                    <Badge variant="outline" className="text-[10px] sm:text-xs bg-purple-500/20 text-purple-300 border-purple-500/50">
                                       Valor troca: {formatBalance(transaction.exchange_value)}
                                     </Badge>
                                   )}
@@ -946,21 +951,21 @@ export default function PaginaSaldo() {
                             <div className="text-right flex-shrink-0 ml-2">
                               {transaction.type === 'exchange_trade' ? (
                                 <div>
-                                  <p className={cn("text-base lg:text-xl font-bold", colors.text)}>
+                                  <p className={cn("text-sm sm:text-base lg:text-xl font-bold", colors.text)}>
                                     {formatBalance(transaction.amount)}
                                   </p>
-                                  <p className="text-xs text-zinc-400">Valor do jogador</p>
+                                  <p className="text-[10px] sm:text-xs text-zinc-400">Valor jogador</p>
                                 </div>
                               ) : (
                                 <div>
-                                  <p className={cn("text-base lg:text-xl font-bold", colors.text)}>
+                                  <p className={cn("text-sm sm:text-base lg:text-xl font-bold", colors.text)}>
                                     {transaction.type === 'credit' ? '+' : '-'} {formatBalance(transaction.amount)}
                                   </p>
                                 </div>
                               )}
                               <Badge 
                                 variant="secondary" 
-                                className={cn("mt-1 text-xs", colors.badge)}
+                                className={cn("mt-1 text-[10px] sm:text-xs", colors.badge)}
                               >
                                 {getBadgeText(transaction)}
                               </Badge>
@@ -973,10 +978,10 @@ export default function PaginaSaldo() {
                 </Card>
               </div>
             ) : (
-              <Card className="p-8 lg:p-16 text-center bg-white/5 border-white/10">
-                <Building2 className="w-12 h-12 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-3 lg:mb-4" />
-                <h3 className="text-xl lg:text-2xl font-bold text-white mb-2">Nenhum clube associado</h3>
-                <p className="text-zinc-400 text-sm lg:text-base">
+              <Card className="p-6 sm:p-8 lg:p-16 text-center bg-white/5 border-white/10">
+                <Building2 className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-2 sm:mb-3 lg:mb-4" />
+                <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-white mb-2">Nenhum clube associado</h3>
+                <p className="text-zinc-400 text-xs sm:text-sm lg:text-base">
                   Você precisa estar associado a um clube para visualizar o saldo.
                 </p>
               </Card>

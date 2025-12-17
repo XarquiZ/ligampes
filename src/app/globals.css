@@ -231,6 +231,96 @@ div:focus {
   transition: all 0.3s ease-in-out;
 }
 
+/* ===== FIX PARA iOS/iPHONE ===== */
+
+/* Solução para zoom automático no iOS */
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select, [contenteditable="true"] {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+  }
+  
+  /* Para elementos com input type diferente */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="search"] {
+    font-size: 16px !important;
+  }
+}
+
+/* Previne ajuste automático de texto no iOS */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+/* Otimizações de toque para mobile */
+* {
+  touch-action: manipulation;
+}
+
+/* Previne pull-to-refresh e overscroll */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  position: fixed; /* Fix para evitar scroll indesejado no iOS */
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Container principal para scroll */
+.ios-safe-area {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+
+/* Fix para notch do iPhone */
+@supports (padding: max(0px)) {
+  .ios-safe-area {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Classes específicas para botões no iOS */
+.ios-button {
+  min-height: 44px; /* Tamanho mínimo recomendado para toque no iOS */
+  min-width: 44px;
+}
+
+/* Remove estilos padrão do iOS para inputs */
+input, textarea {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: 0; /* Remove bordas arredondadas padrão do iOS */
+}
+
+/* Fix para modal e diálogos no iOS */
+.dialog-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+}
+
+/* Garante que modais respeitem safe area */
+.dialog-content-ios {
+  max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
 /* Adicione estas cores personalizadas */
 :root {
   /* Tons suaves e delicados */
@@ -272,4 +362,46 @@ div:focus {
 /* Gradientes suaves */
 .bg-gradient-soft {
   background: linear-gradient(135deg, #ffffff 0%, #f8f9ff 100%);
+}
+
+/* Utilitários para mobile */
+.mobile-only {
+  @apply block sm:hidden;
+}
+
+.desktop-only {
+  @apply hidden sm:block;
+}
+
+/* Texto responsivo */
+.text-responsive {
+  font-size: clamp(14px, 4vw, 16px);
+}
+
+.heading-responsive {
+  font-size: clamp(20px, 6vw, 32px);
+}
+
+/* Padding responsivo */
+.p-responsive {
+  padding: clamp(12px, 3vw, 24px);
+}
+
+/* Container responsivo */
+.container-responsive {
+  width: 100%;
+  max-width: 100%;
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+}
+
+/* Fix para flexbox no mobile */
+.flex-mobile {
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .flex-mobile {
+    flex-direction: row;
+  }
 }
