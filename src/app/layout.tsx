@@ -1,4 +1,4 @@
-// src/app/layout.tsx - VERSÃO FINAL CORRIGIDA COM RESPONSIVIDADE
+// src/app/layout.tsx - VERSÃO FINAL CORRIGIDA
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -39,14 +39,9 @@ export const metadata: Metadata = {
   manifest: "/manifest.json", // Se você tiver um manifest
 };
 
-// CONFIGURAÇÃO ESPECÍFICA PARA MOBILE
+// CONFIGURAÇÃO PARA PWA (opcional mas recomendado)
 export const viewport: Viewport = {
   themeColor: "#000000",
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -55,29 +50,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR" className="overflow-x-hidden">
+    <html lang="pt-BR">
       <head>
         {/* Meta tags específicas para iOS */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="LIGA MPES" />
         
-        {/* Meta tags para prevenir zoom no iOS */}
-        <meta name="format-detection" content="telephone=no" />
-        <meta name="format-detection" content="date=no" />
-        <meta name="format-detection" content="address=no" />
-        <meta name="format-detection" content="email=no" />
-        
         {/* Meta tag para Android */}
         <meta name="theme-color" content="#000000" />
         
         {/* Link tags manuais (opcional, já coberto pelo metadata) */}
         <link rel="manifest" href="/manifest.json" />
-        
-        {/* Viewport tag para compatibilidade */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
       </head>
-      <body className={inter.className + " bg-zinc-950 text-white min-h-screen ios-fix"}>
+      <body className={inter.className + " bg-zinc-950 text-white min-h-screen"}>
         <Providers>
           <Suspense fallback={
             <div className="flex min-h-screen items-center justify-center bg-zinc-950">
@@ -86,9 +72,7 @@ export default function RootLayout({
               </div>
             </div>
           }>
-            <div className="ios-safe-area">
-              {children}
-            </div>
+            {children}
           </Suspense>
         </Providers>
       </body>

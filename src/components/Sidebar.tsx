@@ -17,12 +17,14 @@ import {
   Menu,
   X,
   ChevronLeft,
+  ChevronRight as ChevronRightIcon,
   Trophy
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
+import { cn } from '@/lib/utils'
 
 interface SidebarProps {
   user: {
@@ -92,19 +94,17 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
-  const [isCollapsed, setIsCollapsed] = useState<boolean | null>(null) // Inicia como null
+  const [isCollapsed, setIsCollapsed] = useState<boolean | null>(null)
 
   // Efeito para carregar o estado salvo do localStorage
   useEffect(() => {
-    // Verificar se estamos no cliente
     if (typeof window !== 'undefined') {
       const savedState = localStorage.getItem('sidebar-collapsed')
       if (savedState !== null) {
-        // Carrega o estado salvo
         setIsCollapsed(JSON.parse(savedState))
       } else {
-        // Se não houver estado salvo, inicia como true (fechado)
-        setIsCollapsed(true)
+        // Padrão: expandido em desktop, colapsado em mobile
+        setIsCollapsed(window.innerWidth < 1024 ? true : false)
       }
     }
   }, [])
@@ -113,9 +113,30 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
   useEffect(() => {
     if (isCollapsed !== null && typeof window !== 'undefined') {
       localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed))
-      console.log('Sidebar state saved:', isCollapsed) // Para debug
     }
   }, [isCollapsed])
+
+  // Ajustar estado baseado no tamanho da tela
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        // Em mobile, sempre começa colapsado
+        if (!isMobileOpen) {
+          setIsCollapsed(true)
+        }
+      } else {
+        // Em desktop, mantém o estado salvo
+        const savedState = localStorage.getItem('sidebar-collapsed')
+        if (savedState !== null) {
+          setIsCollapsed(JSON.parse(savedState))
+        }
+      }
+    }
+
+    handleResize() // Executar no mount
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [isMobileOpen])
 
   const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
@@ -130,31 +151,33 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
 
   const toggleMobileMenu = () => {
     setIsMobileOpen(!isMobileOpen)
+    // Quando abrir menu mobile, expande o sidebar
+    if (!isMobileOpen && window.innerWidth < 1024) {
+      setIsCollapsed(false)
+    }
   }
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed)
+    // No mobile, quando colapsar, fecha o menu
+    if (window.innerWidth < 1024) {
+      setIsMobileOpen(false)
+    }
   }
 
   const handleLogoClick = () => {
     router.push('/dashboard')
-    setIsMobileOpen(false)
+    if (window.innerWidth < 1024) {
+      setIsMobileOpen(false)
+    }
   }
 
   // Mostra loading enquanto carrega o estado
   if (isCollapsed === null) {
     return (
       <>
-        {/* Mobile Menu Button */}
-        <button
-          onClick={toggleMobileMenu}
-          className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-zinc-800 rounded-lg text-white"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
-        
         {/* Sidebar skeleton */}
-        <div className="fixed lg:sticky top-0 left-0 h-screen bg-zinc-900 border-r border-white/10 w-16 z-40 animate-pulse" />
+        <div className="fixed top-0 left-0 h-screen bg-zinc-900 border-r border-white/10 w-16 z-40 animate-pulse" />
       </>
     )
   }
@@ -164,45 +187,70 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
       {/* Mobile Menu Button */}
       <button
         onClick={toggleMobileMenu}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-zinc-800 rounded-lg text-white"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-zinc-800/90 backdrop-blur-sm rounded-lg border border-zinc-700 text-white safe-top safe-left"
+        aria-label={isMobileOpen ? "Fechar menu" : "Abrir menu"}
       >
-        {isMobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        {isMobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
       {/* Overlay para mobile */}
       {isMobileOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black/50 z-30"
-          onClick={() => setIsMobileOpen(false)}
+          className="lg:hidden fixed inset-0 bg-black/60 z-30"
+          onClick={() => {
+            setIsMobileOpen(false)
+            if (window.innerWidth < 1024) {
+              setIsCollapsed(true)
+            }
+          }}
         />
       )}
 
-      {/* Sidebar */}
-      <div className={`
-        fixed lg:sticky top-0 left-0 h-screen bg-zinc-900 border-r border-white/10 
-        transform transition-all duration-300 ease-in-out z-40
-        ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        ${isCollapsed ? 'w-16' : 'w-64'}
-      `}>
-        <div className="flex flex-col h-full">
+      {/* Sidebar - SEMPRE FIXO À ESQUERDA */}
+      <div 
+        className={cn(
+          "fixed top-0 left-0 h-screen bg-zinc-900 border-r border-white/10 z-40",
+          "transform transition-all duration-300 ease-in-out",
+          // Estado mobile
+          isMobileOpen ? "translate-x-0" : "-translate-x-full",
+          // Estado desktop - sempre visível
+          "lg:translate-x-0",
+          // Largura baseada no estado
+          isCollapsed ? "w-16" : "w-64"
+        )}
+        style={{
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          height: '100dvh'
+        }}
+      >
+        <div className="flex flex-col h-full relative">
           {/* Header */}
-          <div className="p-3 border-b border-white/10 relative">
+          <div className="p-3 border-b border-white/10">
             <div 
-              className={`flex items-center gap-3 mb-3 cursor-pointer ${
-                isCollapsed ? 'justify-center' : ''
-              }`}
+              className={cn(
+                "flex items-center gap-3 mb-3 cursor-pointer",
+                isCollapsed ? "justify-center" : ""
+              )}
               onClick={handleLogoClick}
             >
               {team?.logo_url ? (
-                <Image 
-                  src={team.logo_url} 
-                  alt={team.name} 
-                  width={isCollapsed ? 32 : 48} 
-                  height={isCollapsed ? 32 : 48} 
-                  className="rounded-full border-2 border-purple-500 object-cover hover:border-purple-400 transition-colors" 
-                />
+                <div className={cn(
+                  "relative rounded-full border-2 border-purple-500 overflow-hidden hover:border-purple-400 transition-colors",
+                  isCollapsed ? "w-8 h-8" : "w-12 h-12"
+                )}>
+                  <Image 
+                    src={team.logo_url} 
+                    alt={team.name} 
+                    fill
+                    className="object-cover" 
+                    sizes={isCollapsed ? "32px" : "48px"}
+                  />
+                </div>
               ) : (
-                <Avatar className={`${isCollapsed ? 'h-8 w-8' : 'h-12 w-12'} cursor-pointer`}>
+                <Avatar className={cn(
+                  "cursor-pointer border-2 border-purple-500 hover:border-purple-400 transition-colors",
+                  isCollapsed ? "h-8 w-8" : "h-12 w-12"
+                )}>
                   <AvatarFallback className="bg-gradient-to-br from-purple-600 to-pink-600 font-bold hover:from-purple-500 hover:to-pink-500 transition-colors">
                     {displayName[0].toUpperCase()}
                   </AvatarFallback>
@@ -223,24 +271,48 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
             </div>
 
             {!isCollapsed && (
-              <h1 className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-xl font-black text-transparent cursor-pointer" onClick={handleLogoClick}>
+              <h1 
+                className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-xl font-black text-transparent cursor-pointer hover:opacity-90 transition-opacity" 
+                onClick={handleLogoClick}
+              >
                 LIGA MPES
               </h1>
             )}
-
-            {/* Toggle Button */}
-            <button
-              onClick={toggleCollapse}
-              className={`absolute -right-3 top-6 bg-zinc-800 border border-white/10 rounded-full p-1 text-white hover:bg-zinc-700 transition-colors ${
-                isCollapsed ? 'rotate-180' : ''
-              }`}
-            >
-              <ChevronLeft className="h-3 w-3" />
-            </button>
           </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 p-2 space-y-1">
+          {/* Botão de expansão/colapsar - MOLDURA MENOR, SETA MESMO TAMANHO */}
+          <button
+            onClick={toggleCollapse}
+            className={cn(
+              "absolute z-50",
+              "bg-zinc-800/90 border border-white/10 rounded-full",
+              "text-white hover:bg-zinc-700/90 hover:border-zinc-500",
+              "transition-all duration-200",
+              "shadow-md hover:shadow-lg",
+              "flex items-center justify-center",
+              // Posicionamento
+              "top-10",
+              "right-0 translate-x-1/2",
+              // Tamanho da MOLDURA menor (era w-6 h-6, agora w-5 h-5)
+              "w-5 h-5",
+              // Padding interno para a seta
+              "p-0.5",
+              // Esconde em mobile quando sidebar fechado
+              isMobileOpen ? "opacity-100" : "lg:opacity-100 opacity-0",
+              // Garante que fique acima de tudo
+              "z-[60]"
+            )}
+            aria-label={isCollapsed ? "Expandir sidebar" : "Colapsar sidebar"}
+          >
+            {isCollapsed ? (
+              <ChevronRightIcon className="h-4 w-4 transition-transform duration-300" />
+            ) : (
+              <ChevronLeft className="h-4 w-4 transition-transform duration-300" />
+            )}
+          </button>
+
+          {/* Navigation com um pouco mais de espaço no topo */}
+          <nav className="flex-1 p-2 pt-3 space-y-1 overflow-y-auto">
             {navigationItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href || 
@@ -250,25 +322,37 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  onClick={() => setIsMobileOpen(false)}
-                  className={`
-                    flex items-center rounded-lg transition-all duration-200 group
-                    ${isActive 
-                      ? 'bg-white/10 text-white shadow-md' 
-                      : 'text-zinc-400 hover:bg-white/5 hover:text-white'
+                  onClick={() => {
+                    if (window.innerWidth < 1024) {
+                      setIsMobileOpen(false)
+                      setIsCollapsed(true)
                     }
-                    ${isCollapsed ? 'justify-center p-2' : 'p-3 gap-3'}
-                  `}
+                  }}
+                  className={cn(
+                    "flex items-center rounded-lg transition-all duration-200 group",
+                    "hover:bg-white/5 hover:text-white",
+                    isActive 
+                      ? 'bg-white/10 text-white shadow-md' 
+                      : 'text-zinc-400',
+                    isCollapsed ? 'justify-center p-2' : 'p-3 gap-3'
+                  )}
                   title={isCollapsed ? item.name : ''}
                 >
-                  <Icon className={`${isCollapsed ? 'h-5 w-5' : 'h-5 w-5'} ${item.color}`} />
+                  <Icon className={cn(
+                    "flex-shrink-0",
+                    isCollapsed ? 'h-5 w-5' : 'h-5 w-5',
+                    item.color
+                  )} />
                   
                   {!isCollapsed && (
                     <>
-                      <span className="font-medium text-sm flex-1">{item.name}</span>
-                      <ChevronRight className={`h-3 w-3 transition-transform duration-200 ${
-                        isActive ? 'translate-x-0 opacity-100' : 'translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
-                      }`} />
+                      <span className="font-medium text-sm flex-1 truncate">{item.name}</span>
+                      <ChevronRight className={cn(
+                        "h-3 w-3 flex-shrink-0 transition-transform duration-200",
+                        isActive 
+                          ? 'translate-x-0 opacity-100' 
+                          : 'translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
+                      )} />
                     </>
                   )}
                 </Link>
@@ -281,25 +365,27 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
             <Button
               onClick={handleSignOut}
               variant="ghost"
-              className={`w-full text-red-400 hover:text-red-300 hover:bg-red-400/10 ${
-                isCollapsed ? 'justify-center p-2' : 'justify-start p-3'
-              }`}
+              className={cn(
+                "w-full text-red-400 hover:text-red-300 hover:bg-red-400/10",
+                "transition-colors duration-200",
+                isCollapsed ? 'justify-center p-2' : 'justify-start p-3 gap-2'
+              )}
               title={isCollapsed ? 'Sair' : ''}
             >
-              <LogOut className="h-4 w-4" />
-              {!isCollapsed && <span className="ml-2 text-sm">Sair</span>}
+              <LogOut className="h-4 w-4 flex-shrink-0" />
+              {!isCollapsed && <span className="text-sm truncate">Sair</span>}
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Collapsed Sidebar Overlay para acionar expand */}
-      {isCollapsed && (
-        <div 
-          className="hidden lg:block fixed left-0 top-0 h-screen w-16 z-30 cursor-pointer"
-          onClick={() => setIsCollapsed(false)}
-        />
-      )}
+      {/* Spacer para conteúdo principal */}
+      <div 
+        className={cn(
+          "hidden lg:block transition-all duration-300",
+          isCollapsed ? "w-16" : "w-64"
+        )}
+      />
     </>
   )
 }

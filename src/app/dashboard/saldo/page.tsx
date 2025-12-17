@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter, RefreshCw, ArrowRightLeft, Users } from 'lucide-react'
+import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter, RefreshCw, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -35,7 +35,7 @@ interface BalanceTransaction {
   related_team?: string
   exchange_value?: number
   is_exchange?: boolean
-  exchange_only?: boolean // Nova propriedade para trocas sem dinheiro
+  exchange_only?: boolean
 }
 
 // Função de formatar valor
@@ -57,12 +57,11 @@ function formatDate(dateString: string) {
   })
 }
 
-// Função para buscar apenas as trocas sem dinheiro (jogador por jogador)
+// Função para buscar apenas as trocas sem dinheiro
 const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]> => {
   try {
     console.log('🔄 Buscando trocas sem dinheiro para o time:', teamId)
     
-    // Buscar transferências de troca onde não há dinheiro envolvido
     const { data: exchangeTransfers, error } = await supabase
       .from('player_transfers')
       .select('*')
@@ -85,12 +84,11 @@ const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]>
       const isBuyer = transfer.to_team_id === teamId
       const isSeller = transfer.from_team_id === teamId
       
-      // Para o vendedor - perde o jogador
       if (isSeller) {
         pureExchanges.push({
           id: `${transfer.id}_sell`,
           team_id: teamId,
-          amount: transfer.value, // Valor do jogador (só para referência)
+          amount: transfer.value,
           type: 'exchange_trade',
           description: `Troca: ${transfer.player_name} saiu`,
           created_at: transfer.created_at,
@@ -99,16 +97,15 @@ const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]>
           related_team: transfer.to_team_id || undefined,
           exchange_value: 0,
           is_exchange: true,
-          exchange_only: true // Marca como troca sem dinheiro
+          exchange_only: true
         })
       }
       
-      // Para o comprador - ganha o jogador
       if (isBuyer) {
         pureExchanges.push({
           id: `${transfer.id}_buy`,
           team_id: teamId,
-          amount: transfer.value, // Valor do jogador (só para referência)
+          amount: transfer.value,
           type: 'exchange_trade',
           description: `Troca: ${transfer.player_name} chegou`,
           created_at: transfer.created_at,
@@ -117,7 +114,7 @@ const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]>
           related_team: transfer.from_team_id || undefined,
           exchange_value: 0,
           is_exchange: true,
-          exchange_only: true // Marca como troca sem dinheiro
+          exchange_only: true
         })
       }
     })
@@ -214,7 +211,6 @@ export default function PaginaSaldo() {
 
     loadUnreadCount()
 
-    // Subscription para atualizar em tempo real
     const subscription = supabase
       .channel('unread_messages')
       .on(
@@ -252,7 +248,6 @@ export default function PaginaSaldo() {
     }
 
     try {
-      // 1. Verificar se é admin
       const { data: profile } = await supabase
         .from('profiles')
         .select('team_id, role')
@@ -261,7 +256,6 @@ export default function PaginaSaldo() {
 
       setIsAdmin(profile?.role === 'admin')
 
-      // 2. Carregar dados do time do usuário
       if (profile?.team_id) {
         const { data: teamData, error: teamError } = await supabase
           .from('teams')
@@ -273,7 +267,6 @@ export default function PaginaSaldo() {
         console.log('✅ Time carregado:', teamData)
         setTeam(teamData)
 
-        // 3. Carregar transações do time da tabela balance_transactions
         const { data: transactionsData, error: transactionsError } = await supabase
           .from('balance_transactions')
           .select('*')
@@ -283,13 +276,11 @@ export default function PaginaSaldo() {
 
         if (transactionsError) throw transactionsError
 
-        // 4. Carregar apenas trocas sem dinheiro (jogador por jogador)
         const pureExchanges = await fetchPureExchanges(profile.team_id)
 
-        // 5. Combinar todas as transações
         const allTransactions = [
           ...(transactionsData || []),
-          ...pureExchanges // Adiciona apenas trocas sem dinheiro
+          ...pureExchanges
         ].sort((a, b) => 
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
@@ -300,7 +291,6 @@ export default function PaginaSaldo() {
         setTransactions(allTransactions)
       }
 
-      // 6. Carregar todos os times (para admin)
       if (profile?.role === 'admin') {
         const { data: teamsData, error: teamsError } = await supabase
           .from('teams')
@@ -318,12 +308,10 @@ export default function PaginaSaldo() {
     }
   }
 
-  // Função para atualizar apenas os dados do time específico
   const refreshTeamData = async (teamId: string) => {
     try {
       console.log('🔄 Atualizando dados do time:', teamId)
       
-      // Buscar dados atualizados do time
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .select('id, name, logo_url, balance')
@@ -335,7 +323,6 @@ export default function PaginaSaldo() {
       console.log('✅ Time atualizado:', teamData)
       setTeam(teamData)
 
-      // Buscar transações atualizadas
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('balance_transactions')
         .select('*')
@@ -345,10 +332,8 @@ export default function PaginaSaldo() {
 
       if (transactionsError) throw transactionsError
 
-      // Buscar trocas sem dinheiro atualizadas
       const pureExchanges = await fetchPureExchanges(teamId)
 
-      // Combinar todas as transações
       const allTransactions = [
         ...(transactionsData || []),
         ...pureExchanges
@@ -363,7 +348,6 @@ export default function PaginaSaldo() {
     }
   }
 
-  // Função para adicionar/remover saldo (admin) - CORRIGIDA
   const handleAdminTransaction = async () => {
     if (!selectedTeam || !transactionAmount || !transactionDescription) {
       alert('Preencha todos os campos')
@@ -387,7 +371,6 @@ export default function PaginaSaldo() {
       console.log('Valor final:', finalAmount)
       console.log('Tipo:', transactionTypeText)
 
-      // 1. Buscar saldo atual do time
       const { data: currentTeam, error: fetchError } = await supabase
         .from('teams')
         .select('balance, name')
@@ -401,7 +384,6 @@ export default function PaginaSaldo() {
 
       console.log('💰 Saldo atual:', currentTeam.balance)
 
-      // 2. Calcular novo saldo
       const newBalance = currentTeam.balance + finalAmount
 
       if (newBalance < 0) {
@@ -411,7 +393,6 @@ export default function PaginaSaldo() {
 
       console.log('💰 Novo saldo calculado:', newBalance)
 
-      // 3. Atualizar saldo do time na tabela teams
       const { error: balanceError } = await supabase
         .from('teams')
         .update({ 
@@ -426,12 +407,11 @@ export default function PaginaSaldo() {
 
       console.log('✅ Saldo atualizado na tabela teams')
 
-      // 4. Registrar transação
       const { data: transactionData, error: transactionError } = await supabase
         .from('balance_transactions')
         .insert([{
           team_id: selectedTeam,
-          amount: amount, // Sempre valor absoluto
+          amount: amount,
           type: transactionTypeText,
           description: transactionDescription,
           created_at: new Date().toISOString()
@@ -450,7 +430,6 @@ export default function PaginaSaldo() {
 
       console.log('✅ Transação registrada:', transactionData)
 
-      // 5. VERIFICAR SE É O TIME DO USUÁRIO ANTES DE ATUALIZAR O ESTADO
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         const { data: userProfile } = await supabase
@@ -460,7 +439,6 @@ export default function PaginaSaldo() {
           .single()
 
         if (userProfile) {
-          // ATUALIZAR ESTADO LOCAL APENAS SE FOR O PRÓPRIO TIME DO USUÁRIO
           if (userProfile.team_id === selectedTeam) {
             console.log('🔄 Atualizando estado do próprio time')
             setTeam(prev => prev ? { ...prev, balance: newBalance } : null)
@@ -470,7 +448,6 @@ export default function PaginaSaldo() {
             }
           } else {
             console.log('ℹ️ Transação foi para outro time, mantendo estado atual')
-            // Se foi para outro time, garante que os dados atuais estão sincronizados
             if (team) {
               await refreshTeamData(team.id)
             }
@@ -478,7 +455,6 @@ export default function PaginaSaldo() {
         }
       }
 
-      // 6. Atualizar a lista de todos os times (para admin) - apenas visual do modal
       if (isAdmin) {
         setAllTeams(prev => 
           prev.map(t => 
@@ -489,10 +465,8 @@ export default function PaginaSaldo() {
         )
       }
 
-      // Sucesso
       alert(`✅ Saldo ${transactionType === 'add' ? 'adicionado' : 'removido'} com sucesso!`)
       
-      // Fechar modal e resetar form
       setAdminModalOpen(false)
       resetAdminForm()
 
@@ -511,7 +485,6 @@ export default function PaginaSaldo() {
     setTransactionType('add')
   }
 
-  // Formatar valor monetário
   const formatCurrency = (value: string) => {
     const onlyNumbers = value.replace(/\D/g, '')
     if (onlyNumbers === '') return ''
@@ -528,7 +501,6 @@ export default function PaginaSaldo() {
     setTransactionAmount(formattedValue)
   }
 
-  // Função para obter cor baseada no tipo de transação
   const getTransactionColor = (transaction: BalanceTransaction) => {
     if (transaction.type === 'exchange_trade') {
       return {
@@ -546,7 +518,7 @@ export default function PaginaSaldo() {
         badge: 'bg-emerald-500/20 text-emerald-400',
         iconComponent: ArrowUpRight
       }
-    } else { // debit
+    } else {
       return {
         bg: 'bg-red-500/20',
         icon: 'text-red-400',
@@ -557,7 +529,6 @@ export default function PaginaSaldo() {
     }
   }
 
-  // Função para obter texto do badge
   const getBadgeText = (transaction: BalanceTransaction) => {
     if (transaction.type === 'exchange_trade') {
       return 'Troca'
@@ -568,7 +539,6 @@ export default function PaginaSaldo() {
     }
   }
 
-  // Calcular totais
   const totalCredits = transactions
     .filter(t => t.type === 'credit')
     .reduce((sum, t) => sum + t.amount, 0)
@@ -583,7 +553,6 @@ export default function PaginaSaldo() {
     ? transactions.filter(t => t.type === 'exchange_trade')
     : transactions.filter(t => t.type === filter)
 
-  // Criar objetos compatíveis com os componentes de chat
   const chatUser = {
     id: user?.id || '',
     name: profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico',
@@ -597,8 +566,8 @@ export default function PaginaSaldo() {
 
   if (authLoading || dataLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 ios-safe-area">
-        <div className="text-2xl font-semibold text-white animate-pulse">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <div className="text-xl lg:text-2xl font-semibold text-white animate-pulse">
           Carregando...
         </div>
       </div>
@@ -607,39 +576,37 @@ export default function PaginaSaldo() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-950 ios-safe-area">
-        <p className="text-2xl text-white animate-pulse">Carregando saldo...</p>
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950">
+        <p className="text-xl lg:text-2xl text-white animate-pulse">Carregando saldo...</p>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 ios-safe-area">
-      {/* Sidebar */}
+    <div className="flex min-h-screen bg-zinc-950">
+      {/* Sidebar - AGORA O COMPONENTE CONTROLADO PELO PRÓPRIO SIDEBAR */}
       <Sidebar user={user!} profile={profile} team={team} />
 
       {/* Conteúdo Principal */}
-      <div className="flex-1 transition-all duration-300 lg:ml-0 w-full">
-        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-3 sm:p-4 lg:p-6 container-responsive">
-          <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6 lg:space-y-8">
-            {/* Header */}
-            <div className="flex flex-col justify-between items-start gap-3 sm:gap-4 mb-4 sm:mb-6 lg:mb-8">
-              <div className="w-full">
-                <h1 className="text-2xl sm:text-3xl lg:text-5xl font-black text-white mb-1 sm:mb-2 break-words">
-                  SALDO DO CLUBE
-                </h1>
-                <p className="text-zinc-400 text-xs sm:text-sm lg:text-lg">
+      <div className="flex-1 w-full">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-4 lg:p-6 safe-horizontal safe-vertical">
+          <div className="max-w-6xl mx-auto space-y-4 lg:space-y-8">
+            {/* Header - Removido o padding-top extra para mobile */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-6 mb-4 lg:mb-8">
+              <div>
+                <h1 className="text-2xl lg:text-5xl font-black text-white mb-2 heading-responsive-xl">SALDO DO CLUBE</h1>
+                <p className="text-zinc-400 text-sm lg:text-lg text-responsive-sm">
                   Acompanhe suas finanças e movimentações
                 </p>
               </div>
 
-              <div className="flex gap-2 w-full sm:w-auto justify-end">
+              <div className="flex flex-wrap gap-2 w-full lg:w-auto">
                 <Button
                   onClick={() => team && refreshTeamData(team.id)}
                   variant="outline"
-                  className="bg-zinc-800/50 border-zinc-600 hover:bg-zinc-700/50 text-xs sm:text-sm py-1 h-8 sm:h-9 ios-button"
+                  className="bg-zinc-800/50 border-zinc-600 hover:bg-zinc-700/50 text-xs lg:text-sm h-9 lg:h-10 flex-1 lg:flex-none"
                 >
-                  <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  <RefreshCw className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
                   <span className="hidden sm:inline">Atualizar</span>
                   <span className="sm:hidden">Atual.</span>
                 </Button>
@@ -647,41 +614,41 @@ export default function PaginaSaldo() {
                 {isAdmin && (
                   <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
                     <DialogTrigger asChild>
-                      <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm py-1 h-8 sm:h-9 ios-button">
-                        <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                        <span className="hidden sm:inline">Gerenciar</span>
-                        <span className="sm:hidden">Saldo</span>
+                      <Button className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs lg:text-sm h-9 lg:h-10 flex-1 lg:flex-none">
+                        <DollarSign className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
+                        <span className="hidden sm:inline">Gerenciar Saldos</span>
+                        <span className="sm:hidden">Admin</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-zinc-900 border-zinc-700 text-white max-w-[95vw] sm:max-w-md lg:max-w-lg dialog-content-ios">
+                    <DialogContent className="bg-zinc-900 border-zinc-700 text-white w-[95vw] max-w-md lg:max-w-lg max-h-[85vh] overflow-y-auto rounded-lg safe-horizontal">
                       <DialogHeader>
-                        <DialogTitle className="text-lg sm:text-xl lg:text-2xl font-bold">
+                        <DialogTitle className="text-lg lg:text-2xl font-bold">
                           Adicionar/Remover Saldo
                         </DialogTitle>
                       </DialogHeader>
 
                       <div className="space-y-3 lg:space-y-4 py-3 lg:py-4">
                         <div>
-                          <label className="text-zinc-400 text-xs sm:text-sm font-medium mb-2 block">
+                          <label className="text-zinc-400 text-xs lg:text-sm font-medium mb-1 lg:mb-2 block">
                             Selecione o Clube
                           </label>
                           <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                            <SelectTrigger className="bg-zinc-800/50 border-zinc-600 text-xs sm:text-sm ios-button">
+                            <SelectTrigger className="bg-zinc-800/50 border-zinc-600 text-xs lg:text-sm h-9 lg:h-10">
                               <SelectValue placeholder="Escolha um clube" />
                             </SelectTrigger>
-                            <SelectContent className="max-h-[60vh]">
+                            <SelectContent className="max-h-60">
                               {allTeams.map(team => (
-                                <SelectItem key={team.id} value={team.id}>
+                                <SelectItem key={team.id} value={team.id} className="text-xs lg:text-sm">
                                   <div className="flex items-center gap-2">
                                     {team.logo_url && (
                                       <img 
                                         src={team.logo_url} 
                                         alt={team.name}
-                                        className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 rounded-full object-contain"
+                                        className="w-4 h-4 lg:w-5 lg:h-5 rounded-full object-contain flex-shrink-0"
                                       />
                                     )}
-                                    <span className="text-xs sm:text-sm">{team.name}</span>
-                                    <Badge variant="secondary" className="ml-auto text-xs">
+                                    <span className="truncate">{team.name}</span>
+                                    <Badge variant="secondary" className="ml-auto text-xs flex-shrink-0">
                                       {formatBalance(team.balance)}
                                     </Badge>
                                   </div>
@@ -692,7 +659,7 @@ export default function PaginaSaldo() {
                         </div>
 
                         <div>
-                          <label className="text-zinc-400 text-xs sm:text-sm font-medium mb-2 block">
+                          <label className="text-zinc-400 text-xs lg:text-sm font-medium mb-1 lg:mb-2 block">
                             Tipo de Operação
                           </label>
                           <div className="flex gap-2">
@@ -701,13 +668,13 @@ export default function PaginaSaldo() {
                               variant={transactionType === 'add' ? 'default' : 'outline'}
                               onClick={() => setTransactionType('add')}
                               className={cn(
-                                "flex-1 text-xs sm:text-sm h-8 sm:h-9 ios-button",
+                                "flex-1 text-xs lg:text-sm h-8 lg:h-9",
                                 transactionType === 'add' 
                                   ? "bg-emerald-600 hover:bg-emerald-700" 
                                   : "bg-zinc-800/50 border-zinc-600"
                               )}
                             >
-                              <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                              <Plus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
                               Adicionar
                             </Button>
                             <Button
@@ -715,43 +682,42 @@ export default function PaginaSaldo() {
                               variant={transactionType === 'remove' ? 'default' : 'outline'}
                               onClick={() => setTransactionType('remove')}
                               className={cn(
-                                "flex-1 text-xs sm:text-sm h-8 sm:h-9 ios-button",
+                                "flex-1 text-xs lg:text-sm h-8 lg:h-9",
                                 transactionType === 'remove' 
                                   ? "bg-red-600 hover:bg-red-700" 
                                   : "bg-zinc-800/50 border-zinc-600"
                               )}
                             >
-                              <Minus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                              <Minus className="w-3 h-3 lg:w-4 lg:h-4 mr-1 lg:mr-2" />
                               Remover
                             </Button>
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-zinc-400 text-xs sm:text-sm font-medium mb-2 block">
+                          <label className="text-zinc-400 text-xs lg:text-sm font-medium mb-1 lg:mb-2 block">
                             Valor
                           </label>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3 h-3 sm:w-4 sm:h-4" />
+                            <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-3 h-3 lg:w-4 lg:h-4" />
                             <Input
                               placeholder="0,00"
                               value={transactionAmount}
                               onChange={handleAmountChange}
-                              className="pl-8 sm:pl-10 bg-zinc-800/50 border-zinc-600 text-sm ios-input"
-                              inputMode="decimal"
+                              className="pl-8 lg:pl-10 bg-zinc-800/50 border-zinc-600 text-xs lg:text-sm h-9 lg:h-10"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="text-zinc-400 text-xs sm:text-sm font-medium mb-2 block">
+                          <label className="text-zinc-400 text-xs lg:text-sm font-medium mb-1 lg:mb-2 block">
                             Descrição
                           </label>
                           <Input
                             placeholder="Ex: Premiação do campeonato, Multa, etc."
                             value={transactionDescription}
                             onChange={(e) => setTransactionDescription(e.target.value)}
-                            className="bg-zinc-800/50 border-zinc-600 text-sm ios-input"
+                            className="bg-zinc-800/50 border-zinc-600 text-xs lg:text-sm h-9 lg:h-10"
                           />
                         </div>
                       </div>
@@ -760,7 +726,7 @@ export default function PaginaSaldo() {
                         <Button
                           variant="outline"
                           onClick={() => setAdminModalOpen(false)}
-                          className="bg-transparent border-zinc-600 text-xs sm:text-sm flex-1 ios-button"
+                          className="bg-transparent border-zinc-600 text-xs lg:text-sm h-9 lg:h-10 flex-1"
                         >
                           Cancelar
                         </Button>
@@ -768,7 +734,7 @@ export default function PaginaSaldo() {
                           onClick={handleAdminTransaction}
                           disabled={processing}
                           className={cn(
-                            "flex-1 text-xs sm:text-sm ios-button",
+                            "flex-1 text-xs lg:text-sm h-9 lg:h-10",
                             transactionType === 'add' 
                               ? "bg-emerald-600 hover:bg-emerald-700" 
                               : "bg-red-600 hover:bg-red-700"
@@ -784,119 +750,134 @@ export default function PaginaSaldo() {
             </div>
 
             {team ? (
-              <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+              <div className="space-y-4 lg:space-y-8">
                 {/* Cards de Resumo */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6">
                   {/* Saldo Atual */}
-                  <Card className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/30 p-3 sm:p-4 lg:p-6">
+                  <Card className="bg-gradient-to-br from-purple-600/20 to-pink-600/20 border-purple-500/30 p-4 lg:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-zinc-400 text-xs">Saldo Atual</p>
-                        <p className="text-lg sm:text-xl lg:text-3xl font-bold text-white mt-1">
+                        <p className="text-zinc-400 text-xs lg:text-sm">Saldo Atual</p>
+                        <p className="text-lg lg:text-3xl font-bold text-white mt-1 lg:mt-2 heading-responsive-lg">
                           {formatBalance(team.balance)}
                         </p>
                       </div>
-                      <div className="p-2 sm:p-3 bg-purple-500/20 rounded-full">
-                        <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-purple-400" />
+                      <div className="p-2 lg:p-3 bg-purple-500/20 rounded-full">
+                        <DollarSign className="w-5 h-5 lg:w-8 lg:h-8 text-purple-400" />
                       </div>
                     </div>
                   </Card>
 
                   {/* Entradas */}
-                  <Card className="bg-gradient-to-br from-emerald-600/20 to-green-600/20 border-emerald-500/30 p-3 sm:p-4 lg:p-6">
+                  <Card className="bg-gradient-to-br from-emerald-600/20 to-green-600/20 border-emerald-500/30 p-4 lg:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-zinc-400 text-xs">Total de Entradas</p>
-                        <p className="text-lg sm:text-xl lg:text-3xl font-bold text-white mt-1">
+                        <p className="text-zinc-400 text-xs lg:text-sm">Total de Entradas</p>
+                        <p className="text-lg lg:text-3xl font-bold text-white mt-1 lg:mt-2 heading-responsive-lg">
                           {formatBalance(totalCredits)}
                         </p>
                       </div>
-                      <div className="p-2 sm:p-3 bg-emerald-500/20 rounded-full">
-                        <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-emerald-400" />
+                      <div className="p-2 lg:p-3 bg-emerald-500/20 rounded-full">
+                        <TrendingUp className="w-5 h-5 lg:w-8 lg:h-8 text-emerald-400" />
                       </div>
                     </div>
                   </Card>
 
                   {/* Saídas */}
-                  <Card className="bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/30 p-3 sm:p-4 lg:p-6">
+                  <Card className="bg-gradient-to-br from-red-600/20 to-orange-600/20 border-red-500/30 p-4 lg:p-6">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-zinc-400 text-xs">Total de Saídas</p>
-                        <p className="text-lg sm:text-xl lg:text-3xl font-bold text-white mt-1">
+                        <p className="text-zinc-400 text-xs lg:text-sm">Total de Saídas</p>
+                        <p className="text-lg lg:text-3xl font-bold text-white mt-1 lg:mt-2 heading-responsive-lg">
                           {formatBalance(totalDebits)}
                         </p>
                       </div>
-                      <div className="p-2 sm:p-3 bg-red-500/20 rounded-full">
-                        <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-red-400" />
+                      <div className="p-2 lg:p-3 bg-red-500/20 rounded-full">
+                        <TrendingDown className="w-5 h-5 lg:w-8 lg:h-8 text-red-400" />
                       </div>
                     </div>
                   </Card>
                 </div>
 
                 {/* Histórico de Transações */}
-                <Card className="bg-white/5 border-white/10 p-3 sm:p-4 lg:p-6">
-                  <div className="flex flex-col justify-between items-start gap-3 sm:gap-4 mb-3 sm:mb-4 lg:mb-6">
+                <Card className="bg-white/5 border-white/10 p-3 lg:p-6">
+                  <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 lg:gap-4 mb-3 lg:mb-6">
                     <div>
-                      <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-white">Histórico de Transações</h2>
-                      <p className="text-zinc-400 text-xs sm:text-sm">Todas as movimentações do seu clube</p>
+                      <h2 className="text-lg lg:text-2xl font-bold text-white heading-responsive-md">Histórico de Transações</h2>
+                      <p className="text-zinc-400 text-xs lg:text-sm">Todas as movimentações do seu clube</p>
                     </div>
 
-                    <div className="flex flex-wrap gap-1 sm:gap-2 w-full sm:w-auto">
+                    <div className="flex flex-wrap gap-1 lg:gap-2 w-full lg:w-auto">
+                      {/* Botão "Todas" - Ícone apenas no mobile */}
                       <Button
                         variant={filter === 'all' ? 'default' : 'outline'}
                         onClick={() => setFilter('all')}
                         className={cn(
-                          "text-xs h-7 sm:h-8 sm:h-9 px-2 sm:px-3 flex-1 sm:flex-none ios-button",
+                          "text-xs lg:text-sm h-7 lg:h-9 flex-1 lg:flex-none min-w-[44px] lg:min-w-[70px] justify-center lg:justify-start",
                           filter === 'all' ? "bg-purple-600" : "bg-zinc-800/50 border-zinc-600"
                         )}
+                        title="Todas as transações"
+                        aria-label="Todas as transações"
                       >
-                        <Filter className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        <span className="hidden xs:inline">Todas</span>
+                        <Filter className="w-3 h-3 lg:w-4 lg:h-4 lg:mr-2 flex-shrink-0" />
+                        <span className="hidden lg:inline">Todas</span>
                       </Button>
+
+                      {/* Botão "Entradas" - Ícone apenas no mobile */}
                       <Button
                         variant={filter === 'credit' ? 'default' : 'outline'}
                         onClick={() => setFilter('credit')}
                         className={cn(
-                          "text-xs h-7 sm:h-8 sm:h-9 px-2 sm:px-3 flex-1 sm:flex-none ios-button",
+                          "text-xs lg:text-sm h-7 lg:h-9 flex-1 lg:flex-none min-w-[44px] lg:min-w-[70px] justify-center lg:justify-start",
                           filter === 'credit' ? "bg-emerald-600" : "bg-zinc-800/50 border-zinc-600"
                         )}
+                        title="Entradas"
+                        aria-label="Entradas"
                       >
-                        <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        <span className="hidden xs:inline">Entradas</span>
+                        <TrendingUp className="w-3 h-3 lg:w-4 lg:h-4 lg:mr-2 flex-shrink-0" />
+                        <span className="hidden lg:inline">Entradas</span>
                       </Button>
+
+                      {/* Botão "Saídas" - Ícone apenas no mobile */}
                       <Button
                         variant={filter === 'debit' ? 'default' : 'outline'}
                         onClick={() => setFilter('debit')}
                         className={cn(
-                          "text-xs h-7 sm:h-8 sm:h-9 px-2 sm:px-3 flex-1 sm:flex-none ios-button",
+                          "text-xs lg:text-sm h-7 lg:h-9 flex-1 lg:flex-none min-w-[44px] lg:min-w-[70px] justify-center lg:justify-start",
                           filter === 'debit' ? "bg-red-600" : "bg-zinc-800/50 border-zinc-600"
                         )}
+                        title="Saídas"
+                        aria-label="Saídas"
                       >
-                        <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        <span className="hidden xs:inline">Saídas</span>
+                        <TrendingDown className="w-3 h-3 lg:w-4 lg:h-4 lg:mr-2 flex-shrink-0" />
+                        <span className="hidden lg:inline">Saídas</span>
                       </Button>
+
+                      {/* Botão "Trocas" - Ícone apenas no mobile */}
                       <Button
                         variant={filter === 'exchange' ? 'default' : 'outline'}
                         onClick={() => setFilter('exchange')}
                         className={cn(
-                          "text-xs h-7 sm:h-8 sm:h-9 px-2 sm:px-3 flex-1 sm:flex-none ios-button",
+                          "text-xs lg:text-sm h-7 lg:h-9 flex-1 lg:flex-none min-w-[44px] lg:min-w-[70px] justify-center lg:justify-start",
                           filter === 'exchange' ? "bg-blue-600" : "bg-zinc-800/50 border-zinc-600"
                         )}
+                        title="Trocas"
+                        aria-label="Trocas"
                       >
-                        <ArrowRightLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                        <span className="hidden xs:inline">Trocas</span>
+                        <ArrowRightLeft className="w-3 h-3 lg:w-4 lg:h-4 lg:mr-2 flex-shrink-0" />
+                        <span className="hidden lg:inline">Trocas</span>
                       </Button>
                     </div>
                   </div>
 
                   {filteredTransactions.length === 0 ? (
-                    <div className="text-center py-6 sm:py-8 lg:py-12">
-                      <DollarSign className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-2 sm:mb-3 lg:mb-4" />
-                      <p className="text-zinc-400 text-sm sm:text-base lg:text-lg">Nenhuma transação encontrada</p>
-                      <p className="text-zinc-500 text-xs sm:text-sm">Suas movimentações aparecerão aqui</p>
+                    <div className="text-center py-6 lg:py-12">
+                      <DollarSign className="w-10 h-10 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-2 lg:mb-4" />
+                      <p className="text-zinc-400 text-sm lg:text-lg">Nenhuma transação encontrada</p>
+                      <p className="text-zinc-500 text-xs lg:text-sm">Suas movimentações aparecerão aqui</p>
                     </div>
                   ) : (
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-2 lg:space-y-3 max-h-[500px] lg:max-h-none overflow-y-auto pr-1 lg:pr-0">
                       {filteredTransactions.map((transaction) => {
                         const colors = getTransactionColor(transaction)
                         const IconComponent = colors.iconComponent
@@ -904,43 +885,43 @@ export default function PaginaSaldo() {
                         return (
                           <div
                             key={transaction.id}
-                            className="flex items-center justify-between p-3 sm:p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors"
+                            className="flex flex-col sm:flex-row sm:items-center justify-between p-3 lg:p-4 bg-zinc-800/30 rounded-lg border border-zinc-700/50 hover:border-zinc-600 transition-colors gap-2 lg:gap-3"
                           >
-                            <div className="flex items-center gap-2 sm:gap-3 lg:gap-4 flex-1 min-w-0">
-                              <div className={cn("p-2 sm:p-3 rounded-full flex-shrink-0", colors.bg)}>
-                                <IconComponent className="w-3 h-3 sm:w-4 sm:h-4 lg:w-6 lg:h-6" />
+                            <div className="flex items-start sm:items-center gap-3 lg:gap-4 w-full sm:w-auto">
+                              <div className={cn("p-2 lg:p-3 rounded-full flex-shrink-0", colors.bg)}>
+                                <IconComponent className="w-4 h-4 lg:w-5 lg:h-5" />
                               </div>
 
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                                  <p className="font-semibold text-white text-xs sm:text-sm lg:text-base truncate">
+                                <div className="flex flex-wrap items-center gap-1 lg:gap-2">
+                                  <p className="font-semibold text-white text-sm lg:text-base truncate">
                                     {transaction.description}
                                   </p>
                                   {transaction.is_exchange && (
-                                    <Badge variant="outline" className="text-[10px] sm:text-xs bg-blue-500/20 text-blue-300 border-blue-500/50 flex-shrink-0">
+                                    <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-300 border-blue-500/50 flex-shrink-0">
                                       {transaction.exchange_only ? 'Troca Jogador' : 'Troca'}
                                     </Badge>
                                   )}
                                 </div>
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 lg:gap-4 mt-1 text-[10px] sm:text-xs lg:text-sm text-zinc-400">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 lg:gap-3 mt-1 text-xs lg:text-sm text-zinc-400">
                                   <div className="flex items-center gap-1">
-                                    <Calendar className="w-2 h-2 sm:w-3 sm:h-3" />
-                                    {formatDate(transaction.created_at)}
+                                    <Calendar className="w-3 h-3 flex-shrink-0" />
+                                    <span className="truncate">{formatDate(transaction.created_at)}</span>
                                   </div>
                                   {transaction.player_name && (
                                     <div className="flex items-center gap-1">
-                                      <User className="w-2 h-2 sm:w-3 sm:h-3" />
+                                      <User className="w-3 h-3 flex-shrink-0" />
                                       <span className="truncate">{transaction.player_name}</span>
                                     </div>
                                   )}
                                   {transaction.related_team && (
                                     <div className="flex items-center gap-1">
-                                      <Building2 className="w-2 h-2 sm:w-3 sm:h-3" />
+                                      <Building2 className="w-3 h-3 flex-shrink-0" />
                                       <span className="truncate">{transaction.related_team}</span>
                                     </div>
                                   )}
                                   {transaction.exchange_value && transaction.exchange_value > 0 && (
-                                    <Badge variant="outline" className="text-[10px] sm:text-xs bg-purple-500/20 text-purple-300 border-purple-500/50">
+                                    <Badge variant="outline" className="text-xs bg-purple-500/20 text-purple-300 border-purple-500/50 flex-shrink-0">
                                       Valor troca: {formatBalance(transaction.exchange_value)}
                                     </Badge>
                                   )}
@@ -948,24 +929,24 @@ export default function PaginaSaldo() {
                               </div>
                             </div>
 
-                            <div className="text-right flex-shrink-0 ml-2">
+                            <div className="text-right flex-shrink-0 sm:ml-2 self-end sm:self-auto">
                               {transaction.type === 'exchange_trade' ? (
                                 <div>
-                                  <p className={cn("text-sm sm:text-base lg:text-xl font-bold", colors.text)}>
+                                  <p className={cn("text-sm lg:text-xl font-bold", colors.text)}>
                                     {formatBalance(transaction.amount)}
                                   </p>
-                                  <p className="text-[10px] sm:text-xs text-zinc-400">Valor jogador</p>
+                                  <p className="text-xs text-zinc-400">Valor do jogador</p>
                                 </div>
                               ) : (
                                 <div>
-                                  <p className={cn("text-sm sm:text-base lg:text-xl font-bold", colors.text)}>
+                                  <p className={cn("text-sm lg:text-xl font-bold", colors.text)}>
                                     {transaction.type === 'credit' ? '+' : '-'} {formatBalance(transaction.amount)}
                                   </p>
                                 </div>
                               )}
                               <Badge 
                                 variant="secondary" 
-                                className={cn("mt-1 text-[10px] sm:text-xs", colors.badge)}
+                                className={cn("mt-1 text-xs", colors.badge)}
                               >
                                 {getBadgeText(transaction)}
                               </Badge>
@@ -978,10 +959,10 @@ export default function PaginaSaldo() {
                 </Card>
               </div>
             ) : (
-              <Card className="p-6 sm:p-8 lg:p-16 text-center bg-white/5 border-white/10">
-                <Building2 className="w-10 h-10 sm:w-12 sm:h-12 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-2 sm:mb-3 lg:mb-4" />
-                <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-white mb-2">Nenhum clube associado</h3>
-                <p className="text-zinc-400 text-xs sm:text-sm lg:text-base">
+              <Card className="p-6 lg:p-16 text-center bg-white/5 border-white/10">
+                <Building2 className="w-10 h-10 lg:w-16 lg:h-16 text-zinc-600 mx-auto mb-3 lg:mb-4" />
+                <h3 className="text-lg lg:text-2xl font-bold text-white mb-2">Nenhum clube associado</h3>
+                <p className="text-zinc-400 text-sm lg:text-base">
                   Você precisa estar associado a um clube para visualizar o saldo.
                 </p>
               </Card>
