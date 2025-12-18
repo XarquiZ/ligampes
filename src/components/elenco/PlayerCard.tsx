@@ -6,6 +6,27 @@ import { PlayerCardProps } from './types'
 import { Target, Footprints, Square, Pencil, DollarSign, X, MessageCircle, Trash2 } from 'lucide-react'
 import { StatItem } from './StatItem'
 
+// Função para formatar o preço
+const formatPrice = (price: number): string => {
+  if (price >= 1000000) {
+    const valueInMillions = price / 1000000
+    if (valueInMillions % 1 === 0) {
+      return `R$ ${valueInMillions.toFixed(0)}M`
+    }
+    if (valueInMillions < 10) {
+      return `R$ ${valueInMillions.toFixed(1)}M`
+    }
+    return `R$ ${Math.round(valueInMillions)}M`
+  } else if (price >= 1000) {
+    const valueInThousands = price / 1000
+    if (valueInThousands % 1 === 0) {
+      return `R$ ${valueInThousands.toFixed(0)}K`
+    }
+    return `R$ ${valueInThousands.toFixed(1)}K`
+  }
+  return `R$ ${price}`
+}
+
 export const PlayerCard: React.FC<PlayerCardProps> = ({
   player,
   showProposeButton = false,
@@ -16,7 +37,6 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   onRemoveFavorite,
   onCardClick
 }) => {
-  // Usar os valores das estatísticas que agora vêm do player_stats
   const stats = {
     goals: player.total_goals || 0,
     assists: player.total_assists || 0,
@@ -28,6 +48,8 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   const handleCardClick = () => {
     onCardClick(player)
   }
+
+  const formattedPrice = formatPrice(Number(player.base_price))
 
   return (
     <div 
@@ -93,7 +115,6 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
 
         <p className="text-xs text-zinc-400 text-center">{player.playstyle || 'Nenhum'}</p>
 
-        {/* Grid de estatísticas */}
         <div className="grid grid-cols-5 gap-1 lg:gap-2 py-2 border-y border-zinc-700/50">
           <StatItem
             icon={<Target className="w-3 h-3 lg:w-4 lg:h-4" />}
@@ -127,7 +148,6 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           />
         </div>
 
-        {/* Informação adicional (opcional) */}
         {player.total_matches > 0 && (
           <div className="text-center text-xs text-zinc-500">
             {player.total_matches} jogo{player.total_matches !== 1 ? 's' : ''}
@@ -136,7 +156,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
 
         <div className="space-y-2">
           <p className="text-center text-lg lg:text-xl font-black text-emerald-400">
-            R$ {Number(player.base_price).toLocaleString('pt-BR')}
+            {formattedPrice}
           </p>
           
           <div className="flex gap-2 w-full">
@@ -164,7 +184,6 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                     size="sm"
                   >
                     <DollarSign className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
-                  
                   </Button>
                 )}
                 
@@ -178,7 +197,6 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                     size="sm"
                   >
                     <X className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
-                  
                   </Button>
                 )}
               </>
