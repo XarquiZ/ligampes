@@ -37,6 +37,7 @@ export const ComparisonSection: React.FC<ComparisonSectionProps & { preSelectedP
   const [search2, setSearch2] = useState('')
   const [filteredPlayers1, setFilteredPlayers1] = useState<Player[]>([])
   const [filteredPlayers2, setFilteredPlayers2] = useState<Player[]>([])
+
   const [activeTab, setActiveTab] = useState<'comparacao' | 'extras'>('comparacao')
 
   // Efeito para pré-selecionar o jogador 1 quando o componente monta ou quando preSelectedPlayerId muda
@@ -387,7 +388,42 @@ export const ComparisonSection: React.FC<ComparisonSectionProps & { preSelectedP
               onChange={(e) => setSearch1(e.target.value)}
               className="pl-10 bg-zinc-900/70 border-zinc-700 text-sm"
             />
+            
+            {/* Lista de resultados para mobile - Jogador 1 */}
+            {filteredPlayers1.length > 0 && (
+              <div className="absolute z-20 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredPlayers1.map(player => (
+                  <button
+                    key={player.id}
+                    onClick={() => {
+                      setPlayer1(player)
+                      setSearch1('')
+                      setFilteredPlayers1([])
+                    }}
+                    className="w-full p-3 text-left hover:bg-zinc-800 transition-colors border-b border-zinc-700 last:border-b-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      {player.photo_url ? (
+                        <img src={player.photo_url} alt={player.name} className="w-8 h-8 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">{player.position}</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-white text-sm truncate">{player.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className="bg-purple-600 text-xs">{player.position}</Badge>
+                          <span className="text-zinc-400 text-xs">OVR {player.overall}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          
           {player1 && (
             <div className="mt-2 p-3 bg-zinc-800/50 rounded-lg border border-purple-500/30">
               <div className="flex items-center gap-3">
@@ -428,7 +464,42 @@ export const ComparisonSection: React.FC<ComparisonSectionProps & { preSelectedP
               onChange={(e) => setSearch2(e.target.value)}
               className="pl-10 bg-zinc-900/70 border-zinc-700 text-sm"
             />
+            
+            {/* Lista de resultados para mobile - Jogador 2 */}
+            {filteredPlayers2.length > 0 && (
+              <div className="absolute z-20 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredPlayers2.map(player => (
+                  <button
+                    key={player.id}
+                    onClick={() => {
+                      setPlayer2(player)
+                      setSearch2('')
+                      setFilteredPlayers2([])
+                    }}
+                    className="w-full p-3 text-left hover:bg-zinc-800 transition-colors border-b border-zinc-700 last:border-b-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      {player.photo_url ? (
+                        <img src={player.photo_url} alt={player.name} className="w-8 h-8 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">{player.position}</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-white text-sm truncate">{player.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge className="bg-blue-600 text-xs">{player.position}</Badge>
+                          <span className="text-zinc-400 text-xs">OVR {player.overall}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          
           {player2 && (
             <div className="mt-2 p-3 bg-zinc-800/50 rounded-lg border border-blue-500/30">
               <div className="flex items-center gap-3">
