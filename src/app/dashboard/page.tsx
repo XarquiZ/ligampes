@@ -16,9 +16,9 @@ import {
 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import FloatingChatButton from '@/components/FloatingChatButton'
-import ChatPopup from '@/components/Chatpopup'
 import Sidebar from '@/components/Sidebar'
+import ChatPopup from '@/components/Chatpopup'
+import FloatingChatButton from '@/components/FloatingChatButton'
 
 // Definir tipos para user e team
 interface User {
@@ -285,8 +285,6 @@ export default function Dashboard() {
   const [players, setPlayers] = useState<Player[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [expandedTile, setExpandedTile] = useState<string | null>(null)
-  const [isChatOpen, setIsChatOpen] = useState(false)
-  const [unreadCount, setUnreadCount] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
   const [newCoachName, setNewCoachName] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
@@ -300,6 +298,10 @@ export default function Dashboard() {
     message: ''
   })
   const [warningModalOpen, setWarningModalOpen] = useState(false)
+
+  // Estados do Chat
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
 
   // Novos estados para dados reais
   const [balanceTransactions, setBalanceTransactions] = useState<any[]>([])
@@ -430,6 +432,60 @@ export default function Dashboard() {
 
     loadUserData()
   }, [authLoading, user])
+
+  // ⚡ SUBSCRIPTION DE CHAT (Unread Count)
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data: conversations } = await supabase
+          .from('conversations')
+          .select('id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+
+        if (!conversations?.length) {
+          setUnreadCount(0)
+          return
+        }
+
+        const conversationIds = conversations.map(conv => conv.id)
+
+        const { count } = await supabase
+          .from('private_messages')
+          .select('*', { count: 'exact', head: true })
+          .in('conversation_id', conversationIds)
+          .eq('read', false)
+          .neq('sender_id', user.id)
+
+        setUnreadCount(count || 0)
+      } catch (error) {
+        console.error('Erro ao carregar contagem de mensagens:', error)
+      }
+    }
+
+    loadUnreadCount()
+
+    // Subscription para atualizar em tempo real
+    const subscription = supabase
+      .channel('unread_messages_dashboard')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        () => {
+          loadUnreadCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [user?.id])
 
   // Carregar dados reais do banco
   useEffect(() => {
@@ -878,59 +934,7 @@ export default function Dashboard() {
     }
   }
 
-  // Carregar contagem de mensagens não lidas
-  useEffect(() => {
-    if (!user?.id) return
 
-    const loadUnreadCount = async () => {
-      try {
-        const { data: conversations } = await supabase
-          .from('conversations')
-          .select('id')
-          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-
-        if (!conversations?.length) {
-          setUnreadCount(0)
-          return
-        }
-
-        const conversationIds = conversations.map(conv => conv.id)
-
-        const { count } = await supabase
-          .from('private_messages')
-          .select('*', { count: 'exact', head: true })
-          .in('conversation_id', conversationIds)
-          .eq('read', false)
-          .neq('sender_id', user.id)
-
-        setUnreadCount(count || 0)
-      } catch (error) {
-        console.error('Erro ao carregar contagem de mensagens:', error)
-      }
-    }
-
-    loadUnreadCount()
-
-    // Subscription para atualizar em tempo real
-    const subscription = supabase
-      .channel('unread_messages')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'private_messages'
-        },
-        () => {
-          loadUnreadCount()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [user])
 
   // Função para atualizar o nome do técnico
   const updateCoachName = async () => {
@@ -1028,15 +1032,21 @@ export default function Dashboard() {
   const chatUser = {
     id: user?.id || '',
     name: displayName,
-    email: user?.email || ''
+    email: user?.email || '',
+    role: profile?.role,
+    team_logo: team?.logo_url,
+    team_name: team?.name
   }
 
   // Criar objeto team compatível com os componentes de chat
   const chatTeam = {
     id: team?.id || '',
     name: team?.name || 'Sem time',
-    divisao: team?.divisao || 'A'
+    divisao: team?.divisao || 'A',
+    logo_url: team?.logo_url
   }
+
+  // Calcular estatísticas do time
 
   // Calcular estatísticas do time
   const teamStatistics = {
@@ -1755,6 +1765,8 @@ export default function Dashboard() {
           </div>
         </div>
 
+
+
         {/* Chat Components */}
         {user && team && (
           <>
@@ -1763,6 +1775,7 @@ export default function Dashboard() {
               currentTeam={chatTeam}
               unreadCount={unreadCount}
               onOpenChat={() => setIsChatOpen(true)}
+              onUnreadCountChange={setUnreadCount}
             />
 
             <ChatPopup
@@ -1770,6 +1783,7 @@ export default function Dashboard() {
               onClose={() => setIsChatOpen(false)}
               currentUser={chatUser}
               currentTeam={chatTeam}
+              onUnreadCountChange={setUnreadCount}
             />
           </>
         )}

@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { 
-  Gavel, 
-  Clock, 
-  DollarSign, 
+import {
+  Gavel,
+  Clock,
+  DollarSign,
   Trophy,
   Lock,
   Zap,
@@ -27,6 +27,8 @@ import { SaldoUpdateIndicator } from '@/components/leilao/saldo-update-indicator
 import { useSaldoReservado } from '@/hooks/use-saldo-reservado'
 import { WinnerCelebrationModal } from '@/components/leilao/winner-celebration-modal'
 import { ConsolationModal } from '@/components/leilao/consolation-modal'
+import ChatPopup from '@/components/Chatpopup'
+import FloatingChatButton from '@/components/FloatingChatButton'
 
 interface Player {
   id: string
@@ -93,7 +95,7 @@ const formatTimeRemaining = (milliseconds: number) => {
   if (days > 0) {
     return `${days}d ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
-  
+
   // Se tiver horas (menos de 1 dia): Retorna "10:12:26"
   if (hours > 0) {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
@@ -108,12 +110,15 @@ export default function PaginaLeilao() {
   const [loading, setLoading] = useState(true)
   const [team, setTeam] = useState<Team | null>(null)
   const [user, setUser] = useState<any>(null)
-  
+  const [profile, setProfile] = useState<any>(null)
+  const [isChatOpen, setIsChatOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [activeTab, setActiveTab] = useState<TabType>('active')
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [finishedAuctionResults, setFinishedAuctionResults] = useState<FinishedAuctionResult[]>([])
-  
+
   // Modal states
   const [winnerCelebrationOpen, setWinnerCelebrationOpen] = useState(false)
   const [consolationModalOpen, setConsolationModalOpen] = useState(false)
@@ -151,18 +156,72 @@ export default function PaginaLeilao() {
   // Carregamento inicial
   useEffect(() => {
     loadInitialData()
-    
+
     return () => {
       // Limpeza será feita no useEffect do WebSocket
     }
   }, [])
+
+  // ⚡ SUBSCRIPTION DE CHAT (Unread Count)
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadUnreadCount = async () => {
+      try {
+        const { data: conversations } = await supabase
+          .from('conversations')
+          .select('id')
+          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+
+        if (!conversations?.length) {
+          setUnreadCount(0)
+          return
+        }
+
+        const conversationIds = conversations.map(conv => conv.id)
+
+        const { count } = await supabase
+          .from('private_messages')
+          .select('*', { count: 'exact', head: true })
+          .in('conversation_id', conversationIds)
+          .eq('read', false)
+          .neq('sender_id', user.id)
+
+        setUnreadCount(count || 0)
+      } catch (error) {
+        console.error('Erro ao carregar contagem de mensagens:', error)
+      }
+    }
+
+    loadUnreadCount()
+
+    // Subscription para atualizar em tempo real
+    const subscription = supabase
+      .channel('unread_messages_leilao')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'private_messages'
+        },
+        () => {
+          loadUnreadCount()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [user?.id])
 
   // ⚡ WEB SOCKET SIMPLIFICADO - APENAS LANCES EM TEMPO REAL
   useEffect(() => {
     if (!user || !team) return
 
     console.log('🔌 Configurando WebSocket para lances em tempo real...')
-    
+
     // CANAL ÚNICO para todos os leilões
     const channel = supabase.channel('auctions-essential')
       .on(
@@ -173,28 +232,28 @@ export default function PaginaLeilao() {
           table: 'auctions',
         },
         async (payload) => {
-          console.log('📡 Update de leilão:', payload.eventType, payload.new?.id)
-          
+          console.log('📡 Update de leilão:', payload.eventType, (payload.new as any)?.id)
+
           // ⚡ ATUALIZAÇÃO DE LANCE
           if (payload.eventType === 'UPDATE' && payload.new) {
             const oldStatus = payload.old?.status
             const newStatus = payload.new.status
-            
+
             // Verificar se o leilão acabou de ser finalizado
             if (oldStatus === 'active' && newStatus === 'finished') {
               await handleAuctionFinished(payload.new.id)
             }
-            
+
             // Atualiza APENAS o leilão específico
             await updateSingleAuction(payload.new.id)
           }
-          
+
           // ⚡ NOVO LEILÃO CRIADO
           if (payload.eventType === 'INSERT' && payload.new) {
             // Recarrega a lista completa
             await loadAuctions()
           }
-          
+
           // ⚡ LEILÃO DELETADO/CANCELADO
           if (payload.eventType === 'DELETE' && payload.old) {
             // Remove da lista local
@@ -229,7 +288,7 @@ export default function PaginaLeilao() {
   // Funções principais
   const loadInitialData = async () => {
     setLoading(true)
-    
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -250,6 +309,7 @@ export default function PaginaLeilao() {
         .single()
 
       if (profile) {
+        setProfile(profile)
         setIsAdmin(profile?.role === 'admin')
         if (profile.teams) {
           setTeam(profile.teams)
@@ -294,13 +354,13 @@ export default function PaginaLeilao() {
             const now = Date.now()
             timeRemaining = Math.max(0, endTime - now)
           }
-          
+
           return {
             ...auction,
             time_remaining: timeRemaining
           }
         })
-        
+
         setAuctions(auctionsWithTime)
       }
     } catch (error) {
@@ -445,12 +505,12 @@ export default function PaginaLeilao() {
 
       if (data?.success) {
         toast.success(data.message || 'Lance realizado com sucesso!')
-        
+
         // ⚡ ATUALIZA LOCALMENTE TAMBÉM (feedback imediato)
         setTimeout(() => {
           updateSingleAuction(auctionId)
         }, 500)
-        
+
         if (team.id) {
           loadPendingReserves(team.id)
         }
@@ -470,10 +530,10 @@ export default function PaginaLeilao() {
 
       // Obter a duração do leilão (se disponível)
       const durationMinutes = auction.auction_duration || 5
-      
+
       const { error } = await supabase
         .from('auctions')
-        .update({ 
+        .update({
           status: 'active',
           start_time: new Date().toISOString(),
           end_time: new Date(Date.now() + durationMinutes * 60000).toISOString()
@@ -494,37 +554,37 @@ export default function PaginaLeilao() {
 
   const handleCancelAuction = async (auctionId: string) => {
     if (!confirm('Tem certeza que deseja cancelar este leilão?')) return
-  
+
     try {
       console.log(`🗑️ Tentando cancelar leilão: ${auctionId}`)
-      
+
       // 1. Primeiro, verificar se há lances no leilão
       const { data: bids, error: bidsError } = await supabase
         .from('bids')
         .select('*')
         .eq('auction_id', auctionId)
-  
+
       if (bidsError) throw bidsError
-  
+
       // 2. Se houver lances, primeiro liberar o saldo reservado dos times
       if (bids && bids.length > 0) {
         console.log(`📊 Encontrados ${bids.length} lances no leilão`)
-        
+
         // Agrupar lances por time
         const teamIds = [...new Set(bids.map(bid => bid.team_id))]
-        
+
         // Para cada time, liberar o saldo reservado
         for (const teamId of teamIds) {
           const teamBids = bids.filter(bid => bid.team_id === teamId)
           const highestBid = Math.max(...teamBids.map(bid => bid.amount))
-          
+
           // Atualizar saldo do time
           const { error: updateError } = await supabase.rpc('liberar_saldo_reservado', {
             p_team_id: teamId,
             p_auction_id: auctionId,
             p_amount: highestBid
           })
-          
+
           if (updateError) {
             console.error(`❌ Erro ao liberar saldo do time ${teamId}:`, updateError)
           } else {
@@ -532,37 +592,37 @@ export default function PaginaLeilao() {
           }
         }
       }
-  
+
       // 3. Depois deletar todos os lances
       const { error: deleteBidsError } = await supabase
         .from('bids')
         .delete()
         .eq('auction_id', auctionId)
-  
+
       if (deleteBidsError) throw deleteBidsError
       console.log('✅ Todos os lances deletados')
-  
+
       // 4. Finalmente deletar o leilão
       const { error: deleteAuctionError } = await supabase
         .from('auctions')
         .delete()
         .eq('id', auctionId)
-  
+
       if (deleteAuctionError) throw deleteAuctionError
       console.log('✅ Leilão deletado')
-  
+
       toast.success('Leilão cancelado com sucesso!')
-      
+
       // Recarregar dados
       await loadAuctions()
-      
+
       if (team?.id) {
         await loadPendingReserves(team.id)
       }
-  
+
     } catch (error: any) {
       console.error('❌ Erro completo ao cancelar leilão:', error)
-      
+
       if (error.code === '23503') {
         toast.error('Não foi possível cancelar o leilão. Existem referências ativas. Tente novamente.')
       } else {
@@ -603,8 +663,8 @@ export default function PaginaLeilao() {
 
   return (
     <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar user={user} team={team} />
-      
+      <Sidebar user={user} team={team} profile={profile} />
+
       <div className="flex-1 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-orange-950/20 to-zinc-950 text-white p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
@@ -623,8 +683,8 @@ export default function PaginaLeilao() {
                   <div className="bg-gradient-to-r from-zinc-800/80 to-zinc-900/80 backdrop-blur-lg rounded-2xl p-4 border border-zinc-700/50 shadow-xl">
                     <div className="flex items-center gap-4">
                       {team.logo_url && (
-                        <img 
-                          src={team.logo_url} 
+                        <img
+                          src={team.logo_url}
                           alt={team.name}
                           className="w-12 h-12 rounded-full border-2 border-orange-500/50 object-cover"
                         />
@@ -640,8 +700,8 @@ export default function PaginaLeilao() {
                             <p className="text-lg md:text-xl font-bold text-white">
                               R$ {formatToMillions(getSaldoDisponivel())}
                             </p>
-                            <SaldoUpdateIndicator 
-                              lastSaldoUpdate={lastSaldoUpdate} 
+                            <SaldoUpdateIndicator
+                              lastSaldoUpdate={lastSaldoUpdate}
                               className="mt-1"
                             />
                           </div>
@@ -653,8 +713,8 @@ export default function PaginaLeilao() {
                             <p className="text-lg md:text-xl font-bold text-white">
                               R$ {formatToMillions(getSaldoReservado())}
                             </p>
-                            <SaldoUpdateIndicator 
-                              lastSaldoUpdate={lastSaldoUpdate} 
+                            <SaldoUpdateIndicator
+                              lastSaldoUpdate={lastSaldoUpdate}
                               className="mt-1"
                             />
                           </div>
@@ -667,8 +727,8 @@ export default function PaginaLeilao() {
                             </span>
                           </div>
                           <div className="flex items-center justify-between mt-1">
-                            <SaldoUpdateIndicator 
-                              lastSaldoUpdate={lastSaldoUpdate} 
+                            <SaldoUpdateIndicator
+                              lastSaldoUpdate={lastSaldoUpdate}
                               className="text-xs"
                             />
                             <div className="flex items-center gap-1">
@@ -685,7 +745,7 @@ export default function PaginaLeilao() {
 
               {/* Botão criar leilão (admin) */}
               {isAdmin && (
-                <Button 
+                <Button
                   onClick={() => setCreateModalOpen(true)}
                   className="bg-orange-600 hover:bg-orange-700 text-white shadow-lg w-full lg:w-auto mt-4 lg:mt-0"
                 >
@@ -703,8 +763,8 @@ export default function PaginaLeilao() {
                   onClick={() => setActiveTab('active')}
                   className={cn(
                     "flex-1 transition-all duration-200",
-                    activeTab === 'active' 
-                      ? "bg-orange-600 text-white shadow-lg" 
+                    activeTab === 'active'
+                      ? "bg-orange-600 text-white shadow-lg"
                       : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
                   )}
                 >
@@ -722,8 +782,8 @@ export default function PaginaLeilao() {
                   onClick={() => setActiveTab('pending')}
                   className={cn(
                     "flex-1 transition-all duration-200",
-                    activeTab === 'pending' 
-                      ? "bg-yellow-600 text-white shadow-lg" 
+                    activeTab === 'pending'
+                      ? "bg-yellow-600 text-white shadow-lg"
                       : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
                   )}
                 >
@@ -741,8 +801,8 @@ export default function PaginaLeilao() {
                   onClick={() => setActiveTab('finished')}
                   className={cn(
                     "flex-1 transition-all duration-200",
-                    activeTab === 'finished' 
-                      ? "bg-green-600 text-white shadow-lg" 
+                    activeTab === 'finished'
+                      ? "bg-green-600 text-white shadow-lg"
                       : "text-zinc-400 hover:text-white hover:bg-zinc-700/50"
                   )}
                 >
@@ -770,12 +830,12 @@ export default function PaginaLeilao() {
                     {activeTab === 'finished' && 'Nenhum leilão finalizado'}
                   </h3>
                   <p className="text-zinc-400 text-sm md:text-base">
-                    {activeTab === 'active' && (isAdmin 
-                      ? 'Crie um leilão ou inicie um leilão agendado!' 
+                    {activeTab === 'active' && (isAdmin
+                      ? 'Crie um leilão ou inicie um leilão agendado!'
                       : 'Aguarde o administrador iniciar um leilão.'
                     )}
-                    {activeTab === 'pending' && (isAdmin 
-                      ? 'Crie um leilão agendado para aparecer aqui!' 
+                    {activeTab === 'pending' && (isAdmin
+                      ? 'Crie um leilão agendado para aparecer aqui!'
                       : 'Aguarde o administrador agendar um leilão.'
                     )}
                     {activeTab === 'finished' && 'Os leilões finalizados aparecerão aqui'}
@@ -784,9 +844,9 @@ export default function PaginaLeilao() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                   {tabAuctions.map(auction => (
-                    <AuctionCard 
-                      key={auction.id} 
-                      auction={auction} 
+                    <AuctionCard
+                      key={auction.id}
+                      auction={auction}
                       type={activeTab}
                       onBid={handlePlaceBid}
                       team={team}
@@ -807,7 +867,7 @@ export default function PaginaLeilao() {
       </div>
 
       {/* Modal de criação */}
-      <CreateAuctionModal 
+      <CreateAuctionModal
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onSuccess={() => {
@@ -817,18 +877,56 @@ export default function PaginaLeilao() {
       />
 
       {/* Modal de celebração do vencedor */}
-      <WinnerCelebrationModal 
+      <WinnerCelebrationModal
         open={winnerCelebrationOpen}
         onOpenChange={setWinnerCelebrationOpen}
         result={currentFinishedResult}
       />
 
       {/* Modal de consolação */}
-      <ConsolationModal 
+      <ConsolationModal
         open={consolationModalOpen}
         onOpenChange={setConsolationModalOpen}
         result={currentFinishedResult}
       />
+
+      {user && profile && team && (
+        <>
+          <FloatingChatButton
+            currentUser={{
+              id: user.id,
+              name: profile.coach_name || user.email,
+              email: user.email
+            }}
+            currentTeam={{
+              id: team.id,
+              name: team.name
+            }}
+            unreadCount={unreadCount}
+            onOpenChat={() => setIsChatOpen(true)}
+            onUnreadCountChange={setUnreadCount}
+          />
+
+          <ChatPopup
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            currentUser={{
+              id: user.id,
+              name: profile.coach_name || user.email,
+              email: user.email,
+              role: profile.role,
+              team_logo: team.logo_url,
+              team_name: team.name
+            }}
+            currentTeam={{
+              id: team.id,
+              name: team.name,
+              logo_url: team.logo_url
+            }}
+            onUnreadCountChange={setUnreadCount}
+          />
+        </>
+      )}
     </div>
   )
 }
