@@ -77,12 +77,12 @@ export default function MercadoView({
   return (
     <>
       {/* Tabs do Mercado */}
-      <div className="flex gap-4 mb-6 justify-center md:justify-start">
+      <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-start">
         <Button
           onClick={() => setMarketTab('disponiveis')}
           variant={marketTab === 'disponiveis' ? 'default' : 'outline'}
           className={cn(
-            "flex items-center gap-2 text-white",
+            "flex items-center justify-center w-full sm:w-auto gap-2 text-white",
             marketTab === 'disponiveis' ? "bg-blue-600 hover:bg-blue-700" : "bg-zinc-800/50 border-zinc-600"
           )}
         >
@@ -92,12 +92,12 @@ export default function MercadoView({
             {marketPlayers.length}
           </Badge>
         </Button>
-        
+
         <Button
           onClick={() => setMarketTab('meus')}
           variant={marketTab === 'meus' ? 'default' : 'outline'}
           className={cn(
-            "flex items-center gap-2 text-white",
+            "flex items-center justify-center w-full sm:w-auto gap-2 text-white",
             marketTab === 'meus' ? "bg-green-600 hover:bg-green-700" : "bg-zinc-800/50 border-zinc-600"
           )}
         >
@@ -135,25 +135,25 @@ export default function MercadoView({
           <p className="text-xl text-zinc-400 animate-pulse">Carregando mercado...</p>
         </div>
       ) : marketTab === 'disponiveis' && marketPlayers.length === 0 ? (
-        <Card className="p-16 text-center bg-white/5 border-white/10">
+        <Card className="p-8 md:p-16 text-center bg-white/5 border-white/10">
           <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
           <p className="text-xl text-zinc-400">Nenhum jogador disponível no mercado</p>
           <p className="text-zinc-500 mt-2">Os times ainda não anunciaram jogadores para venda</p>
         </Card>
       ) : marketTab === 'meus' && myMarketPlayers.length === 0 && !showAddForm ? (
-        <Card className="p-16 text-center bg-white/5 border-white/10">
+        <Card className="p-8 md:p-16 text-center bg-white/5 border-white/10">
           <Tag className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
           <p className="text-xl text-zinc-400">Você ainda não anunciou jogadores</p>
           <p className="text-zinc-500 mt-2">Clique em "Adicionar Jogador" para começar</p>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {(marketTab === 'disponiveis' ? marketPlayers : myMarketPlayers)
             .filter(listing => marketTab === 'disponiveis' ? listing.is_active : true)
             .map(listing => (
-              <MarketPlayerCard 
-                key={listing.id} 
-                listing={listing} 
+              <MarketPlayerCard
+                key={listing.id}
+                listing={listing}
                 isMine={marketTab === 'meus'}
                 onStartEditDescription={handleStartEditDescription}
                 onRemoveFromMarket={handleRemoveFromMarket}

@@ -47,7 +47,7 @@ export default function MarketPlayerForm({
 
   return (
     <Card className="p-6 mb-6 bg-white/5 border-white/10">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-0 mb-4">
         <div>
           <h3 className="text-xl font-bold text-white">Anunciar Jogador</h3>
           <p className="text-zinc-400">Coloque jogadores do seu time disponíveis para negociação</p>
@@ -61,7 +61,7 @@ export default function MarketPlayerForm({
               setMarketDescription('')
               setSaleMode('fixed_price')
             }}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white"
           >
             <Plus className="w-4 h-4 mr-2" />
             Adicionar Jogador
@@ -81,7 +81,7 @@ export default function MarketPlayerForm({
                 <div
                   key={player.id}
                   className={cn(
-                    "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                    "flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
                     selectedPlayer?.id === player.id
                       ? "bg-blue-500/20 border-blue-500/50"
                       : "bg-zinc-800/30 border-zinc-600 hover:border-zinc-500"
@@ -94,8 +94,8 @@ export default function MarketPlayerForm({
                   }}
                 >
                   {player.photo_url ? (
-                    <img 
-                      src={player.photo_url} 
+                    <img
+                      src={player.photo_url}
                       alt={player.name}
                       className="w-10 h-10 rounded-full object-cover"
                     />
@@ -111,7 +111,7 @@ export default function MarketPlayerForm({
                       <span className="text-zinc-400">OVR {player.overall}</span>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="w-full sm:w-auto text-left sm:text-right mt-2 sm:mt-0">
                     <p className="text-emerald-400 font-bold">
                       R$ {player.base_price.toLocaleString('pt-BR')}
                     </p>
@@ -128,7 +128,7 @@ export default function MarketPlayerForm({
                 <label className="text-zinc-400 text-sm font-medium mb-2 block">
                   Como deseja anunciar?
                 </label>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setSaleMode('fixed_price')}
@@ -143,7 +143,7 @@ export default function MarketPlayerForm({
                     <span className="font-medium">Fixar Preço</span>
                     <span className="text-xs opacity-70">Defina um valor fixo</span>
                   </button>
-                  
+
                   <button
                     type="button"
                     onClick={() => {
@@ -194,8 +194,8 @@ export default function MarketPlayerForm({
                     >
                       <option value="">Selecione um preço...</option>
                       {priceOptions.map((option, index) => (
-                        <option 
-                          key={index} 
+                        <option
+                          key={index}
                           value={option.label}
                           className="bg-zinc-800 text-white"
                         >
@@ -220,7 +220,7 @@ export default function MarketPlayerForm({
 
               {/* Descrição - OPCIONAL para ambos */}
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
                   <label className="text-zinc-400 text-sm font-medium">
                     Descrição {saleMode === 'negotiable' ? 'da Negociação ' : ''}(opcional)
                   </label>
@@ -230,9 +230,9 @@ export default function MarketPlayerForm({
                     variant="outline"
                     size="sm"
                     className={cn(
-                      "border-blue-400/30 hover:bg-blue-400/10",
-                      saleMode === 'negotiable' 
-                        ? "text-purple-400 border-purple-400/30 hover:bg-purple-400/10" 
+                      "w-full sm:w-auto border-blue-400/30 hover:bg-blue-400/10",
+                      saleMode === 'negotiable'
+                        ? "text-purple-400 border-purple-400/30 hover:bg-purple-400/10"
                         : "text-blue-400 border-blue-400/30 hover:bg-blue-400/10"
                     )}
                   >
@@ -240,7 +240,7 @@ export default function MarketPlayerForm({
                     {marketDescription ? 'Editar Descrição' : 'Adicionar Descrição'}
                   </Button>
                 </div>
-                
+
                 {/* Visualização da descrição atual */}
                 {marketDescription ? (
                   <div className={cn(
@@ -253,13 +253,13 @@ export default function MarketPlayerForm({
                   </div>
                 ) : (
                   <p className="text-zinc-500 text-sm italic">
-                    {saleMode === 'negotiable' 
+                    {saleMode === 'negotiable'
                       ? 'Adicione uma descrição para explicar o que você busca na negociação (ex: "Aceito propostas em jogadores da posição X").'
                       : 'Por que está colocando à venda?'
                     }
                   </p>
                 )}
-                
+
                 {saleMode === 'negotiable' && (
                   <div className="mt-3 p-3 bg-purple-900/10 rounded-lg border border-purple-700/30">
                     <div className="flex items-start gap-2">
@@ -277,20 +277,20 @@ export default function MarketPlayerForm({
               </div>
 
               {/* Botões */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                 <Button
                   onClick={() => handleAddToMarket(saleMode)}
                   disabled={addingPlayer || (saleMode === 'fixed_price' && !marketPrice)}
                   className={cn(
                     "flex-1 text-white disabled:opacity-50 disabled:cursor-not-allowed",
-                    saleMode === 'fixed_price' 
-                      ? "bg-blue-600 hover:bg-blue-700" 
+                    saleMode === 'fixed_price'
+                      ? "bg-blue-600 hover:bg-blue-700"
                       : "bg-purple-600 hover:bg-purple-700"
                   )}
                 >
                   {addingPlayer ? 'Anunciando...' : (
-                    saleMode === 'fixed_price' 
-                      ? 'Anunciar com Preço Fixo' 
+                    saleMode === 'fixed_price'
+                      ? 'Anunciar com Preço Fixo'
                       : 'Anunciar para Negociação'
                   )}
                 </Button>

@@ -40,7 +40,7 @@ export default function EditDescriptionForm({
         className="bg-zinc-800/50 border-zinc-600 text-white placeholder:text-zinc-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
         rows={3}
       />
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <Button
           onClick={() => onUpdateDescription(listing.id)}
           size="sm"

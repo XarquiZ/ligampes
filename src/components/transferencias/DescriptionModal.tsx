@@ -48,8 +48,8 @@ export default function DescriptionModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div 
-        className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md p-6"
+      <div
+        className="bg-zinc-900 border border-zinc-700 rounded-xl w-[95%] sm:w-full max-w-md p-4 sm:p-6"
         onKeyDown={handleKeyDown}
       >
         <div className="flex items-center justify-between mb-4">
@@ -66,7 +66,7 @@ export default function DescriptionModal({
             <X className="w-4 h-4" />
           </Button>
         </div>
-        
+
         <div className="mb-4">
           <p className="text-zinc-400 text-sm mb-2">
             Escreva uma descrição para o jogador (opcional)
@@ -80,8 +80,8 @@ export default function DescriptionModal({
             rows={4}
           />
         </div>
-        
-        <div className="flex justify-end gap-3">
+
+        <div className="flex flex-col sm:flex-row justify-end gap-3">
           <Button
             onClick={onClose}
             variant="outline"
@@ -97,7 +97,7 @@ export default function DescriptionModal({
             Aplicar Descrição
           </Button>
         </div>
-        
+
         <div className="mt-3 text-xs text-zinc-500">
           Dica: Pressione <kbd className="px-1.5 py-0.5 bg-zinc-800 rounded">Ctrl+Enter</kbd> para salvar
         </div>
