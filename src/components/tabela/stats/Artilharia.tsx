@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
 import Image from "next/image";
 
+import { ChevronDown } from "lucide-react";
+
 interface Artilheiro {
   id: string;
   nome: string;
@@ -20,6 +22,7 @@ export default function Artilharia() {
   const [loading, setLoading] = useState(true);
   const [dataAtualizacao, setDataAtualizacao] = useState<string>('');
   const [divisaoAtiva, setDivisaoAtiva] = useState<"A" | "B">("A");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const fetchArtilheiros = async (divisao: "A" | "B") => {
     try {
@@ -237,14 +240,51 @@ export default function Artilharia() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Seletor de Divisão */}
-          <div className="flex items-center gap-2">
+          {/* Seletor de Divisão - Mobile Dropdown */}
+          <div className="relative md:hidden">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg font-medium border border-gray-700"
+            >
+              <span>{divisaoAtiva === "A" ? "Série A" : "Série B"}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                <div className="absolute top-full right-0 mt-2 z-50 w-32 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+                  <button
+                    onClick={() => {
+                      setDivisaoAtiva("A");
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 hover:bg-gray-700 ${divisaoAtiva === "A" ? "text-yellow-500 font-bold" : "text-gray-300"}`}
+                  >
+                    Série A
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDivisaoAtiva("B");
+                      setIsDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 hover:bg-gray-700 ${divisaoAtiva === "B" ? "text-yellow-500 font-bold" : "text-gray-300"}`}
+                  >
+                    Série B
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Seletor de Divisão - Desktop */}
+          <div className="hidden md:flex items-center gap-2">
             <div className="flex bg-gray-800 rounded-lg p-1">
               <button
                 onClick={() => setDivisaoAtiva("A")}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "A"
-                    ? "bg-yellow-500 text-black font-semibold"
-                    : "text-gray-300 hover:text-white hover:bg-gray-700"
+                  ? "bg-yellow-500 text-black font-semibold"
+                  : "text-gray-300 hover:text-white hover:bg-gray-700"
                   }`}
               >
                 Série A
@@ -252,15 +292,14 @@ export default function Artilharia() {
               <button
                 onClick={() => setDivisaoAtiva("B")}
                 className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "B"
-                    ? "bg-yellow-500 text-black font-semibold"
-                    : "text-gray-300 hover:text-white hover:bg-gray-700"
+                  ? "bg-yellow-500 text-black font-semibold"
+                  : "text-gray-300 hover:text-white hover:bg-gray-700"
                   }`}
               >
                 Série B
               </button>
             </div>
           </div>
-
         </div>
       </div>
 

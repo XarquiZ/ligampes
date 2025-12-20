@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
 import Image from "next/image";
 
+import { ChevronDown } from "lucide-react";
+
 interface TimeStat {
   id: number;
   nome: string;
@@ -23,9 +25,10 @@ interface TimeStat {
 export default function TimeStats() {
   const [timesDivisaoA, setTimesDivisaoA] = useState<TimeStat[]>([]);
   const [timesDivisaoB, setTimesDivisaoB] = useState<TimeStat[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [divisaoAtiva, setDivisaoAtiva] = useState<"A" | "B">("A");
   const [sortBy, setSortBy] = useState<keyof TimeStat>("golsFeitos");
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Buscar dados do Supabase
@@ -194,7 +197,7 @@ export default function TimeStats() {
     const aValue = a[sortBy];
     const bValue = b[sortBy];
 
-    if (aValue === null || bValue === null) {
+    if (aValue === null || aValue === undefined || bValue === null || bValue === undefined) {
       return 0;
     }
 
@@ -226,55 +229,95 @@ export default function TimeStats() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          {/* Seletor de Divisão */}
-          <div className="flex items-center gap-2">
-            <div className="flex bg-gray-800 rounded-lg p-1">
+          {/* Seletor de Divisão - Adaptado Responsivo */}
+          <div className="flex items-center gap-4">
+            {/* Seletor de Divisão - Mobile Dropdown */}
+            <div className="relative md:hidden">
               <button
-                onClick={() => setDivisaoAtiva("A")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "A"
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg font-medium border border-gray-700"
+              >
+                <span>{divisaoAtiva === "A" ? "Série A" : "Série B"}</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+                  <div className="absolute top-full right-0 mt-2 z-50 w-32 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+                    <button
+                      onClick={() => {
+                        setDivisaoAtiva("A");
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 hover:bg-gray-700 ${divisaoAtiva === "A" ? "text-yellow-500 font-bold" : "text-gray-300"}`}
+                    >
+                      Série A
+                    </button>
+                    <button
+                      onClick={() => {
+                        setDivisaoAtiva("B");
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2 hover:bg-gray-700 ${divisaoAtiva === "B" ? "text-yellow-500 font-bold" : "text-gray-300"}`}
+                    >
+                      Série B
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Seletor de Divisão - Desktop */}
+            <div className="hidden md:flex items-center gap-2">
+              <div className="flex bg-gray-800 rounded-lg p-1">
+                <button
+                  onClick={() => setDivisaoAtiva("A")}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "A"
                     ? "bg-yellow-500 text-black font-semibold"
                     : "text-gray-300 hover:text-white hover:bg-gray-700"
-                  }`}
-              >
-                Série A
-              </button>
-              <button
-                onClick={() => setDivisaoAtiva("B")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "B"
+                    }`}
+                >
+                  Série A
+                </button>
+                <button
+                  onClick={() => setDivisaoAtiva("B")}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "B"
                     ? "bg-yellow-500 text-black font-semibold"
                     : "text-gray-300 hover:text-white hover:bg-gray-700"
-                  }`}
-              >
-                Série B
-              </button>
+                    }`}
+                >
+                  Série B
+                </button>
+              </div>
             </div>
           </div>
 
           {/* Botões de Ordenação */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="grid grid-cols-3 sm:flex gap-2 w-full sm:w-auto">
             <button
               onClick={() => handleSort("golsFeitos")}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${sortBy === "golsFeitos"
-                  ? "bg-yellow-500 text-black font-semibold"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+              className={`px-3 py-2 sm:py-1 rounded-lg text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 ${sortBy === "golsFeitos"
+                ? "bg-yellow-500 text-black font-semibold"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
                 }`}
             >
               GF {sortIcon("golsFeitos")}
             </button>
             <button
               onClick={() => handleSort("saldo")}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${sortBy === "saldo"
-                  ? "bg-yellow-500 text-black font-semibold"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+              className={`px-3 py-2 sm:py-1 rounded-lg text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 ${sortBy === "saldo"
+                ? "bg-yellow-500 text-black font-semibold"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
                 }`}
             >
               Saldo {sortIcon("saldo")}
             </button>
             <button
               onClick={() => handleSort("posseMedia")}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${sortBy === "posseMedia"
-                  ? "bg-yellow-500 text-black font-semibold"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+              className={`px-3 py-2 sm:py-1 rounded-lg text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 ${sortBy === "posseMedia"
+                ? "bg-yellow-500 text-black font-semibold"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700"
                 }`}
             >
               Posse {sortIcon("posseMedia")}
@@ -287,10 +330,10 @@ export default function TimeStats() {
         <table className="w-full min-w-full md:min-w-[800px]">
           <thead>
             <tr className="border-b border-gray-800">
-              <th className="text-left py-3 px-4 text-yellow-400 font-semibold min-w-[200px]">Time</th>
-              <th className="text-left py-3 px-4 text-yellow-400 font-semibold">GF</th>
-              <th className="text-left py-3 px-4 text-yellow-400 font-semibold">GS</th>
-              <th className="text-left py-3 px-4 text-yellow-400 font-semibold">Saldo</th>
+              <th className="text-left py-3 px-2 md:px-4 text-yellow-400 font-semibold min-w-[140px] md:min-w-[200px] text-xs md:text-base">Time</th>
+              <th className="text-left py-3 px-2 md:px-4 text-yellow-400 font-semibold text-xs md:text-base">GF</th>
+              <th className="text-left py-3 px-2 md:px-4 text-yellow-400 font-semibold text-xs md:text-base">GS</th>
+              <th className="text-left py-3 px-2 md:px-4 text-yellow-400 font-semibold text-xs md:text-base">Saldo</th>
               <th className="text-left py-3 px-4 text-yellow-400 font-semibold hidden md:table-cell">Posse</th>
               <th className="text-left py-3 px-4 text-yellow-400 font-semibold hidden md:table-cell">Finalizações</th>
               <th className="text-left py-3 px-4 text-yellow-400 font-semibold hidden md:table-cell">CA</th>
@@ -304,10 +347,10 @@ export default function TimeStats() {
                   key={time.id}
                   className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors"
                 >
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-3 min-w-[180px]">
+                  <td className="py-3 px-2 md:px-4">
+                    <div className="flex items-center gap-2 md:gap-3 min-w-[140px] md:min-w-[180px]">
                       {time.logo_url ? (
-                        <div className="relative w-8 h-8 flex-shrink-0">
+                        <div className="relative w-6 h-6 md:w-8 md:h-8 flex-shrink-0">
                           <Image
                             src={time.logo_url}
                             alt={`Logo do ${time.nome}`}
@@ -321,30 +364,30 @@ export default function TimeStats() {
                           />
                         </div>
                       ) : (
-                        <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-bold text-gray-300">
+                        <div className="w-6 h-6 md:w-8 md:h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs md:text-sm font-bold text-gray-300">
                             {time.nome.charAt(0)}
                           </span>
                         </div>
                       )}
                       {/* Nome do time em branco com espaço garantido */}
-                      <div className="font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis">
+                      <div className="font-medium text-white whitespace-nowrap overflow-hidden text-ellipsis text-xs md:text-base">
                         {time.nome}
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-4">
-                    <div className="text-xl font-bold text-green-400">
+                  <td className="py-3 px-2 md:px-4">
+                    <div className="text-base md:text-xl font-bold text-green-400">
                       {time.golsFeitos}
                     </div>
                   </td>
-                  <td className="py-3 px-4">
-                    <div className="text-xl font-bold text-red-400">
+                  <td className="py-3 px-2 md:px-4">
+                    <div className="text-base md:text-xl font-bold text-red-400">
                       {time.golsSofridos}
                     </div>
                   </td>
-                  <td className="py-3 px-4">
-                    <div className={`text-xl font-bold ${time.saldo > 0 ? "text-green-400" : time.saldo < 0 ? "text-red-400" : "text-gray-300"
+                  <td className="py-3 px-2 md:px-4">
+                    <div className={`text-base md:text-xl font-bold ${time.saldo > 0 ? "text-green-400" : time.saldo < 0 ? "text-red-400" : "text-gray-300"
                       }`}>
                       {time.saldo > 0 ? "+" : ""}{time.saldo}
                     </div>

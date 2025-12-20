@@ -80,10 +80,10 @@ export default function Calendario() {
         // Extrair rodadas únicas
         const rodadasUnicas = Array.from(new Set(data?.map(match => match.round) || []))
           .sort((a, b) => a - b);
-        
+
         setRodadasDisponiveis(rodadasUnicas);
         setMaxRodadas(rodadasUnicas.length > 0 ? Math.max(...rodadasUnicas) : 1);
-        
+
         // Se a rodada atual não existir nas disponíveis, ajustar para a primeira
         if (rodadasUnicas.length > 0 && !rodadasUnicas.includes(rodada)) {
           setRodada(rodadasUnicas[0]);
@@ -116,7 +116,7 @@ export default function Calendario() {
     };
 
     window.addEventListener('match-updated', handleMatchUpdated);
-    
+
     return () => {
       window.removeEventListener('match-updated', handleMatchUpdated);
     };
@@ -146,10 +146,10 @@ export default function Calendario() {
             Acompanhe os jogos da {serie === 'A' ? 'Série A' : 'Série B'}
           </p>
         </div>
-        
+
         <div className="flex flex-wrap gap-4">
           <SerieSelector serie={serie} setSerie={setSerie} />
-          <RodadaSelector 
+          <RodadaSelector
             rodada={rodada}
             setRodada={setRodada}
             rodadasDisponiveis={rodadasDisponiveis}
@@ -175,8 +175,8 @@ export default function Calendario() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {jogos.map((jogo) => (
-            <JogoCard 
-              key={jogo.id} 
+            <JogoCard
+              key={jogo.id}
               jogo={{
                 ...jogo,
                 data: jogo.date,

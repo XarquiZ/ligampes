@@ -237,7 +237,7 @@ export default function TabelaPage() {
 
       {/* Conteúdo Principal */}
       <div className="flex-1 transition-all duration-300 lg:ml-0">
-        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-4 lg:p-6">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-0 lg:p-6">
           <div className="p-4 pt-24 md:p-6 space-y-6 md:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Cabeçalho */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

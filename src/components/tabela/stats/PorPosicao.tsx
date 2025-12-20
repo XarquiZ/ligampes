@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
 import Image from "next/image";
 
+import { ChevronDown } from "lucide-react";
+
 interface JogadorRating {
   id: string;
   player_id: string;
@@ -45,6 +47,8 @@ export default function PorPosicao() {
   const [divisaoAtiva, setDivisaoAtiva] = useState<"A" | "B">("A");
   const [posicaoAtiva, setPosicaoAtiva] = useState<string>("GO");
   const [jogadoresPorPosicao, setJogadoresPorPosicao] = useState<JogadorRating[]>([]);
+  const [isSerieDropdownOpen, setIsSerieDropdownOpen] = useState(false);
+  const [isPosicaoDropdownOpen, setIsPosicaoDropdownOpen] = useState(false);
 
   // Buscar jogadores com melhor avg_rating
   const fetchMelhoresPorPosicao = async (divisao: "A" | "B") => {
@@ -334,25 +338,65 @@ export default function PorPosicao() {
 
         {/* Seletor de Divisão */}
         <div className="flex items-center gap-4">
-          <div className="flex bg-gray-800 rounded-lg p-1">
+          {/* Mobile Dropdown */}
+          <div className="relative md:hidden">
             <button
-              onClick={() => setDivisaoAtiva("A")}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "A"
+              onClick={() => setIsSerieDropdownOpen(!isSerieDropdownOpen)}
+              className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded-lg font-medium border border-gray-700"
+            >
+              <span>{divisaoAtiva === "A" ? "Série A" : "Série B"}</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${isSerieDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isSerieDropdownOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsSerieDropdownOpen(false)} />
+                <div className="absolute top-full right-0 mt-2 z-50 w-32 bg-gray-800 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+                  <button
+                    onClick={() => {
+                      setDivisaoAtiva("A");
+                      setIsSerieDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 hover:bg-gray-700 ${divisaoAtiva === "A" ? "text-yellow-500 font-bold" : "text-gray-300"}`}
+                  >
+                    Série A
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDivisaoAtiva("B");
+                      setIsSerieDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-2 hover:bg-gray-700 ${divisaoAtiva === "B" ? "text-yellow-500 font-bold" : "text-gray-300"}`}
+                  >
+                    Série B
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Desktop Buttons */}
+          <div className="hidden md:flex items-center gap-4">
+            <div className="flex bg-gray-800 rounded-lg p-1">
+              <button
+                onClick={() => setDivisaoAtiva("A")}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "A"
                   ? "bg-yellow-500 text-black font-semibold"
                   : "text-gray-300 hover:text-white hover:bg-gray-700"
-                }`}
-            >
-              Série A
-            </button>
-            <button
-              onClick={() => setDivisaoAtiva("B")}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "B"
+                  }`}
+              >
+                Série A
+              </button>
+              <button
+                onClick={() => setDivisaoAtiva("B")}
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "B"
                   ? "bg-yellow-500 text-black font-semibold"
                   : "text-gray-300 hover:text-white hover:bg-gray-700"
-                }`}
-            >
-              Série B
-            </button>
+                  }`}
+              >
+                Série B
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -360,14 +404,56 @@ export default function PorPosicao() {
       {/* Filtro de Posições */}
       <div className="mb-6">
         <h4 className="text-lg font-semibold text-white mb-3">Selecione a Posição</h4>
-        <div className="flex gap-2 overflow-x-auto pb-3">
+
+        {/* Mobile Dropdown */}
+        <div className="relative md:hidden w-full">
+          <button
+            onClick={() => setIsPosicaoDropdownOpen(!isPosicaoDropdownOpen)}
+            className="w-full flex items-center justify-between bg-gray-800 text-white px-4 py-3 rounded-lg font-medium border border-gray-700"
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-yellow-500 font-bold">{posicaoAtiva}</span>
+              <span className="text-gray-400">- {POSITION_NAMES[posicaoAtiva]}</span>
+            </span>
+            <ChevronDown className={`w-5 h-5 transition-transform ${isPosicaoDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {isPosicaoDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsPosicaoDropdownOpen(false)} />
+              <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                {POSITIONS.map((pos) => (
+                  <button
+                    key={pos}
+                    onClick={() => {
+                      setPosicaoAtiva(pos);
+                      setIsPosicaoDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-4 py-3 border-b border-gray-700 last:border-0 hover:bg-gray-700 transition-colors flex items-center justify-between ${posicaoAtiva === pos ? "bg-gray-700/50" : ""
+                      }`}
+                  >
+                    <span className={`font-medium ${posicaoAtiva === pos ? "text-yellow-500" : "text-white"}`}>
+                      {pos}
+                    </span>
+                    <span className="text-sm text-gray-400">
+                      {POSITION_NAMES[pos]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Desktop Scrollable List */}
+        <div className="hidden md:flex gap-2 overflow-x-auto pb-3 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
           {POSITIONS.map((pos) => (
             <button
               key={pos}
               onClick={() => setPosicaoAtiva(pos)}
               className={`px-4 py-3 rounded-lg transition-all whitespace-nowrap font-medium text-lg ${posicaoAtiva === pos
-                  ? "bg-yellow-500 text-black font-bold shadow-lg shadow-yellow-500/30"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+                ? "bg-yellow-500 text-black font-bold shadow-lg shadow-yellow-500/30"
+                : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
                 }`}
             >
               {pos}
@@ -477,7 +563,7 @@ export default function PorPosicao() {
                   </div>
 
                   {/* Lado direito - Estatísticas */}
-                  <div className="flex items-center justify-around sm:justify-end gap-4 md:gap-8 w-full md:w-auto">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 md:gap-8 w-full md:w-auto">
                     {/* Average Rating (Destaque) */}
                     <div className="text-center">
                       <div className={`text-3xl font-bold ${getRatingColor(jogador.avg_rating)}`}>
@@ -487,7 +573,7 @@ export default function PorPosicao() {
                     </div>
 
                     {/* Outras Estatísticas */}
-                    <div className="flex gap-4 md:gap-6">
+                    <div className="flex gap-2 md:gap-6">
                       <div className="text-center">
                         <div className="text-sm text-gray-400">Jogos</div>
                         <div className="font-medium text-white">{jogador.jogos}</div>
