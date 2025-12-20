@@ -24,7 +24,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Filter, X, ArrowUpDown, Check, BarChart, Menu } from 'lucide-react'
+import { Filter, X, ArrowUpDown, Check, BarChart } from 'lucide-react'
 
 // Definindo as posições disponíveis
 const POSITIONS = [
@@ -58,7 +58,6 @@ const OVERALL_OPTIONS = [
 export default function PaginaTransferencias() {
   const router = useRouter()
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
   // Estados para Transferências
   const [transfers, setTransfers] = useState<Transfer[]>([])
@@ -1195,60 +1194,17 @@ export default function PaginaTransferencias() {
 
   return (
     <div className="flex min-h-screen bg-zinc-950">
-      {/* Sidebar para desktop */}
-      <div className="hidden lg:block">
-        <Sidebar 
-          user={user!}
-          profile={profile}
-          team={team}
-        />
-      </div>
-
-      {/* Sidebar mobile overlay */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar mobile */}
-      <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-zinc-900 transform transition-transform duration-300 lg:hidden
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <Sidebar 
-          user={user!}
-          profile={profile}
-          team={team}
-          onClose={() => setIsSidebarOpen(false)}
-        />
-      </div>
+      {/* Sidebar - AGORA CONTROLA TUDO INTERNAMENTE */}
+      <Sidebar 
+        user={user!}
+        profile={profile}
+        team={team}
+      />
 
       <div className="flex-1 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-4 md:p-8">
-          {/* Mobile header */}
-          <div className="lg:hidden mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setIsSidebarOpen(true)}
-                className="bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <div className="text-right">
-                <h2 className="text-white font-semibold">
-                  {profile?.coach_name || 'Técnico'}
-                </h2>
-                <p className="text-xs text-zinc-400">
-                  {team?.name || 'Sem time'}
-                </p>
-              </div>
-            </div>
-          </div>
-
+          {/* REMOVI O MOBILE HEADER - O Sidebar agora controla isso */}
+          
           <div className="mx-auto max-w-6xl">
             <h1 className="text-3xl md:text-5xl font-black text-white mb-2 text-center md:text-left">
               {activeView === 'transferencias' ? 'NEGOCIAÇÕES' : 'MERCADO'}
