@@ -12,7 +12,7 @@ import {
   DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight,
   Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown,
   Building2, Target, Footprints, Clock, AlertTriangle, X,
-  Trophy, BarChart2, CalendarDays
+  Trophy, BarChart2, CalendarDays, ScrollText
 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -137,22 +137,20 @@ function MatchResult({ match }: { match: MatchSchedule }) {
       </div>
     )
   }
-  
+
   return (
     <div className="flex items-center justify-center gap-1">
-      <span className={`font-bold ${
-        match.home_score && match.away_score && match.home_score > match.away_score 
-          ? 'text-green-400' 
+      <span className={`font-bold ${match.home_score && match.away_score && match.home_score > match.away_score
+          ? 'text-green-400'
           : 'text-zinc-300'
-      }`}>
+        }`}>
         {match.home_score}
       </span>
       <span className="text-zinc-500">-</span>
-      <span className={`font-bold ${
-        match.home_score && match.away_score && match.away_score > match.home_score 
-          ? 'text-green-400' 
+      <span className={`font-bold ${match.home_score && match.away_score && match.away_score > match.home_score
+          ? 'text-green-400'
           : 'text-zinc-300'
-      }`}>
+        }`}>
         {match.away_score}
       </span>
     </div>
@@ -311,7 +309,7 @@ export default function Dashboard() {
     contractedPlayers: 0,
     ratingDistribution: {
       '75+': 0,
-      '80+': 0, 
+      '80+': 0,
       '85+': 0,
       '90+': 0
     }
@@ -370,7 +368,7 @@ export default function Dashboard() {
             setProfile(newProfile)
             setTeam(newProfile?.teams || null)
             setNewCoachName(newProfile?.coach_name || defaultName)
-            
+
             // Carregar jogadores do time
             if (newProfile?.teams?.id) {
               loadTeamPlayers(newProfile.teams.id)
@@ -380,7 +378,7 @@ export default function Dashboard() {
           setProfile(profileData)
           setTeam(profileData?.teams || null)
           setNewCoachName(profileData?.coach_name || '')
-          
+
           // Carregar jogadores do time
           if (profileData?.teams?.id) {
             loadTeamPlayers(profileData.teams.id)
@@ -402,7 +400,7 @@ export default function Dashboard() {
 
         if (!playersError) {
           setPlayers(playersData || [])
-          
+
           // Verificar contagem de jogadores
           const playerCount = playersData?.length || 0
           if (playerCount < 18) {
@@ -631,11 +629,11 @@ export default function Dashboard() {
       }));
 
       setLeagueTable(tableData);
-      
+
       // Encontrar posição do time atual
       const currentTeamPosition = tableData.find(t => t.team_id === team.id)?.position || null;
       setTeamPosition(currentTeamPosition);
-      
+
     } catch (error) {
       console.error('Erro ao carregar tabela:', error);
     }
@@ -797,12 +795,12 @@ export default function Dashboard() {
       scheduleData.sort((a, b) => {
         if (a.status === 'finished' && b.status === 'scheduled') return -1;
         if (a.status === 'scheduled' && b.status === 'finished') return 1;
-        
+
         if (a.status === 'finished' && b.status === 'finished') {
           // Ordenar por data decrescente (mais recente primeiro)
           return new Date(b.date).getTime() - new Date(a.date).getTime();
         }
-        
+
         // Ordenar por data crescente (próximos primeiro)
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       });
@@ -811,7 +809,7 @@ export default function Dashboard() {
       const limitedScheduleData = scheduleData.slice(0, 3);
 
       setMatchSchedule(limitedScheduleData);
-      
+
     } catch (error) {
       console.error('Erro ao carregar agenda:', error);
     }
@@ -874,7 +872,7 @@ export default function Dashboard() {
       };
 
       setTeamStats(teamStats);
-      
+
     } catch (error) {
       console.error('Erro ao carregar estatísticas do time:', error);
     }
@@ -897,7 +895,7 @@ export default function Dashboard() {
         }
 
         const conversationIds = conversations.map(conv => conv.id)
-        
+
         const { count } = await supabase
           .from('private_messages')
           .select('*', { count: 'exact', head: true })
@@ -947,7 +945,7 @@ export default function Dashboard() {
 
       const { data, error } = await supabase
         .from('profiles')
-        .update({ 
+        .update({
           coach_name: newCoachName.trim()
         })
         .eq('id', user.id)
@@ -972,10 +970,10 @@ export default function Dashboard() {
       setProfile(data)
       setIsEditingName(false)
       console.log('✅ Nome do técnico atualizado com sucesso!')
-      
+
     } catch (error: any) {
       console.error('❌ Erro ao atualizar nome do técnico:', error)
-      
+
       if (error.code === '42501') {
         alert('Permissão negada. Verifique as políticas RLS da tabela profiles.')
       } else {
@@ -1043,10 +1041,10 @@ export default function Dashboard() {
   // Calcular estatísticas do time
   const teamStatistics = {
     totalPlayers: players.length,
-    averageOverall: players.length > 0 
+    averageOverall: players.length > 0
       ? Math.round(players.reduce((sum, player) => sum + player.overall, 0) / players.length)
       : 0,
-    topPlayer: players.length > 0 
+    topPlayer: players.length > 0
       ? players.reduce((best, player) => player.overall > best.overall ? player : best)
       : null,
     positions: players.reduce((acc, player) => {
@@ -1073,65 +1071,75 @@ export default function Dashboard() {
   }
 
   const tiles = [
-    { 
-      title: 'SALDO', 
-      icon: DollarSign, 
-      color: 'green', 
-      value: formatBalance(team?.balance || 0), 
-      subtitle: 'disponível para gastar', 
+    {
+      title: 'SALDO',
+      icon: DollarSign,
+      color: 'green',
+      value: formatBalance(team?.balance || 0),
+      subtitle: 'disponível para gastar',
       link: '/dashboard/saldo',
       buttonText: 'Ver saldo',
       preview: 'saldo'
     },
-    { 
-      title: 'MEU ELENCO', 
-      icon: Shirt, 
-      color: 'blue', 
-      value: getPlayerCountValue(), 
-      subtitle: 'jogadores no elenco', 
+    {
+      title: 'MEU ELENCO',
+      icon: Shirt,
+      color: 'blue',
+      value: getPlayerCountValue(),
+      subtitle: 'jogadores no elenco',
       link: '/dashboard/elenco',
       buttonText: 'Ver elenco',
       preview: 'elenco'
     },
-    { 
-      title: 'JOGADORES', 
-      icon: Users, 
-      color: 'pink', 
-      value: 'Pool', 
-      subtitle: 'todos os atletas', 
+    {
+      title: 'JOGADORES',
+      icon: Users,
+      color: 'pink',
+      value: 'Pool',
+      subtitle: 'todos os atletas',
       link: '/dashboard/jogadores',
       buttonText: 'Ver jogadores',
       preview: 'jogadores'
     },
-    { 
-      title: 'TRANSFERÊNCIAS', 
-      icon: ArrowLeftRight, 
-      color: 'purple', 
-      value: 'Mercado', 
-      subtitle: 'negociações ativas', 
+    {
+      title: 'TRANSFERÊNCIAS',
+      icon: ArrowLeftRight,
+      color: 'purple',
+      value: 'Mercado',
+      subtitle: 'negociações ativas',
       link: '/dashboard/transferencias',
       buttonText: 'Ver mercado',
       preview: 'transferencias'
     },
-    { 
-      title: 'LEILÃO', 
-      icon: Calendar, 
-      color: 'red', 
-      value: activeAuctions.length > 0 ? 'AO VIVO' : 'EM BREVE', 
-      subtitle: activeAuctions.length > 0 ? 'leilão ativo' : 'próximo evento', 
+    {
+      title: 'LEILÃO',
+      icon: Calendar,
+      color: 'red',
+      value: activeAuctions.length > 0 ? 'AO VIVO' : 'EM BREVE',
+      subtitle: activeAuctions.length > 0 ? 'leilão ativo' : 'próximo evento',
       link: '/dashboard/leilao',
       buttonText: 'Ver leilão',
       preview: 'leilao'
     },
-    { 
-      title: 'TABELA', 
-      icon: Trophy, 
-      color: 'yellow', 
-      value: teamPosition ? `${teamPosition}º` : 'N/A', 
-      subtitle: 'classificação atual', 
+    {
+      title: 'TABELA',
+      icon: Trophy,
+      color: 'yellow',
+      value: teamPosition ? `${teamPosition}º` : 'N/A',
+      subtitle: 'classificação atual',
       link: '/dashboard/tabela',
       buttonText: 'Ver classificação',
       preview: 'tabela'
+    },
+    {
+      title: 'INFORMAÇÕES',
+      icon: ScrollText,
+      color: 'indigo',
+      value: 'Regras',
+      subtitle: 'regulamento oficial',
+      link: '/dashboard/informacoes',
+      buttonText: 'Ler regras',
+      preview: 'regras'
     },
   ]
 
@@ -1153,7 +1161,7 @@ export default function Dashboard() {
               <span className="text-emerald-400 text-sm font-semibold">Saldo Disponível</span>
               <span className="text-emerald-400 font-bold text-lg">{formatBalance(team?.balance || 0)}</span>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700 text-center">
                 <TrendingUp className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
@@ -1172,7 +1180,7 @@ export default function Dashboard() {
               <div className="space-y-2">
                 <p className="text-zinc-400 text-sm font-semibold">Últimas Movimentações:</p>
                 {recentTransactions.map((transaction) => (
-                  <div 
+                  <div
                     key={transaction.id}
                     className="flex justify-between items-center p-2 bg-zinc-800/30 rounded text-xs"
                   >
@@ -1195,7 +1203,7 @@ export default function Dashboard() {
             )}
           </div>
         )
-      
+
       case 'MEU ELENCO':
         return (
           <div className="space-y-3">
@@ -1203,7 +1211,7 @@ export default function Dashboard() {
               <span className="text-blue-400 text-sm font-semibold">Jogadores no Elenco</span>
               <span className={`font-bold text-lg ${getPlayerCountColor()}`}>{players.length}/28</span>
             </div>
-            
+
             {teamStatistics.topPlayer && (
               <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-700">
                 <div className="flex items-center justify-between">
@@ -1246,7 +1254,7 @@ export default function Dashboard() {
             )}
           </div>
         )
-      
+
       case 'JOGADORES':
         return (
           <div className="space-y-3">
@@ -1254,7 +1262,7 @@ export default function Dashboard() {
               <span className="text-pink-400 text-sm font-semibold">Database Completa</span>
               <span className="text-pink-400 font-bold text-lg">{playersStats.totalPlayers}</span>
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Jogadores Livres</span>
@@ -1281,7 +1289,7 @@ export default function Dashboard() {
             </div>
           </div>
         )
-      
+
       case 'TABELA':
         const teamInTable = leagueTable.find(t => t.team_id === team?.id)
         const top5Table = leagueTable.slice(0, 5)
@@ -1305,7 +1313,7 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              
+
               {teamInTable && (
                 <div className="grid grid-cols-4 gap-2 text-xs mt-3">
                   <div className="text-center bg-zinc-800/30 p-2 rounded">
@@ -1342,31 +1350,28 @@ export default function Dashboard() {
                 </div>
                 <span className="text-zinc-500 text-xs">Pts J V E D</span>
               </div>
-              
+
               <div className="space-y-1">
                 {top5Table.map((teamTable) => (
-                  <div 
+                  <div
                     key={teamTable.id}
-                    className={`flex items-center justify-between p-2 rounded text-xs ${
-                      teamTable.team_id === team?.id
-                        ? 'bg-yellow-500/10 border border-yellow-500/20' 
+                    className={`flex items-center justify-between p-2 rounded text-xs ${teamTable.team_id === team?.id
+                        ? 'bg-yellow-500/10 border border-yellow-500/20'
                         : 'bg-zinc-800/30'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className={`w-6 text-center font-bold ${
-                        teamTable.position === 1 ? 'text-yellow-400' :
-                        teamTable.position === 2 ? 'text-zinc-300' :
-                        teamTable.position === 3 ? 'text-amber-700' :
-                        'text-zinc-400'
-                      }`}>
+                      <span className={`w-6 text-center font-bold ${teamTable.position === 1 ? 'text-yellow-400' :
+                          teamTable.position === 2 ? 'text-zinc-300' :
+                            teamTable.position === 3 ? 'text-amber-700' :
+                              'text-zinc-400'
+                        }`}>
                         {teamTable.position}º
                       </span>
-                      <span className={`font-medium ${
-                        teamTable.team_id === team?.id
-                          ? 'text-yellow-300' 
+                      <span className={`font-medium ${teamTable.team_id === team?.id
+                          ? 'text-yellow-300'
                           : 'text-white'
-                      }`}>
+                        }`}>
                         {teamTable.team_name}
                       </span>
                     </div>
@@ -1391,7 +1396,7 @@ export default function Dashboard() {
                 </div>
                 <span className="text-zinc-500 text-xs">Resultado</span>
               </div>
-              
+
               <div className="space-y-2">
                 {nextMatches.length > 0 ? (
                   nextMatches.map((match) => (
@@ -1404,32 +1409,28 @@ export default function Dashboard() {
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-1">
-                          <div className={`w-2 h-2 rounded-full ${
-                            match.home_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
-                          }`} />
-                          <span className={`${
-                            match.home_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
-                          }`}>
+                          <div className={`w-2 h-2 rounded-full ${match.home_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
+                            }`} />
+                          <span className={`${match.home_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
+                            }`}>
                             {match.home_team_name}
                           </span>
                         </div>
-                        
+
                         <div className="mx-2">
                           <MatchResult match={match} />
                         </div>
-                        
+
                         <div className="flex items-center gap-2 flex-1 justify-end">
-                          <span className={`${
-                            match.away_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
-                          }`}>
+                          <span className={`${match.away_team_id === team?.id ? 'text-yellow-300 font-semibold' : 'text-white'
+                            }`}>
                             {match.away_team_name}
                           </span>
-                          <div className={`w-2 h-2 rounded-full ${
-                            match.away_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
-                          }`} />
+                          <div className={`w-2 h-2 rounded-full ${match.away_team_id === team?.id ? 'bg-yellow-400' : 'bg-zinc-500'
+                            }`} />
                         </div>
                       </div>
-                      
+
                       {/* Estatísticas da partida (se finalizada) */}
                       {match.status === 'finished' && (
                         <div className="mt-2 pt-2 border-t border-zinc-700/50">
@@ -1469,10 +1470,10 @@ export default function Dashboard() {
                       {teamStats.last_5_matches.map((result, index) => (
                         <span key={index} className={`
                           w-5 h-5 flex items-center justify-center rounded text-[10px] font-bold
-                          ${result === 'V' ? 'bg-green-500/30 text-green-400' : 
-                            result === 'E' ? 'bg-yellow-500/30 text-yellow-400' : 
-                            result === 'D' ? 'bg-red-500/30 text-red-400' :
-                            'bg-zinc-700 text-zinc-400'}
+                          ${result === 'V' ? 'bg-green-500/30 text-green-400' :
+                            result === 'E' ? 'bg-yellow-500/30 text-yellow-400' :
+                              result === 'D' ? 'bg-red-500/30 text-red-400' :
+                                'bg-zinc-700 text-zinc-400'}
                         `}>
                           {result}
                         </span>
@@ -1485,7 +1486,33 @@ export default function Dashboard() {
             )}
           </div>
         )
-      
+
+      case 'INFORMAÇÕES':
+        return (
+          <div className="space-y-3">
+            <div className="p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="w-4 h-4 text-indigo-400" />
+                <span className="text-indigo-400 font-semibold text-sm">Pontos Importantes</span>
+              </div>
+              <ul className="space-y-2 text-xs text-zinc-300">
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                  Jogue sempre com seriedade
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                  Prazo de 10 dias para jogos
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                  Respeito e Fair Play obrigatórios
+                </li>
+              </ul>
+            </div>
+          </div>
+        )
+
       default:
         return (
           <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-center">
@@ -1498,12 +1525,12 @@ export default function Dashboard() {
   // Função para determinar a posição do tile expandido
   const getTilePositionClass = (tileTitle: string, index: number) => {
     if (expandedTile !== tileTitle) return ''
-    
+
     // Tile na posição 3 (JOGADORES) - expande para a esquerda mantendo a posição
     if (index === 2) {
       return 'lg:col-start-2 lg:col-span-2 row-start-1 scale-105 shadow-2xl z-10'
     }
-    
+
     // Demais tiles - comportamento padrão (expandem para a direita)
     return 'lg:col-span-2 scale-105 shadow-2xl z-10'
   }
@@ -1520,12 +1547,12 @@ export default function Dashboard() {
             {/* Header do conteúdo */}
             <div className="flex flex-col md:flex-row items-center gap-4 lg:gap-6 pt-4 lg:pt-6">
               {team?.logo_url ? (
-                <Image 
-                  src={team.logo_url} 
-                  alt={team.name} 
-                  width={100} 
-                  height={100} 
-                  className="rounded-2xl lg:rounded-3xl border-4 lg:border-6 border-purple-600/30 shadow-xl lg:shadow-2xl object-cover" 
+                <Image
+                  src={team.logo_url}
+                  alt={team.name}
+                  width={100}
+                  height={100}
+                  className="rounded-2xl lg:rounded-3xl border-4 lg:border-6 border-purple-600/30 shadow-xl lg:shadow-2xl object-cover"
                 />
               ) : (
                 <Avatar className="h-24 w-24 lg:h-32 lg:w-32 border-4 lg:border-6 border-purple-600/30">
@@ -1607,11 +1634,10 @@ export default function Dashboard() {
               {tiles.map((tile, index) => (
                 <Card
                   key={tile.title}
-                  className={`group relative overflow-hidden rounded-xl lg:rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg lg:shadow-xl transition-all duration-700 cursor-pointer ${
-                    expandedTile === tile.title
+                  className={`group relative overflow-hidden rounded-xl lg:rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg lg:shadow-xl transition-all duration-700 cursor-pointer ${expandedTile === tile.title
                       ? getTilePositionClass(tile.title, index)
                       : 'hover:scale-105 hover:shadow-purple-600/40'
-                  }`}
+                    }`}
                   onClick={() => setExpandedTile(expandedTile === tile.title ? null : tile.title)}
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
@@ -1621,7 +1647,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2 lg:gap-3">
                         <tile.icon className={`h-6 w-6 lg:h-8 lg:w-8 text-${tile.color}-400 drop-shadow-lg`} />
                         <span className="truncate">{tile.title}</span>
-                        
+
                         {/* Ícone de aviso para MEU ELENCO se houver problema (primeiro estágio) */}
                         {tile.title === 'MEU ELENCO' && playerCountWarning.show && expandedTile !== tile.title && (
                           <button
@@ -1732,13 +1758,13 @@ export default function Dashboard() {
         {/* Chat Components */}
         {user && team && (
           <>
-            <FloatingChatButton 
+            <FloatingChatButton
               currentUser={chatUser}
               currentTeam={chatTeam}
               unreadCount={unreadCount}
               onOpenChat={() => setIsChatOpen(true)}
             />
-            
+
             <ChatPopup
               isOpen={isChatOpen}
               onClose={() => setIsChatOpen(false)}

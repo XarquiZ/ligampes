@@ -4,21 +4,22 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { 
-  DollarSign, 
-  Shirt, 
-  Calendar, 
-  LogOut, 
-  Crown, 
-  ArrowLeftRight, 
-  Users, 
+import {
+  DollarSign,
+  Shirt,
+  Calendar,
+  LogOut,
+  Crown,
+  ArrowLeftRight,
+  Users,
   ChevronRight,
   Home,
   Menu,
   X,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
-  Trophy
+  Trophy,
+  ScrollText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -46,47 +47,53 @@ interface SidebarProps {
 }
 
 const navigationItems = [
-  { 
-    name: 'Dashboard', 
-    href: '/dashboard', 
+  {
+    name: 'Dashboard',
+    href: '/dashboard',
     icon: Home,
     color: 'text-blue-400'
   },
-  { 
-    name: 'Saldo', 
-    href: '/dashboard/saldo', 
-    icon: DollarSign, 
-    color: 'text-green-400' 
+  {
+    name: 'Saldo',
+    href: '/dashboard/saldo',
+    icon: DollarSign,
+    color: 'text-green-400'
   },
-  { 
-    name: 'Meu Elenco', 
-    href: '/dashboard/elenco', 
-    icon: Shirt, 
-    color: 'text-blue-400' 
+  {
+    name: 'Meu Elenco',
+    href: '/dashboard/elenco',
+    icon: Shirt,
+    color: 'text-blue-400'
   },
-  { 
-    name: 'Jogadores', 
-    href: '/dashboard/jogadores', 
-    icon: Users, 
-    color: 'text-pink-400' 
+  {
+    name: 'Jogadores',
+    href: '/dashboard/jogadores',
+    icon: Users,
+    color: 'text-pink-400'
   },
-  { 
-    name: 'Transferências', 
-    href: '/dashboard/transferencias', 
-    icon: ArrowLeftRight, 
-    color: 'text-purple-400' 
+  {
+    name: 'Transferências',
+    href: '/dashboard/transferencias',
+    icon: ArrowLeftRight,
+    color: 'text-purple-400'
   },
-  { 
-    name: 'Leilão', 
-    href: '/dashboard/leilao', 
-    icon: Calendar, 
-    color: 'text-red-400' 
+  {
+    name: 'Leilão',
+    href: '/dashboard/leilao',
+    icon: Calendar,
+    color: 'text-red-400'
   },
-  { 
-    name: 'Tabela', 
-    href: '/dashboard/tabela', 
-    icon: Trophy, 
-    color: 'text-yellow-400' 
+  {
+    name: 'Tabela',
+    href: '/dashboard/tabela',
+    icon: Trophy,
+    color: 'text-yellow-400'
+  },
+  {
+    name: 'Informações',
+    href: '/dashboard/informacoes',
+    icon: ScrollText,
+    color: 'text-indigo-400'
   },
 ]
 
@@ -195,7 +202,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
 
       {/* Overlay para mobile */}
       {isMobileOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 bg-black/60 z-30"
           onClick={() => {
             setIsMobileOpen(false)
@@ -207,7 +214,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
       )}
 
       {/* Sidebar - SEMPRE FIXO À ESQUERDA */}
-      <div 
+      <div
         className={cn(
           "fixed top-0 left-0 h-screen bg-zinc-900 border-r border-white/10 z-40",
           "transform transition-all duration-300 ease-in-out",
@@ -226,7 +233,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
         <div className="flex flex-col h-full relative">
           {/* Header */}
           <div className="p-3 border-b border-white/10">
-            <div 
+            <div
               className={cn(
                 "flex items-center gap-3 mb-3 cursor-pointer",
                 isCollapsed ? "justify-center" : ""
@@ -238,11 +245,11 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
                   "relative rounded-full border-2 border-purple-500 overflow-hidden hover:border-purple-400 transition-colors",
                   isCollapsed ? "w-8 h-8" : "w-12 h-12"
                 )}>
-                  <Image 
-                    src={team.logo_url} 
-                    alt={team.name} 
+                  <Image
+                    src={team.logo_url}
+                    alt={team.name}
                     fill
-                    className="object-cover" 
+                    className="object-cover"
                     sizes={isCollapsed ? "32px" : "48px"}
                   />
                 </div>
@@ -256,7 +263,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
                   </AvatarFallback>
                 </Avatar>
               )}
-              
+
               {!isCollapsed && (
                 <div className="flex-1 min-w-0">
                   <h2 className="text-base font-bold text-white truncate hover:text-purple-300 transition-colors">
@@ -271,8 +278,8 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
             </div>
 
             {!isCollapsed && (
-              <h1 
-                className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-xl font-black text-transparent cursor-pointer hover:opacity-90 transition-opacity" 
+              <h1
+                className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-xl font-black text-transparent cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={handleLogoClick}
               >
                 LIGA MPES
@@ -315,9 +322,9 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
           <nav className="flex-1 p-2 pt-3 space-y-1 overflow-y-auto">
             {navigationItems.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href || 
+              const isActive = pathname === item.href ||
                 (pathname.startsWith(item.href) && item.href !== '/dashboard')
-              
+
               return (
                 <Link
                   key={item.name}
@@ -331,8 +338,8 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
                   className={cn(
                     "flex items-center rounded-lg transition-all duration-200 group",
                     "hover:bg-white/5 hover:text-white",
-                    isActive 
-                      ? 'bg-white/10 text-white shadow-md' 
+                    isActive
+                      ? 'bg-white/10 text-white shadow-md'
                       : 'text-zinc-400',
                     isCollapsed ? 'justify-center p-2' : 'p-3 gap-3'
                   )}
@@ -343,14 +350,14 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
                     isCollapsed ? 'h-5 w-5' : 'h-5 w-5',
                     item.color
                   )} />
-                  
+
                   {!isCollapsed && (
                     <>
                       <span className="font-medium text-sm flex-1 truncate">{item.name}</span>
                       <ChevronRight className={cn(
                         "h-3 w-3 flex-shrink-0 transition-transform duration-200",
-                        isActive 
-                          ? 'translate-x-0 opacity-100' 
+                        isActive
+                          ? 'translate-x-0 opacity-100'
                           : 'translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100'
                       )} />
                     </>
@@ -380,7 +387,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
       </div>
 
       {/* Spacer para conteúdo principal */}
-      <div 
+      <div
         className={cn(
           "hidden lg:block transition-all duration-300",
           isCollapsed ? "w-16" : "w-64"
