@@ -3,13 +3,12 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { 
   CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
   Calendar, Users, ArrowRightLeft, X, Ban, ShoppingCart, 
   Gavel, User, UserPlus, Users as UsersIcon, Image as ImageIcon,
-  Filter
+  Filter, ChevronDown, ChevronRight
 } from 'lucide-react'
 import ExchangePlayers from './ExchangePlayers'
 import { Transfer, formatBalance, formatDateTime, isAuction } from './types'
@@ -55,6 +54,8 @@ export default function TransferCard({
   
   const [additionalPlayersDetails, setAdditionalPlayersDetails] = useState<PlayerDetails[]>([])
   const [loadingPlayers, setLoadingPlayers] = useState(false)
+  const [showAdditionalPlayers, setShowAdditionalPlayers] = useState(false)
+  const [showExchangeDetails, setShowExchangeDetails] = useState(false)
 
   // Buscar detalhes dos jogadores adicionais
   useEffect(() => {
@@ -156,7 +157,7 @@ export default function TransferCard({
         isMultiSell && "border-purple-500/20 hover:border-purple-500/40"
       )}
     >
-      {/* Badge de tipo de transferência */}
+      {/* Badge de tipo de transferência - IGUAL ORIGINAL */}
       <div className="flex justify-between items-start mb-3">
         <div className="flex gap-2">
           <Badge className={cn(
@@ -212,543 +213,800 @@ export default function TransferCard({
       </div>
 
       {transfer.status === 'pending' ? (
-        // LAYOUT COMPACTO PARA EM ANDAMENTO
+        // LAYOUT PARA EM ANDAMENTO
         <>
-          {/* Times e Valor em linha compacta */}
-          <div className="flex items-center justify-between mb-4">
-            {/* Time Vendedor */}
-            <div className="flex flex-col items-center text-center flex-1">
-              {isAuctionTransfer ? (
-                // Logo do Leilão
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center mb-1">
-                  <Gavel className="w-5 h-5 text-white" />
-                </div>
-              ) : transfer.from_team?.logo_url ? (
-                <img 
-                  src={transfer.from_team.logo_url} 
-                  alt={transfer.from_team.name}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-red-500/50 mb-1"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center mb-1">
-                  <span className="text-xs font-bold text-white">
-                    {transfer.from_team?.name?.substring(0, 2) || 'VD'}
-                  </span>
-                </div>
-              )}
-              <p className="text-white text-sm font-medium truncate w-full">
-                {isAuctionTransfer ? 'Leilão' : transfer.from_team?.name || 'Vendedor'}
-              </p>
-              <p className="text-zinc-400 text-xs">
-                {isAuctionTransfer ? 'Sistema de Leilão' : 'Vendedor'}
-              </p>
-            </div>
-
-            {/* Setas e Valor - Compacto */}
-            <div className="flex flex-col items-center mx-2">
-              <div className="flex items-center gap-1">
-                <ArrowRight className="w-4 h-4 text-yellow-400" />
-                <div className="flex flex-col items-center">
-                  <div className="flex items-center gap-1">
-                    {transfer.is_exchange ? (
-                      <ArrowRightLeft className="w-3 h-3 text-blue-400" />
-                    ) : isAuctionTransfer ? (
-                      <Gavel className="w-3 h-3 text-orange-400" />
-                    ) : (
-                      <DollarSign className="w-3 h-3 text-emerald-400" />
-                    )}
-                    <span className={cn(
-                      "font-bold text-sm",
-                      transfer.is_exchange ? "text-blue-400" : 
-                      isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
-                    )}>
-                      {formatBalance(transfer.value)}
+          {/* Layout Mobile - Apenas abaixo de 768px */}
+          <div className="sm:hidden">
+            {/* Cabeçalho Compacto Mobile */}
+            <div className="flex flex-col gap-3 mb-4">
+              {/* Jogador */}
+              <div className="flex items-center gap-3">
+                {transfer.player?.photo_url ? (
+                  <img 
+                    src={transfer.player.photo_url} 
+                    alt={transfer.player.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                    <span className="text-sm font-black text-white">
+                      {transfer.player?.position || 'N/A'}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <h3 className="text-base font-bold text-white truncate">
+                    {transfer.player?.name || 'Jogador Desconhecido'}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className="bg-purple-600 text-xs">
+                      {transfer.player?.position || 'N/A'}
+                    </Badge>
+                    <span className="text-yellow-400 text-xs font-semibold">
+                      ⏳ Aguardando
                     </span>
                   </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-yellow-400" />
               </div>
-              <p className="text-zinc-400 text-xs mt-1 text-center">
-                {isAuctionTransfer ? 'Leilão' : transfer.is_exchange ? 'Troca' : 'Venda'}
-              </p>
-            </div>
 
-            {/* Time Comprador */}
-            <div className="flex flex-col items-center text-center flex-1">
-              {transfer.to_team?.logo_url ? (
-                <img 
-                  src={transfer.to_team.logo_url} 
-                  alt={transfer.to_team.name}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-green-500/50 mb-1"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center mb-1">
-                  <span className="text-xs font-bold text-white">
-                    {transfer.to_team?.name?.substring(0, 2) || 'CP'}
-                  </span>
+              {/* Times e Valor - Mobile Vertical */}
+              <div className="flex flex-col items-center gap-2">
+                {/* Time Vendedor */}
+                <div className="flex items-center gap-2 w-full">
+                  <div className="flex items-center gap-2 flex-1">
+                    {isAuctionTransfer ? (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
+                        <Gavel className="w-4 h-4 text-white" />
+                      </div>
+                    ) : transfer.from_team?.logo_url ? (
+                      <img 
+                        src={transfer.from_team.logo_url} 
+                        alt={transfer.from_team.name}
+                        className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">
+                          {transfer.from_team?.name?.substring(0, 2) || 'VD'}
+                        </span>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-white text-sm font-medium">
+                        {isAuctionTransfer ? 'Leilão' : transfer.from_team?.name || 'Vendedor'}
+                      </p>
+                      <p className="text-zinc-400 text-xs">
+                        {isAuctionTransfer ? 'Sistema' : 'Vendedor'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              )}
-              <p className="text-white text-sm font-medium truncate w-full">
-                {transfer.to_team?.name || 'Comprador'}
-              </p>
-              <p className="text-zinc-400 text-xs">Comprador</p>
-            </div>
-          </div>
 
-          {/* Seção de jogadores */}
-          {hasMultiplePlayers ? (
-            // Exibir múltiplos jogadores em vendas múltiplas
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <UsersIcon className="w-4 h-4 text-purple-400" />
-                <h4 className="text-sm font-semibold text-white">
-                  {transfer.transfer_players?.length || 0} Jogadores na Venda
-                </h4>
-              </div>
-              
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {/* Jogador principal (primeiro da lista) */}
-                <div className="flex items-center gap-3 p-3 bg-purple-900/20 rounded-lg border border-purple-500/30">
-                  {transfer.player?.photo_url ? (
-                    <img 
-                      src={transfer.player.photo_url} 
-                      alt={transfer.player.name}
-                      className="w-10 h-10 rounded-full object-cover border-2 border-purple-500"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                      <span className="text-xs font-black text-white">
-                        {transfer.player?.position || 'N/A'}
+                {/* Setas e Valor - Centralizado */}
+                <div className="flex items-center justify-center w-full py-1">
+                  <div className="flex items-center gap-1">
+                    <ArrowRight className="w-4 h-4 text-yellow-400" />
+                    <div className="flex items-center gap-1 mx-2">
+                      {transfer.is_exchange ? (
+                        <ArrowRightLeft className="w-3 h-3 text-blue-400" />
+                      ) : isAuctionTransfer ? (
+                        <Gavel className="w-3 h-3 text-orange-400" />
+                      ) : (
+                        <DollarSign className="w-3 h-3 text-emerald-400" />
+                      )}
+                      <span className={cn(
+                        "font-bold text-sm",
+                        transfer.is_exchange ? "text-blue-400" : 
+                        isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
+                      )}>
+                        {formatBalance(transfer.value)}
                       </span>
                     </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-white truncate">
-                        {transfer.player?.name || 'Jogador Desconhecido'}
-                      </h3>
-                      <Badge className="bg-purple-600 text-[10px]">
-                        {transfer.player?.position || 'N/A'}
-                      </Badge>
-                    </div>
-                    <p className="text-purple-300 text-xs mt-1">
-                      Principal
-                    </p>
+                    <ArrowRight className="w-4 h-4 text-yellow-400" />
                   </div>
                 </div>
-                
-                {/* Outros jogadores */}
-                {loadingPlayers ? (
-                  <div className="flex justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
-                  </div>
-                ) : (
-                  (transfer.transfer_players?.slice(1) || []).map((playerId: string, index: number) => {
-                    const playerName = getPlayerName(playerId, index)
-                    const playerPhoto = getPlayerPhoto(playerId)
-                    const playerPosition = getPlayerPosition(playerId)
-                    const playerOverall = getPlayerOverall(playerId)
-                    const playerValue = transfer.player_values?.[index + 1]
-                    
-                    return (
-                      <div key={playerId || index} className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg border border-zinc-700/50">
-                        {playerPhoto ? (
-                          <img 
-                            src={playerPhoto} 
-                            alt={playerName}
-                            className="w-10 h-10 rounded-full object-cover border-2 border-blue-500"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-700 to-cyan-700 flex items-center justify-center">
-                            <ImageIcon className="w-5 h-5 text-white" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-sm font-medium text-white truncate">
-                                {playerName}
-                              </h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge className="bg-blue-600 text-[10px]">
-                                  {playerPosition}
-                                </Badge>
-                                <span className="text-zinc-400 text-xs">OVR {playerOverall}</span>
-                              </div>
-                            </div>
-                            {playerValue && (
-                              <span className="text-emerald-400 text-xs font-bold ml-2">
-                                R$ {playerValue.toLocaleString('pt-BR')}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-zinc-400 text-xs mt-1">
-                            Jogador adicional
-                          </p>
-                        </div>
+
+                {/* Time Comprador */}
+                <div className="flex items-center gap-2 w-full">
+                  <div className="flex items-center gap-2 flex-1">
+                    {transfer.to_team?.logo_url ? (
+                      <img 
+                        src={transfer.to_team.logo_url} 
+                        alt={transfer.to_team.name}
+                        className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">
+                          {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+                        </span>
                       </div>
-                    )
-                  })
+                    )}
+                    <div>
+                      <p className="text-white text-sm font-medium">
+                        {transfer.to_team?.name || 'Comprador'}
+                      </p>
+                      <p className="text-zinc-400 text-xs">Comprador</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Jogadores da Troca (se for troca) - Mobile Collapsible */}
+            {transfer.is_exchange && (
+              <div className="mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowExchangeDetails(!showExchangeDetails)}
+                  className="w-full justify-between text-white hover:bg-zinc-800"
+                >
+                  <span className="flex items-center gap-2">
+                    <ArrowRightLeft className="w-4 h-4 text-blue-400" />
+                    Ver jogadores da troca
+                  </span>
+                  {showExchangeDetails ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </Button>
+                
+                {showExchangeDetails && (
+                  <div className="mt-2">
+                    <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />
+                  </div>
                 )}
               </div>
-              
-              <div className="mt-3 p-2 bg-zinc-900/50 rounded-lg">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-zinc-400">Total de jogadores:</span>
-                  <span className="text-white font-bold">{transfer.transfer_players?.length || 1}</span>
+            )}
+
+            {/* Aprovações - Mobile Grid */}
+            <div className="mb-4">
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {/* Vendedor */}
+                <div className="text-center">
+                  <div className="group relative inline-block">
+                    <CheckCircle2
+                      className={cn(
+                        "h-8 w-8 mx-auto transition-all",
+                        transfer.approved_by_seller ? "text-green-400" : "text-zinc-600"
+                      )}
+                    />
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    {isAuctionTransfer ? 'Sistema' : 'Vendedor'}
+                  </p>
                 </div>
-                <div className="flex justify-between items-center text-sm mt-1">
-                  <span className="text-zinc-400">Valor total:</span>
-                  <span className="text-emerald-400 font-bold">{formatBalance(transfer.value)}</span>
+
+                {/* Comprador */}
+                <div className="text-center">
+                  <div className="group relative inline-block">
+                    <CheckCircle2
+                      className={cn(
+                        "h-8 w-8 mx-auto transition-all",
+                        transfer.approved_by_buyer ? "text-green-400" : "text-zinc-600"
+                      )}
+                    />
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1">Comprador</p>
+                </div>
+
+                {/* Admin */}
+                <div className="text-center">
+                  <div className="group relative inline-block">
+                    <CheckCircle2
+                      className={cn(
+                        "h-8 w-8 mx-auto transition-all",
+                        transfer.approved_by_admin ? "text-green-400" : "text-zinc-600"
+                      )}
+                    />
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1">Admin</p>
                 </div>
               </div>
-            </div>
-          ) : (
-            // Exibir jogador único (para vendas normais ou trocas)
-            <div className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg mb-4">
-              {transfer.player?.photo_url ? (
-                <img 
-                  src={transfer.player.photo_url} 
-                  alt={transfer.player.name}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                  <span className="text-sm font-black text-white">
-                    {transfer.player?.position || 'N/A'}
-                  </span>
+
+              {/* Botões de aprovação mobile */}
+              {(userTeamId === transfer.from_team_id || userTeamId === transfer.to_team_id || isAdmin) && (
+                <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
+                    {userTeamId === transfer.from_team_id && !transfer.approved_by_seller && !isAuctionTransfer && (
+                      <Button
+                        onClick={() => aprovar(transfer.id, 'seller')}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white text-xs w-full"
+                      >
+                        Aprovar Vendedor
+                      </Button>
+                    )}
+                    {userTeamId === transfer.to_team_id && !transfer.approved_by_buyer && (
+                      <Button
+                        onClick={() => aprovar(transfer.id, 'buyer')}
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs w-full"
+                      >
+                        Aprovar Comprador
+                      </Button>
+                    )}
+                    {isAdmin && !transfer.approved_by_admin && (
+                      <Button
+                        onClick={() => aprovar(transfer.id, 'admin')}
+                        size="sm"
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs w-full"
+                      >
+                        Aprovar Admin
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* BOTÃO DE CANCELAR - APENAS PARA ADMIN */}
+                  {isAdmin && (
+                    <div className="flex justify-center">
+                      <Button
+                        onClick={() => rejeitarTransferencia(transfer.id)}
+                        variant="outline"
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700 text-white border-red-600 text-xs w-full"
+                      >
+                        <Ban className="w-3 h-3 mr-1" />
+                        Cancelar
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Mensagem se já aprovou */}
+                  {((userTeamId === transfer.from_team_id && transfer.approved_by_seller) ||
+                    (userTeamId === transfer.to_team_id && transfer.approved_by_buyer) ||
+                    (isAdmin && transfer.approved_by_admin)) && (
+                    <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
+                      <CheckCircle className="w-3 h-3" />
+                      Você já aprovou esta negociação
+                    </p>
+                  )}
                 </div>
               )}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-white truncate">
-                  {transfer.player?.name || 'Jogador Desconhecido'}
-                </h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge className="bg-purple-600 text-xs">
-                    {transfer.player?.position || 'N/A'}
-                  </Badge>
-                  <span className="text-yellow-400 text-xs font-semibold">
-                    ⏳ Aguardando
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Jogadores da Troca (se for troca) */}
-          {transfer.is_exchange && <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />}
-
-          {/* Aprovações - Compacto */}
-          <div className="flex items-center justify-between mb-4 px-2">
-            {/* Vendedor */}
-            <div className="text-center group relative">
-              <div className="group relative">
-                <CheckCircle2
-                  className={cn(
-                    "h-8 w-8 transition-all cursor-help",
-                    transfer.approved_by_seller ? "text-green-400" : "text-zinc-600"
-                  )}
-                />
-                {/* Tooltip para Vendedor */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
-                  <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
-                    <div className="flex items-center gap-2">
-                      {transfer.approved_by_seller ? (
-                        <>
-                          {isAuctionTransfer ? (
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
-                              <Gavel className="w-3 h-3 text-white" />
-                            </div>
-                          ) : transfer.from_team?.logo_url ? (
-                            <img 
-                              src={transfer.from_team.logo_url} 
-                              alt={transfer.from_team.name}
-                              className="w-5 h-5 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
-                              <span className="text-[8px] font-bold text-white">
-                                {transfer.from_team?.name?.substring(0, 2) || 'VD'}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-semibold">
-                              {isAuctionTransfer ? 'Sistema de Leilão' : transfer.from_team?.name || 'Vendedor'}
-                            </p>
-                            <p className="text-green-400 text-[10px]">✓ Aprovado</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          {isAuctionTransfer ? (
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
-                              <Gavel className="w-3 h-3 text-white" />
-                            </div>
-                          ) : transfer.from_team?.logo_url ? (
-                            <img 
-                              src={transfer.from_team.logo_url} 
-                              alt={transfer.from_team.name}
-                              className="w-5 h-5 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
-                              <span className="text-[8px] font-bold text-white">
-                                {transfer.from_team?.name?.substring(0, 2) || 'VD'}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-semibold">
-                              {isAuctionTransfer ? 'Sistema de Leilão' : transfer.from_team?.name || 'Vendedor'}
-                            </p>
-                            <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {/* Seta do tooltip */}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                    <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-zinc-400 mt-1">
-                {isAuctionTransfer ? 'Sistema' : 'Vendedor'}
-              </p>
-            </div>
-
-            {/* Comprador */}
-            <div className="text-center group relative">
-              <div className="group relative">
-                <CheckCircle2
-                  className={cn(
-                    "h-8 w-8 transition-all cursor-help",
-                    transfer.approved_by_buyer ? "text-green-400" : "text-zinc-600"
-                  )}
-                />
-                {/* Tooltip para Comprador */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
-                  <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
-                    <div className="flex items-center gap-2">
-                      {transfer.approved_by_buyer ? (
-                        <>
-                          {transfer.to_team?.logo_url ? (
-                            <img 
-                              src={transfer.to_team.logo_url} 
-                              alt={transfer.to_team.name}
-                              className="w-5 h-5 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
-                              <span className="text-[8px] font-bold text-white">
-                                {transfer.to_team?.name?.substring(0, 2) || 'CP'}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-semibold">{transfer.to_team?.name || 'Comprador'}</p>
-                            <p className="text-green-400 text-[10px]">✓ Aprovado</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          {transfer.to_team?.logo_url ? (
-                            <img 
-                              src={transfer.to_team.logo_url} 
-                              alt={transfer.to_team.name}
-                              className="w-5 h-5 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
-                              <span className="text-[8px] font-bold text-white">
-                                {transfer.to_team?.name?.substring(0, 2) || 'CP'}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <p className="font-semibold">{transfer.to_team?.name || 'Comprador'}</p>
-                            <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {/* Seta do tooltip */}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                    <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-zinc-400 mt-1">Comprador</p>
-            </div>
-
-            {/* Admin */}
-            <div className="text-center group relative">
-              <div className="group relative">
-                <CheckCircle2
-                  className={cn(
-                    "h-8 w-8 transition-all cursor-help",
-                    transfer.approved_by_admin ? "text-green-400" : "text-zinc-600"
-                  )}
-                />
-                {/* Tooltip para Admin */}
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
-                  <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
-                    <div className="flex items-center gap-2">
-                      {transfer.approved_by_admin ? (
-                        <>
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                            <UsersIcon className="w-3 h-3 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-semibold">Administração</p>
-                            <p className="text-green-400 text-[10px]">✓ Aprovado</p>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
-                            <UsersIcon className="w-3 h-3 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-semibold">Administração</p>
-                            <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {/* Seta do tooltip */}
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                    <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-zinc-400 mt-1">Admin</p>
             </div>
           </div>
 
-          {/* Botões de aprovação */}
-          {(userTeamId === transfer.from_team_id || userTeamId === transfer.to_team_id || isAdmin) && (
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-2 justify-center">
-                {userTeamId === transfer.from_team_id && !transfer.approved_by_seller && !isAuctionTransfer && (
-                  <Button
-                    onClick={() => aprovar(transfer.id, 'seller')}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-white text-xs px-3"
-                  >
-                    Aprovar Vendedor
-                  </Button>
+          {/* Layout Desktop - IGUAL ORIGINAL (768px+) */}
+          <div className="hidden sm:block">
+            {/* Times e Valor em linha compacta */}
+            <div className="flex items-center justify-between mb-4">
+              {/* Time Vendedor */}
+              <div className="flex flex-col items-center text-center flex-1">
+                {isAuctionTransfer ? (
+                  // Logo do Leilão
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center mb-1">
+                    <Gavel className="w-5 h-5 text-white" />
+                  </div>
+                ) : transfer.from_team?.logo_url ? (
+                  <img 
+                    src={transfer.from_team.logo_url} 
+                    alt={transfer.from_team.name}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-red-500/50 mb-1"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center mb-1">
+                    <span className="text-xs font-bold text-white">
+                      {transfer.from_team?.name?.substring(0, 2) || 'VD'}
+                    </span>
+                  </div>
                 )}
-                {userTeamId === transfer.to_team_id && !transfer.approved_by_buyer && (
-                  <Button
-                    onClick={() => aprovar(transfer.id, 'buyer')}
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3"
-                  >
-                    Aprovar Comprador
-                  </Button>
-                )}
-                {isAdmin && !transfer.approved_by_admin && (
-                  <Button
-                    onClick={() => aprovar(transfer.id, 'admin')}
-                    size="sm"
-                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3"
-                  >
-                    Aprovar Admin
-                  </Button>
-                )}
+                <p className="text-white text-sm font-medium truncate w-full">
+                  {isAuctionTransfer ? 'Leilão' : transfer.from_team?.name || 'Vendedor'}
+                </p>
+                <p className="text-zinc-400 text-xs">
+                  {isAuctionTransfer ? 'Sistema de Leilão' : 'Vendedor'}
+                </p>
               </div>
 
-              {/* BOTÃO DE CANCELAR - APENAS PARA ADMIN */}
-              {isAdmin && (
-                <div className="flex justify-center">
-                  <Button
-                    onClick={() => rejeitarTransferencia(transfer.id)}
-                    variant="outline"
-                    size="sm"
-                    className="bg-red-600 hover:bg-red-700 text-white border-red-600 text-xs"
-                  >
-                    <Ban className="w-3 h-3 mr-1" />
-                    Cancelar
-                  </Button>
+              {/* Setas e Valor - Compacto */}
+              <div className="flex flex-col items-center mx-2">
+                <div className="flex items-center gap-1">
+                  <ArrowRight className="w-4 h-4 text-yellow-400" />
+                  <div className="flex flex-col items-center">
+                    <div className="flex items-center gap-1">
+                      {transfer.is_exchange ? (
+                        <ArrowRightLeft className="w-3 h-3 text-blue-400" />
+                      ) : isAuctionTransfer ? (
+                        <Gavel className="w-3 h-3 text-orange-400" />
+                      ) : (
+                        <DollarSign className="w-3 h-3 text-emerald-400" />
+                      )}
+                      <span className={cn(
+                        "font-bold text-sm",
+                        transfer.is_exchange ? "text-blue-400" : 
+                        isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
+                      )}>
+                        {formatBalance(transfer.value)}
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-yellow-400" />
                 </div>
-              )}
-
-              {/* Mensagem se já aprovou */}
-              {((userTeamId === transfer.from_team_id && transfer.approved_by_seller) ||
-                (userTeamId === transfer.to_team_id && transfer.approved_by_buyer) ||
-                (isAdmin && transfer.approved_by_admin)) && (
-                <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
-                  <CheckCircle className="w-3 h-3" />
-                  Você já aprovou esta negociação
+                <p className="text-zinc-400 text-xs mt-1 text-center">
+                  {isAuctionTransfer ? 'Leilão' : transfer.is_exchange ? 'Troca' : 'Venda'}
                 </p>
-              )}
+              </div>
+
+              {/* Time Comprador */}
+              <div className="flex flex-col items-center text-center flex-1">
+                {transfer.to_team?.logo_url ? (
+                  <img 
+                    src={transfer.to_team.logo_url} 
+                    alt={transfer.to_team.name}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-green-500/50 mb-1"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center mb-1">
+                    <span className="text-xs font-bold text-white">
+                      {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+                    </span>
+                  </div>
+                )}
+                <p className="text-white text-sm font-medium truncate w-full">
+                  {transfer.to_team?.name || 'Comprador'}
+                </p>
+                <p className="text-zinc-400 text-xs">Comprador</p>
+              </div>
             </div>
-          )}
+
+            {/* Seção de jogadores - IGUAL ORIGINAL */}
+            {hasMultiplePlayers ? (
+              // Exibir múltiplos jogadores em vendas múltiplas
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <UsersIcon className="w-4 h-4 text-purple-400" />
+                  <h4 className="text-sm font-semibold text-white">
+                    {transfer.transfer_players?.length || 0} Jogadores na Venda
+                  </h4>
+                </div>
+                
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {/* Jogador principal (primeiro da lista) */}
+                  <div className="flex items-center gap-3 p-3 bg-purple-900/20 rounded-lg border border-purple-500/30">
+                    {transfer.player?.photo_url ? (
+                      <img 
+                        src={transfer.player.photo_url} 
+                        alt={transfer.player.name}
+                        className="w-10 h-10 rounded-full object-cover border-2 border-purple-500"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                        <span className="text-xs font-black text-white">
+                          {transfer.player?.position || 'N/A'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-white truncate">
+                          {transfer.player?.name || 'Jogador Desconhecido'}
+                        </h3>
+                        <Badge className="bg-purple-600 text-[10px]">
+                          {transfer.player?.position || 'N/A'}
+                        </Badge>
+                      </div>
+                      <p className="text-purple-300 text-xs mt-1">
+                        Principal
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Outros jogadores */}
+                  {loadingPlayers ? (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"></div>
+                    </div>
+                  ) : (
+                    (transfer.transfer_players?.slice(1) || []).map((playerId: string, index: number) => {
+                      const playerName = getPlayerName(playerId, index)
+                      const playerPhoto = getPlayerPhoto(playerId)
+                      const playerPosition = getPlayerPosition(playerId)
+                      const playerOverall = getPlayerOverall(playerId)
+                      const playerValue = transfer.player_values?.[index + 1]
+                      
+                      return (
+                        <div key={playerId || index} className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg border border-zinc-700/50">
+                          {playerPhoto ? (
+                            <img 
+                              src={playerPhoto} 
+                              alt={playerName}
+                              className="w-10 h-10 rounded-full object-cover border-2 border-blue-500"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-700 to-cyan-700 flex items-center justify-center">
+                              <ImageIcon className="w-5 h-5 text-white" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h3 className="text-sm font-medium text-white truncate">
+                                  {playerName}
+                                </h3>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge className="bg-blue-600 text-[10px]">
+                                    {playerPosition}
+                                  </Badge>
+                                  <span className="text-zinc-400 text-xs">OVR {playerOverall}</span>
+                                </div>
+                              </div>
+                              {playerValue && (
+                                <span className="text-emerald-400 text-xs font-bold ml-2">
+                                  R$ {playerValue.toLocaleString('pt-BR')}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-zinc-400 text-xs mt-1">
+                              Jogador adicional
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+                
+                <div className="mt-3 p-2 bg-zinc-900/50 rounded-lg">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-zinc-400">Total de jogadores:</span>
+                    <span className="text-white font-bold">{transfer.transfer_players?.length || 1}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm mt-1">
+                    <span className="text-zinc-400">Valor total:</span>
+                    <span className="text-emerald-400 font-bold">{formatBalance(transfer.value)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Exibir jogador único (para vendas normais ou trocas)
+              <div className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg mb-4">
+                {transfer.player?.photo_url ? (
+                  <img 
+                    src={transfer.player.photo_url} 
+                    alt={transfer.player.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                    <span className="text-sm font-black text-white">
+                      {transfer.player?.position || 'N/A'}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base font-bold text-white truncate">
+                    {transfer.player?.name || 'Jogador Desconhecido'}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className="bg-purple-600 text-xs">
+                      {transfer.player?.position || 'N/A'}
+                    </Badge>
+                    <span className="text-yellow-400 text-xs font-semibold">
+                      ⏳ Aguardando
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Jogadores da Troca (se for troca) - IGUAL ORIGINAL */}
+            {transfer.is_exchange && <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />}
+
+            {/* Aprovações - IGUAL ORIGINAL */}
+            <div className="flex items-center justify-between mb-4 px-2">
+              {/* Vendedor */}
+              <div className="text-center group relative">
+                <div className="group relative">
+                  <CheckCircle2
+                    className={cn(
+                      "h-8 w-8 transition-all cursor-help",
+                      transfer.approved_by_seller ? "text-green-400" : "text-zinc-600"
+                    )}
+                  />
+                  {/* Tooltip para Vendedor */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+                    <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
+                      <div className="flex items-center gap-2">
+                        {transfer.approved_by_seller ? (
+                          <>
+                            {isAuctionTransfer ? (
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
+                                <Gavel className="w-3 h-3 text-white" />
+                              </div>
+                            ) : transfer.from_team?.logo_url ? (
+                              <img 
+                                src={transfer.from_team.logo_url} 
+                                alt={transfer.from_team.name}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-white">
+                                  {transfer.from_team?.name?.substring(0, 2) || 'VD'}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-semibold">
+                                {isAuctionTransfer ? 'Sistema de Leilão' : transfer.from_team?.name || 'Vendedor'}
+                              </p>
+                              <p className="text-green-400 text-[10px]">✓ Aprovado</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {isAuctionTransfer ? (
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
+                                <Gavel className="w-3 h-3 text-white" />
+                              </div>
+                            ) : transfer.from_team?.logo_url ? (
+                              <img 
+                                src={transfer.from_team.logo_url} 
+                                alt={transfer.from_team.name}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-white">
+                                  {transfer.from_team?.name?.substring(0, 2) || 'VD'}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-semibold">
+                                {isAuctionTransfer ? 'Sistema de Leilão' : transfer.from_team?.name || 'Vendedor'}
+                              </p>
+                              <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {/* Seta do tooltip */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                      <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-400 mt-1">
+                  {isAuctionTransfer ? 'Sistema' : 'Vendedor'}
+                </p>
+              </div>
+
+              {/* Comprador */}
+              <div className="text-center group relative">
+                <div className="group relative">
+                  <CheckCircle2
+                    className={cn(
+                      "h-8 w-8 transition-all cursor-help",
+                      transfer.approved_by_buyer ? "text-green-400" : "text-zinc-600"
+                    )}
+                  />
+                  {/* Tooltip para Comprador */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+                    <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
+                      <div className="flex items-center gap-2">
+                        {transfer.approved_by_buyer ? (
+                          <>
+                            {transfer.to_team?.logo_url ? (
+                              <img 
+                                src={transfer.to_team.logo_url} 
+                                alt={transfer.to_team.name}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-white">
+                                  {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-semibold">{transfer.to_team?.name || 'Comprador'}</p>
+                              <p className="text-green-400 text-[10px]">✓ Aprovado</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {transfer.to_team?.logo_url ? (
+                              <img 
+                                src={transfer.to_team.logo_url} 
+                                alt={transfer.to_team.name}
+                                className="w-5 h-5 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                                <span className="text-[8px] font-bold text-white">
+                                  {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+                                </span>
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-semibold">{transfer.to_team?.name || 'Comprador'}</p>
+                              <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {/* Seta do tooltip */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                      <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-400 mt-1">Comprador</p>
+              </div>
+
+              {/* Admin */}
+              <div className="text-center group relative">
+                <div className="group relative">
+                  <CheckCircle2
+                    className={cn(
+                      "h-8 w-8 transition-all cursor-help",
+                      transfer.approved_by_admin ? "text-green-400" : "text-zinc-600"
+                    )}
+                  />
+                  {/* Tooltip para Admin */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
+                    <div className="bg-gray-800 text-white text-xs rounded-lg py-2 px-3 shadow-lg border border-gray-700 min-w-[180px]">
+                      <div className="flex items-center gap-2">
+                        {transfer.approved_by_admin ? (
+                          <>
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                              <UsersIcon className="w-3 h-3 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold">Administração</p>
+                              <p className="text-green-400 text-[10px]">✓ Aprovado</p>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center">
+                              <UsersIcon className="w-3 h-3 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold">Administração</p>
+                              <p className="text-yellow-400 text-[10px]">⏳ Aguardando aprovação</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {/* Seta do tooltip */}
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                      <div className="w-2 h-2 bg-gray-800 border-l border-t border-gray-700 rotate-45"></div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-400 mt-1">Admin</p>
+              </div>
+            </div>
+
+            {/* Botões de aprovação - IGUAL ORIGINAL */}
+            {(userTeamId === transfer.from_team_id || userTeamId === transfer.to_team_id || isAdmin) && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {userTeamId === transfer.from_team_id && !transfer.approved_by_seller && !isAuctionTransfer && (
+                    <Button
+                      onClick={() => aprovar(transfer.id, 'seller')}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white text-xs px-3"
+                    >
+                      Aprovar Vendedor
+                    </Button>
+                  )}
+                  {userTeamId === transfer.to_team_id && !transfer.approved_by_buyer && (
+                    <Button
+                      onClick={() => aprovar(transfer.id, 'buyer')}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3"
+                    >
+                      Aprovar Comprador
+                    </Button>
+                  )}
+                  {isAdmin && !transfer.approved_by_admin && (
+                    <Button
+                      onClick={() => aprovar(transfer.id, 'admin')}
+                      size="sm"
+                      className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-3"
+                    >
+                      Aprovar Admin
+                    </Button>
+                  )}
+                </div>
+
+                {/* BOTÃO DE CANCELAR - APENAS PARA ADMIN */}
+                {isAdmin && (
+                  <div className="flex justify-center">
+                    <Button
+                      onClick={() => rejeitarTransferencia(transfer.id)}
+                      variant="outline"
+                      size="sm"
+                      className="bg-red-600 hover:bg-red-700 text-white border-red-600 text-xs"
+                    >
+                      <Ban className="w-3 h-3 mr-1" />
+                      Cancelar
+                    </Button>
+                  </div>
+                )}
+
+                {/* Mensagem se já aprovou */}
+                {((userTeamId === transfer.from_team_id && transfer.approved_by_seller) ||
+                  (userTeamId === transfer.to_team_id && transfer.approved_by_buyer) ||
+                  (isAdmin && transfer.approved_by_admin)) && (
+                  <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
+                    <CheckCircle className="w-3 h-3" />
+                    Você já aprovou esta negociação
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </>
       ) : (
         // LAYOUT PARA TRANSFERÊNCIAS FINALIZADAS
-        <div className="space-y-3">
-          {/* Header com data/hora */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-zinc-400">
-              <Calendar className="w-3 h-3" />
-              <span className="text-xs">
-                {formatDateTime(transfer.created_at).date} às {formatDateTime(transfer.created_at).time}
+        <>
+          {/* Layout Mobile - Apenas abaixo de 768px */}
+          <div className="sm:hidden space-y-3">
+            {/* Header com data/hora - Mobile Compact */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-zinc-400">
+                <Calendar className="w-3 h-3" />
+                <span className="text-xs">
+                  {formatDateTime(transfer.created_at).date}
+                </span>
+              </div>
+              <span className="text-zinc-400 text-xs">
+                {formatDateTime(transfer.created_at).time}
               </span>
             </div>
-          </div>
 
-          {/* Conteúdo principal */}
-          <div className="flex items-center justify-between">
-            {/* Time de Origem */}
-            <div className="flex items-center gap-2">
-              {isAuctionTransfer ? (
-                // Logo do Leilão
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
-                  <Gavel className="w-4 h-4 text-white" />
+            {/* Conteúdo principal - Mobile Vertical */}
+            <div className="flex flex-col gap-3">
+              {/* Time de Origem */}
+              <div className="flex items-center gap-2">
+                {isAuctionTransfer ? (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
+                    <Gavel className="w-4 h-4 text-white" />
+                  </div>
+                ) : transfer.from_team?.logo_url ? (
+                  <img 
+                    src={transfer.from_team.logo_url} 
+                    alt={transfer.from_team.name}
+                    className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                    <span className="text-xs font-bold text-white">
+                      {transfer.from_team?.name?.substring(0, 2) || 'VD'}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <p className="text-white text-sm font-semibold truncate">
+                    {isAuctionTransfer ? 'Leilão' : transfer.from_team?.name || 'Vendedor'}
+                  </p>
+                  <p className="text-zinc-400 text-[10px]">
+                    {isAuctionTransfer ? 'Sistema' : isDismissal ? 'Anterior' : 'Vendedor'}
+                  </p>
                 </div>
-              ) : transfer.from_team?.logo_url ? (
-                <img 
-                  src={transfer.from_team.logo_url} 
-                  alt={transfer.from_team.name}
-                  className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
-                  <span className="text-xs font-bold text-white">
-                    {transfer.from_team?.name?.substring(0, 2) || 'VD'}
-                  </span>
-                </div>
-              )}
-              <div className="text-right">
-                <p className="text-white text-xs font-semibold truncate max-w-[60px]">
-                  {isAuctionTransfer ? 'Leilão' : transfer.from_team?.name || 'Vendedor'}
-                </p>
-                <p className="text-zinc-400 text-[10px]">
-                  {isAuctionTransfer ? 'Sistema de Leilão' : 
-                   isDismissal ? 'Anterior' : 'Vendedor'}
-                </p>
               </div>
-            </div>
 
-            {/* Setas e Valor */}
-            <div className="flex flex-col items-center flex-1 mx-2">
-              <div className="flex items-center gap-1">
-                <ArrowRight className="w-3 h-3 text-yellow-400" />
+              {/* Valor Centralizado */}
+              <div className="flex flex-col items-center justify-center">
                 <div className="flex items-center gap-1">
                   {isDismissal ? (
-                    <X className="w-3 h-3 text-red-400" />
+                    <X className="w-4 h-4 text-red-400" />
                   ) : transfer.is_exchange ? (
-                    <ArrowRightLeft className="w-3 h-3 text-blue-400" />
+                    <ArrowRightLeft className="w-4 h-4 text-blue-400" />
                   ) : isAuctionTransfer ? (
-                    <Gavel className="w-3 h-3 text-orange-400" />
+                    <Gavel className="w-4 h-4 text-orange-400" />
                   ) : (
-                    <DollarSign className="w-3 h-3 text-emerald-400" />
+                    <DollarSign className="w-4 h-4 text-emerald-400" />
                   )}
                   <span className={cn(
                     "font-bold text-sm",
@@ -759,58 +1017,66 @@ export default function TransferCard({
                     {formatBalance(transfer.value)}
                   </span>
                 </div>
-                <ArrowRight className="w-3 h-3 text-yellow-400" />
+                <p className="text-zinc-400 text-[10px] mt-1">
+                  {isAuctionTransfer ? 'Leilão' : 
+                   isDismissal ? 'Dispensa' : transfer.is_exchange ? 'Troca' : 'Venda'}
+                </p>
               </div>
-              <p className="text-zinc-400 text-[10px] mt-1">
-                {isAuctionTransfer ? 'Leilão' : 
-                 isDismissal ? 'Dispensa' : transfer.is_exchange ? 'Troca' : 'Venda'}
-              </p>
+
+              {/* Destino */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <p className="text-white text-sm font-semibold truncate text-right">
+                    {isDismissal ? 'Sem Clube' : transfer.to_team?.name || 'Comprador'}
+                  </p>
+                  <p className="text-zinc-400 text-[10px] text-right">
+                    {isDismissal ? 'Destino' : 'Comprador'}
+                  </p>
+                </div>
+                {isDismissal ? (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-400 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-gray-300" />
+                  </div>
+                ) : transfer.to_team?.logo_url ? (
+                  <img 
+                    src={transfer.to_team.logo_url} 
+                    alt={transfer.to_team.name}
+                    className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                    <span className="text-xs font-bold text-white">
+                      {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Destino */}
-            <div className="flex items-center gap-2">
-              <div className="text-left">
-                <p className="text-white text-xs font-semibold truncate max-w-[60px]">
-                  {isDismissal ? 'Sem Clube' : transfer.to_team?.name || 'Comprador'}
-                </p>
-                <p className="text-zinc-400 text-[10px]">
-                  {isDismissal ? 'Destino' : 'Comprador'}
-                </p>
-              </div>
-              {isDismissal ? (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-400 flex items-center justify-center">
-                  <Users className="w-4 h-4 text-gray-300" />
-                </div>
-              ) : transfer.to_team?.logo_url ? (
-                <img 
-                  src={transfer.to_team.logo_url} 
-                  alt={transfer.to_team.name}
-                  className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
-                  <span className="text-xs font-bold text-white">
-                    {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+            {/* Seção de jogadores - Mobile Collapsible */}
+            {hasMultiplePlayers && (
+              <div className="pt-2 border-t border-zinc-700/50">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAdditionalPlayers(!showAdditionalPlayers)}
+                  className="w-full justify-between text-white hover:bg-zinc-800 mb-2"
+                >
+                  <span className="flex items-center gap-2">
+                    <UsersIcon className="w-4 h-4 text-purple-400" />
+                    <span className="text-sm font-semibold">
+                      {transfer.transfer_players?.length || 0} Jogadores
+                    </span>
                   </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Seção de jogadores */}
-          {hasMultiplePlayers ? (
-            // Exibir múltiplos jogadores em vendas múltiplas finalizadas
-            <div className="pt-2 border-t border-zinc-700/50">
-              <div className="flex items-center gap-2 mb-2">
-                <UsersIcon className="w-4 h-4 text-purple-400" />
-                <h4 className="text-sm font-semibold text-white">
-                  {transfer.transfer_players?.length || 0} Jogadores Transferidos
-                </h4>
-              </div>
-              
-              <div className="space-y-2">
-                {/* Jogador principal (primeiro da lista) */}
-                <div className="flex items-center gap-2">
+                  {showAdditionalPlayers ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </Button>
+                
+                {/* Jogador principal sempre visível */}
+                <div className="flex items-center gap-2 mb-2">
                   {transfer.player?.photo_url ? (
                     <img 
                       src={transfer.player.photo_url} 
@@ -824,8 +1090,8 @@ export default function TransferCard({
                       </span>
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-xs font-semibold truncate">
+                  <div className="flex-1">
+                    <p className="text-white text-sm font-semibold truncate">
                       {transfer.player?.name || 'Jogador Desconhecido'}
                     </p>
                     <Badge className="bg-purple-600 text-[10px]">
@@ -833,89 +1099,291 @@ export default function TransferCard({
                     </Badge>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Jogador único para vendas normais */}
+            {!hasMultiplePlayers && (
+              <div className="flex items-center gap-2 pt-2 border-t border-zinc-700/50">
+                {transfer.player?.photo_url ? (
+                  <img 
+                    src={transfer.player.photo_url} 
+                    alt={transfer.player.name}
+                    className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                    <span className="text-xs font-black text-white">
+                      {transfer.player?.position || 'N/A'}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <p className="text-white text-sm font-semibold truncate">
+                    {transfer.player?.name || 'Jogador Desconhecido'}
+                  </p>
+                  <Badge className="bg-purple-600 text-[10px]">
+                    {transfer.player?.position || 'N/A'}
+                  </Badge>
+                </div>
+              </div>
+            )}
+
+            {/* Jogadores da Troca (se for troca) - Mobile Collapsible */}
+            {transfer.is_exchange && (
+              <div className="pt-2 border-t border-zinc-700/50">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowExchangeDetails(!showExchangeDetails)}
+                  className="w-full justify-between text-white hover:bg-zinc-800"
+                >
+                  <span className="flex items-center gap-2">
+                    <ArrowRightLeft className="w-4 h-4 text-blue-400" />
+                    <span>Jogadores da Troca</span>
+                  </span>
+                  {showExchangeDetails ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </Button>
                 
-                {/* Outros jogadores (collapsed por padrão) */}
-                {(transfer.transfer_players?.slice(1) || []).length > 0 && (
-                  <div className="pl-2 border-l-2 border-purple-500/30 ml-4">
-                    <div className="flex items-center gap-1 text-xs text-zinc-400 mb-1">
-                      <UserPlus className="w-3 h-3" />
-                      <span>+ {(transfer.transfer_players?.slice(1) || []).length} jogadores adicionais</span>
-                    </div>
-                    
-                    {loadingPlayers ? (
-                      <div className="flex justify-center py-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        {(transfer.transfer_players?.slice(1) || []).map((playerId: string, index: number) => {
-                          const playerName = getPlayerName(playerId, index)
-                          const playerPhoto = getPlayerPhoto(playerId)
-                          const playerPosition = getPlayerPosition(playerId)
-                          
-                          return (
-                            <div key={playerId} className="flex items-center gap-2 text-xs">
-                              {playerPhoto ? (
-                                <img 
-                                  src={playerPhoto} 
-                                  alt={playerName}
-                                  className="w-5 h-5 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-700 to-cyan-700 flex items-center justify-center">
-                                  <ImageIcon className="w-3 h-3 text-white" />
-                                </div>
-                              )}
-                              <div className="flex items-center gap-2">
-                                <span className="text-zinc-300 truncate">{playerName}</span>
-                                <Badge className="bg-blue-600 text-[8px]">{playerPosition}</Badge>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
+                {showExchangeDetails && (
+                  <div className="mt-2">
+                    <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />
                   </div>
                 )}
               </div>
-              
-              <div className="mt-2 pt-2 border-t border-zinc-700/30 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Total:</span>
-                  <span className="text-white font-bold">{transfer.transfer_players?.length || 1} jogadores</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Exibir jogador único para vendas normais
-            <div className="flex items-center gap-2 pt-2 border-t border-zinc-700/50">
-              {transfer.player?.photo_url ? (
-                <img 
-                  src={transfer.player.photo_url} 
-                  alt={transfer.player.name}
-                  className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
-                  <span className="text-xs font-black text-white">
-                    {transfer.player?.position || 'N/A'}
-                  </span>
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-semibold truncate">
-                  {transfer.player?.name || 'Jogador Desconhecido'}
-                </p>
-                <Badge className="bg-purple-600 text-[10px]">
-                  {transfer.player?.position || 'N/A'}
-                </Badge>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Jogadores da Troca (se for troca) */}
-          {transfer.is_exchange && <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />}
-        </div>
+          {/* Layout Desktop - IGUAL ORIGINAL (768px+) */}
+          <div className="hidden sm:block space-y-3">
+            {/* Header com data/hora */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-zinc-400">
+                <Calendar className="w-3 h-3" />
+                <span className="text-xs">
+                  {formatDateTime(transfer.created_at).date} às {formatDateTime(transfer.created_at).time}
+                </span>
+              </div>
+            </div>
+
+            {/* Conteúdo principal */}
+            <div className="flex items-center justify-between">
+              {/* Time de Origem */}
+              <div className="flex items-center gap-2">
+                {isAuctionTransfer ? (
+                  // Logo do Leilão
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-600 to-yellow-600 flex items-center justify-center">
+                    <Gavel className="w-4 h-4 text-white" />
+                  </div>
+                ) : transfer.from_team?.logo_url ? (
+                  <img 
+                    src={transfer.from_team.logo_url} 
+                    alt={transfer.from_team.name}
+                    className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-orange-600 flex items-center justify-center">
+                    <span className="text-xs font-bold text-white">
+                      {transfer.from_team?.name?.substring(0, 2) || 'VD'}
+                    </span>
+                  </div>
+                )}
+                <div className="text-right">
+                  <p className="text-white text-xs font-semibold truncate max-w-[60px]">
+                    {isAuctionTransfer ? 'Leilão' : transfer.from_team?.name || 'Vendedor'}
+                  </p>
+                  <p className="text-zinc-400 text-[10px]">
+                    {isAuctionTransfer ? 'Sistema de Leilão' : 
+                     isDismissal ? 'Anterior' : 'Vendedor'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Setas e Valor */}
+              <div className="flex flex-col items-center flex-1 mx-2">
+                <div className="flex items-center gap-1">
+                  <ArrowRight className="w-3 h-3 text-yellow-400" />
+                  <div className="flex items-center gap-1">
+                    {isDismissal ? (
+                      <X className="w-3 h-3 text-red-400" />
+                    ) : transfer.is_exchange ? (
+                      <ArrowRightLeft className="w-3 h-3 text-blue-400" />
+                    ) : isAuctionTransfer ? (
+                      <Gavel className="w-3 h-3 text-orange-400" />
+                    ) : (
+                      <DollarSign className="w-3 h-3 text-emerald-400" />
+                    )}
+                    <span className={cn(
+                      "font-bold text-sm",
+                      isDismissal ? "text-red-400" : 
+                      transfer.is_exchange ? "text-blue-400" : 
+                      isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
+                    )}>
+                      {formatBalance(transfer.value)}
+                    </span>
+                  </div>
+                  <ArrowRight className="w-3 h-3 text-yellow-400" />
+                </div>
+                <p className="text-zinc-400 text-[10px] mt-1">
+                  {isAuctionTransfer ? 'Leilão' : 
+                   isDismissal ? 'Dispensa' : transfer.is_exchange ? 'Troca' : 'Venda'}
+                </p>
+              </div>
+
+              {/* Destino */}
+              <div className="flex items-center gap-2">
+                <div className="text-left">
+                  <p className="text-white text-xs font-semibold truncate max-w-[60px]">
+                    {isDismissal ? 'Sem Clube' : transfer.to_team?.name || 'Comprador'}
+                  </p>
+                  <p className="text-zinc-400 text-[10px]">
+                    {isDismissal ? 'Destino' : 'Comprador'}
+                  </p>
+                </div>
+                {isDismissal ? (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-600 to-gray-400 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-gray-300" />
+                  </div>
+                ) : transfer.to_team?.logo_url ? (
+                  <img 
+                    src={transfer.to_team.logo_url} 
+                    alt={transfer.to_team.name}
+                    className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-600 to-emerald-600 flex items-center justify-center">
+                    <span className="text-xs font-bold text-white">
+                      {transfer.to_team?.name?.substring(0, 2) || 'CP'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Seção de jogadores - IGUAL ORIGINAL */}
+            {hasMultiplePlayers ? (
+              // Exibir múltiplos jogadores em vendas múltiplas finalizadas
+              <div className="pt-2 border-t border-zinc-700/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <UsersIcon className="w-4 h-4 text-purple-400" />
+                  <h4 className="text-sm font-semibold text-white">
+                    {transfer.transfer_players?.length || 0} Jogadores Transferidos
+                  </h4>
+                </div>
+                
+                <div className="space-y-2">
+                  {/* Jogador principal (primeiro da lista) */}
+                  <div className="flex items-center gap-2">
+                    {transfer.player?.photo_url ? (
+                      <img 
+                        src={transfer.player.photo_url} 
+                        alt={transfer.player.name}
+                        className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                        <span className="text-xs font-black text-white">
+                          {transfer.player?.position || 'N/A'}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-semibold truncate">
+                        {transfer.player?.name || 'Jogador Desconhecido'}
+                      </p>
+                      <Badge className="bg-purple-600 text-[10px]">
+                        {transfer.player?.position || 'N/A'}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* Outros jogadores (collapsed por padrão) */}
+                  {(transfer.transfer_players?.slice(1) || []).length > 0 && (
+                    <div className="pl-2 border-l-2 border-purple-500/30 ml-4">
+                      <div className="flex items-center gap-1 text-xs text-zinc-400 mb-1">
+                        <UserPlus className="w-3 h-3" />
+                        <span>+ {(transfer.transfer_players?.slice(1) || []).length} jogadores adicionais</span>
+                      </div>
+                      
+                      {loadingPlayers ? (
+                        <div className="flex justify-center py-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {(transfer.transfer_players?.slice(1) || []).map((playerId: string, index: number) => {
+                            const playerName = getPlayerName(playerId, index)
+                            const playerPhoto = getPlayerPhoto(playerId)
+                            const playerPosition = getPlayerPosition(playerId)
+                            
+                            return (
+                              <div key={playerId} className="flex items-center gap-2 text-xs">
+                                {playerPhoto ? (
+                                  <img 
+                                    src={playerPhoto} 
+                                    alt={playerName}
+                                    className="w-5 h-5 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-700 to-cyan-700 flex items-center justify-center">
+                                    <ImageIcon className="w-3 h-3 text-white" />
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-zinc-300 truncate">{playerName}</span>
+                                  <Badge className="bg-blue-600 text-[8px]">{playerPosition}</Badge>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-2 pt-2 border-t border-zinc-700/30 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Total:</span>
+                    <span className="text-white font-bold">{transfer.transfer_players?.length || 1} jogadores</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              // Exibir jogador único para vendas normais
+              <div className="flex items-center gap-2 pt-2 border-t border-zinc-700/50">
+                {transfer.player?.photo_url ? (
+                  <img 
+                    src={transfer.player.photo_url} 
+                    alt={transfer.player.name}
+                    className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-700 to-pink-700 flex items-center justify-center">
+                    <span className="text-xs font-black text-white">
+                      {transfer.player?.position || 'N/A'}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white text-sm font-semibold truncate">
+                    {transfer.player?.name || 'Jogador Desconhecido'}
+                  </p>
+                  <Badge className="bg-purple-600 text-[10px]">
+                    {transfer.player?.position || 'N/A'}
+                  </Badge>
+                </div>
+              </div>
+            )}
+
+            {/* Jogadores da Troca (se for troca) - IGUAL ORIGINAL */}
+            {transfer.is_exchange && <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />}
+          </div>
+        </>
       )}
     </Card>
   )

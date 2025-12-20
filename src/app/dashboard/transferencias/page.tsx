@@ -24,7 +24,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Filter, X, ArrowUpDown, Check, BarChart } from 'lucide-react'
+import { Filter, X, ArrowUpDown, Check, BarChart, Menu } from 'lucide-react'
 
 // Definindo as posições disponíveis
 const POSITIONS = [
@@ -58,6 +58,7 @@ const OVERALL_OPTIONS = [
 export default function PaginaTransferencias() {
   const router = useRouter()
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
   // Estados para Transferências
   const [transfers, setTransfers] = useState<Transfer[]>([])
@@ -101,6 +102,9 @@ export default function PaginaTransferencias() {
   const [selectedSort, setSelectedSort] = useState<string>('recent') // Padrão: Mais recentes
   const [selectedMinOverall, setSelectedMinOverall] = useState<string>('all')
   const [filteredMarketPlayers, setFilteredMarketPlayers] = useState<MarketPlayer[]>([])
+
+  // Estado para mostrar/ocultar filtros mobile
+  const [showFiltersMobile, setShowFiltersMobile] = useState(false)
 
   // Carregar dados do usuário e time
   useEffect(() => {
@@ -1159,6 +1163,7 @@ export default function PaginaTransferencias() {
     setSelectedPositions([])
     setSelectedSort('recent')
     setSelectedMinOverall('all')
+    setShowFiltersMobile(false)
   }
 
   const togglePosition = (position: string) => {
@@ -1190,26 +1195,74 @@ export default function PaginaTransferencias() {
 
   return (
     <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar 
-        user={user!}
-        profile={profile}
-        team={team}
-      />
+      {/* Sidebar para desktop */}
+      <div className="hidden lg:block">
+        <Sidebar 
+          user={user!}
+          profile={profile}
+          team={team}
+        />
+      </div>
+
+      {/* Sidebar mobile overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar mobile */}
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-zinc-900 transform transition-transform duration-300 lg:hidden
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <Sidebar 
+          user={user!}
+          profile={profile}
+          team={team}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      </div>
 
       <div className="flex-1 lg:ml-0">
-        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-8">
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-4 md:p-8">
+          {/* Mobile header */}
+          <div className="lg:hidden mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsSidebarOpen(true)}
+                className="bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <div className="text-right">
+                <h2 className="text-white font-semibold">
+                  {profile?.coach_name || 'Técnico'}
+                </h2>
+                <p className="text-xs text-zinc-400">
+                  {team?.name || 'Sem time'}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="mx-auto max-w-6xl">
-            <h1 className="text-5xl font-black text-white mb-2 text-center md:text-left">
-              {activeView === 'transferencias' ? 'NEGOCIAÇÕES DE JOGADORES' : 'MERCADO DE JOGADORES'}
+            <h1 className="text-3xl md:text-5xl font-black text-white mb-2 text-center md:text-left">
+              {activeView === 'transferencias' ? 'NEGOCIAÇÕES' : 'MERCADO'}
             </h1>
-            <p className="text-zinc-400 mb-8 text-center md:text-left">
+            <p className="text-zinc-400 mb-6 md:mb-8 text-center md:text-left text-sm md:text-base">
               {activeView === 'transferencias' 
-                ? 'Gerencie todas as transferências do campeonato' 
-                : 'Anuncie e compre jogadores diretamente do mercado'
+                ? 'Gerencie todas as transferências' 
+                : 'Anuncie e compre jogadores'
               }
             </p>
 
-            <ViewSwitch activeView={activeView} setActiveView={setActiveView} />
+            <div className="mb-6">
+              <ViewSwitch activeView={activeView} setActiveView={setActiveView} />
+            </div>
 
             {activeView === 'transferencias' ? (
               <>
@@ -1229,7 +1282,7 @@ export default function PaginaTransferencias() {
                           <SelectTrigger className="w-full sm:w-[250px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
                             <SelectValue placeholder="Selecione um time" />
                           </SelectTrigger>
-                          <SelectContent className="bg-zinc-900 border-zinc-700">
+                          <SelectContent className="bg-zinc-900 border-zinc-700 max-h-60">
                             <SelectItem 
                               value="all" 
                               className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
@@ -1282,7 +1335,7 @@ export default function PaginaTransferencias() {
                             variant="outline"
                             size="sm"
                             onClick={clearTeamFilter}
-                            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700"
+                            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700 w-full sm:w-auto"
                           >
                             <X className="w-4 h-4 mr-1" />
                             Limpar filtro
@@ -1293,7 +1346,7 @@ export default function PaginaTransferencias() {
                     
                     {selectedTeamFilter && (
                       <div className="mt-3 pt-3 border-t border-zinc-700/30">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs text-zinc-400">Mostrando transferências envolvendo:</span>
                           <div className="flex items-center gap-1">
                             {(() => {
@@ -1314,7 +1367,7 @@ export default function PaginaTransferencias() {
                                         </span>
                                       </div>
                                     )}
-                                    <span className="text-white text-sm font-medium">{selectedTeam.name}</span>
+                                    <span className="text-white text-sm font-medium truncate">{selectedTeam.name}</span>
                                   </>
                                 )
                               }
@@ -1343,16 +1396,28 @@ export default function PaginaTransferencias() {
               </>
             ) : (
               <>
-                {/* Filtros do Mercado - Apenas para jogadores disponíveis */}
+                {/* Botão para mostrar/ocultar filtros no mobile */}
+                <div className="lg:hidden mb-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowFiltersMobile(!showFiltersMobile)}
+                    className="w-full bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800"
+                  >
+                    <Filter className="w-4 h-4 mr-2" />
+                    {showFiltersMobile ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+                  </Button>
+                </div>
+
+                {/* Filtros do Mercado - Responsivos */}
                 {marketTab === 'disponiveis' && (
-                  <div className="mb-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-700/50">
-                    <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4">
+                  <div className={`mb-6 p-4 bg-zinc-900/50 rounded-lg border border-zinc-700/50 ${!showFiltersMobile ? 'hidden lg:block' : ''}`}>
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                       <div className="flex items-center gap-2">
                         <Filter className="w-4 h-4 text-blue-400" />
                         <span className="text-sm text-zinc-300">Filtrar jogadores disponíveis:</span>
                       </div>
                       
-                      <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 w-full xl:w-auto">
+                      <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 w-full lg:w-auto">
                         
                         {/* Filtro de Posições (Multi-select) */}
                         <div className="w-full sm:w-auto">
@@ -1365,7 +1430,7 @@ export default function PaginaTransferencias() {
                                 </span>
                               </div>
                             </SelectTrigger>
-                            <SelectContent className="bg-zinc-900 border-zinc-700 max-h-96">
+                            <SelectContent className="bg-zinc-900 border-zinc-700 max-h-96 w-[calc(100vw-2rem)] sm:w-auto">
                               <div 
                                 className="flex items-center justify-between px-2 py-2 cursor-pointer hover:bg-blue-600/30 rounded-md"
                                 onClick={toggleAllPositions}
@@ -1376,21 +1441,23 @@ export default function PaginaTransferencias() {
                                 <Check className={`w-4 h-4 ${selectedPositions.length === POSITIONS.length ? 'text-green-400' : 'text-zinc-500'}`} />
                               </div>
                               <div className="border-t border-zinc-700 my-2"></div>
-                              {POSITIONS.map((position) => (
-                                <div
-                                  key={position.value}
-                                  className={`flex items-center justify-between px-2 py-2 cursor-pointer rounded-md ${selectedPositions.includes(position.value) ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'}`}
-                                  onClick={() => togglePosition(position.value)}
-                                >
-                                  <span className="text-sm text-white">{position.label}</span>
-                                  {selectedPositions.includes(position.value) && <Check className="w-4 h-4" />}
-                                </div>
-                              ))}
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
+                                {POSITIONS.map((position) => (
+                                  <div
+                                    key={position.value}
+                                    className={`flex items-center justify-between px-2 py-2 cursor-pointer rounded-md ${selectedPositions.includes(position.value) ? 'bg-blue-600 text-white' : 'hover:bg-zinc-800'}`}
+                                    onClick={() => togglePosition(position.value)}
+                                  >
+                                    <span className="text-sm text-white">{position.label}</span>
+                                    {selectedPositions.includes(position.value) && <Check className="w-4 h-4" />}
+                                  </div>
+                                ))}
+                              </div>
                             </SelectContent>
                           </Select>
                         </div>
 
-                        {/* Filtro de Overall Mínimo (NOVO) */}
+                        {/* Filtro de Overall Mínimo */}
                         <div className="w-full sm:w-auto">
                           <Select value={selectedMinOverall} onValueChange={setSelectedMinOverall}>
                             <SelectTrigger className="w-full sm:w-[160px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800 h-10">
@@ -1410,7 +1477,7 @@ export default function PaginaTransferencias() {
                           </Select>
                         </div>
 
-                        {/* Ordenação (ATUALIZADO) */}
+                        {/* Ordenação */}
                         <div className="w-full sm:w-auto">
                           <Select value={selectedSort} onValueChange={setSelectedSort}>
                             <SelectTrigger className="w-full sm:w-[220px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800 h-10">
@@ -1435,7 +1502,7 @@ export default function PaginaTransferencias() {
                             variant="outline"
                             size="sm"
                             onClick={clearMarketFilters}
-                            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700 h-10"
+                            className="text-zinc-400 hover:text-white hover:bg-red-500/10 hover:border-red-500/50 border-zinc-700 h-10 w-full sm:w-auto"
                           >
                             <X className="w-4 h-4 mr-1" />
                             Limpar
@@ -1451,19 +1518,19 @@ export default function PaginaTransferencias() {
                             <span className="text-xs text-zinc-400">Filtros ativos:</span>
                             
                             {selectedPositions.length > 0 && (
-                              <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30">
+                              <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
                                 {selectedPositions.length} Posições
                               </Badge>
                             )}
 
                             {selectedMinOverall !== 'all' && (
-                              <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30">
+                              <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/30 text-xs">
                                 OVR {selectedMinOverall}+
                               </Badge>
                             )}
 
                             {selectedSort !== 'recent' && (
-                              <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30">
+                              <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/30 text-xs">
                                 {selectedSort === 'cheapest' && 'Menor Preço'}
                                 {selectedSort === 'expensive' && 'Maior Preço'}
                                 {selectedSort === 'highest_overall' && 'Melhor OVR'}
@@ -1472,7 +1539,7 @@ export default function PaginaTransferencias() {
                             )}
                             
                             <span className="text-xs text-zinc-500 ml-auto">
-                              ({filteredMarketPlayers.length} de {marketPlayers.length} jogadores)
+                              ({filteredMarketPlayers.length} de {marketPlayers.length})
                             </span>
                           </div>
                         </div>
