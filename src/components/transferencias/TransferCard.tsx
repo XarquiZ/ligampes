@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { 
-  CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight, 
-  Calendar, Users, ArrowRightLeft, X, Ban, ShoppingCart, 
+import {
+  CheckCircle2, Clock, CheckCircle, DollarSign, ArrowRight,
+  Calendar, Users, ArrowRightLeft, X, Ban, ShoppingCart,
   Gavel, User, UserPlus, Users as UsersIcon, Image as ImageIcon,
-  Filter, ChevronDown, ChevronRight
+  Filter, ChevronDown, ChevronRight, Check
 } from 'lucide-react'
 import ExchangePlayers from './ExchangePlayers'
 import { Transfer, formatBalance, formatDateTime, isAuction } from './types'
@@ -51,32 +51,59 @@ export default function TransferCard({
   const isAuctionTransfer = isAuction(transfer.transfer_type)
   const isMultiSell = transfer.transfer_type === 'multi_sell'
   const hasMultiplePlayers = isMultiSell && transfer.transfer_players && transfer.transfer_players.length > 1
-  
+
   const [additionalPlayersDetails, setAdditionalPlayersDetails] = useState<PlayerDetails[]>([])
   const [loadingPlayers, setLoadingPlayers] = useState(false)
   const [showAdditionalPlayers, setShowAdditionalPlayers] = useState(false)
   const [showExchangeDetails, setShowExchangeDetails] = useState(false)
 
+  // Estado local para controle de processado (Admin)
+  const [isProcessed, setIsProcessed] = useState(transfer.processed_by_admin || false)
+
+  useEffect(() => {
+    setIsProcessed(transfer.processed_by_admin || false)
+  }, [transfer.processed_by_admin])
+
+  const toggleProcessed = async () => {
+    const newValue = !isProcessed
+    setIsProcessed(newValue)
+
+    try {
+      const { error } = await supabase
+        .from('player_transfers')
+        .update({ processed_by_admin: newValue })
+        .eq('id', transfer.id)
+
+      if (error) {
+        console.error('Erro ao atualizar status processado:', error)
+        setIsProcessed(!newValue) // Reverte em caso de erro
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar status processado:', error)
+      setIsProcessed(!newValue)
+    }
+  }
+
   // Buscar detalhes dos jogadores adicionais
   useEffect(() => {
     const loadAdditionalPlayersDetails = async () => {
       if (!hasMultiplePlayers || !transfer.transfer_players) return
-      
+
       // Pular o primeiro jogador (já está em transfer.player)
       const additionalPlayerIds = transfer.transfer_players.slice(1)
-      
+
       if (additionalPlayerIds.length === 0) {
         setAdditionalPlayersDetails([])
         return
       }
-      
+
       setLoadingPlayers(true)
       try {
         const { data, error } = await supabase
           .from('players')
           .select('id, name, photo_url, position, overall, base_price')
           .in('id', additionalPlayerIds)
-        
+
         if (error) {
           console.error('Erro ao carregar detalhes dos jogadores:', error)
           setAdditionalPlayersDetails([])
@@ -90,7 +117,7 @@ export default function TransferCard({
         setLoadingPlayers(false)
       }
     }
-    
+
     loadAdditionalPlayersDetails()
   }, [hasMultiplePlayers, transfer.transfer_players])
 
@@ -105,7 +132,7 @@ export default function TransferCard({
     if (transfer.player_names && transfer.player_names.length > index + 1) {
       return transfer.player_names[index + 1]
     }
-    
+
     // Depois tenta do banco
     const playerDetails = getPlayerDetails(playerId)
     return playerDetails?.name || `Jogador ${index + 2}`
@@ -132,10 +159,10 @@ export default function TransferCard({
   // Verifica se o transfer card deve ser mostrado com base no filtro
   const shouldShowTransfer = () => {
     if (activeTab !== 'completed' || !selectedTeamFilter) return true
-    
+
     // Verifica se a transferência envolve o time selecionado
-    return transfer.from_team_id === selectedTeamFilter || 
-           transfer.to_team_id === selectedTeamFilter
+    return transfer.from_team_id === selectedTeamFilter ||
+      transfer.to_team_id === selectedTeamFilter
   }
 
   // Se não deve mostrar o card, retorna null
@@ -147,9 +174,9 @@ export default function TransferCard({
     <Card
       key={transfer.id}
       className={cn(
-        "bg-white/5 backdrop-blur-xl border transition-all",
-        transfer.status === 'approved' 
-          ? "border-green-500/20 hover:border-green-500/40 p-4" 
+        "bg-white/5 backdrop-blur-xl border transition-all relative overflow-hidden",
+        transfer.status === 'approved'
+          ? "border-green-500/20 hover:border-green-500/40 p-4"
           : "border-white/10 hover:border-white/20 p-5",
         transfer.is_exchange && "border-blue-500/20 hover:border-blue-500/40",
         isDismissal && "border-red-500/20 hover:border-red-500/40",
@@ -162,10 +189,10 @@ export default function TransferCard({
         <div className="flex gap-2">
           <Badge className={cn(
             "text-xs",
-            isAuctionTransfer ? "bg-orange-600" : 
-            transfer.is_exchange ? "bg-blue-600" : 
-            isDismissal ? "bg-red-600" : 
-            isMultiSell ? "bg-purple-600" : "bg-emerald-600"
+            isAuctionTransfer ? "bg-orange-600" :
+              transfer.is_exchange ? "bg-blue-600" :
+                isDismissal ? "bg-red-600" :
+                  isMultiSell ? "bg-purple-600" : "bg-emerald-600"
           )}>
             {isAuctionTransfer ? (
               <>
@@ -194,7 +221,7 @@ export default function TransferCard({
               </>
             )}
           </Badge>
-          
+
           {/* Badge de quantidade de jogadores em vendas múltiplas */}
           {hasMultiplePlayers && (
             <Badge className="bg-purple-800 text-white text-xs">
@@ -203,12 +230,57 @@ export default function TransferCard({
             </Badge>
           )}
         </div>
-        
+
         {transfer.status === 'approved' && (
           <Badge className="bg-green-600 text-white text-xs">
             <CheckCircle className="w-3 h-3 mr-1" />
             Concluída
           </Badge>
+        )}
+
+        {/* ADMIN: Badge "ATUALIZADO" e Checkbox */}
+        {isAdmin && activeTab === 'completed' && (
+          <div className="flex items-center gap-2 ml-2 relative group-admin-action">
+            <label className={cn(
+              "flex items-center gap-2 cursor-pointer bg-black/40 px-2 py-1.5 rounded border transition-all select-none hover:bg-black/60 z-20 relative",
+              isProcessed ? "border-green-500/50 bg-green-900/10" : "border-white/10"
+            )}>
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={isProcessed}
+                  onChange={toggleProcessed}
+                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer accent-green-500 opacity-0 absolute inset-0 z-10"
+                />
+                <div className={cn(
+                  "w-4 h-4 rounded border flex items-center justify-center transition-colors",
+                  isProcessed ? "bg-green-500 border-green-500" : "border-zinc-500 bg-white/5"
+                )}>
+                  {isProcessed && <Check size={10} className="text-white font-bold" strokeWidth={4} />}
+                </div>
+              </div>
+              <span className={cn(
+                "text-[10px] font-bold uppercase tracking-wider transition-colors",
+                isProcessed ? "text-green-400" : "text-zinc-400"
+              )}>
+                Processado
+              </span>
+            </label>
+
+            {/* Carimbo Visual Estilo Carta */}
+            {isProcessed && (
+              <div className="absolute top-1/2 left-full ml-4 -translate-y-1/2 z-10 pointer-events-none transform -rotate-12 select-none">
+                <div className="border-[3px] border-double border-green-600/60 rounded-sm px-3 py-1 animate-in fade-in zoom-in duration-300 bg-green-500/5 backdrop-blur-[1px]">
+                  <span className="text-green-600 font-black text-[10px] uppercase tracking-[0.2em] opacity-80 whitespace-nowrap drop-shadow-sm">
+                    ATUALIZADO
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Espaçador para o carimbo não sair do card */}
+            {isProcessed && <div className="w-24 transition-all duration-300"></div>}
+          </div>
         )}
       </div>
 
@@ -222,8 +294,8 @@ export default function TransferCard({
               {/* Jogador */}
               <div className="flex items-center gap-3">
                 {transfer.player?.photo_url ? (
-                  <img 
-                    src={transfer.player.photo_url} 
+                  <img
+                    src={transfer.player.photo_url}
                     alt={transfer.player.name}
                     className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
                   />
@@ -259,8 +331,8 @@ export default function TransferCard({
                         <Gavel className="w-4 h-4 text-white" />
                       </div>
                     ) : transfer.from_team?.logo_url ? (
-                      <img 
-                        src={transfer.from_team.logo_url} 
+                      <img
+                        src={transfer.from_team.logo_url}
                         alt={transfer.from_team.name}
                         className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
                       />
@@ -296,8 +368,8 @@ export default function TransferCard({
                       )}
                       <span className={cn(
                         "font-bold text-sm",
-                        transfer.is_exchange ? "text-blue-400" : 
-                        isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
+                        transfer.is_exchange ? "text-blue-400" :
+                          isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
                       )}>
                         {formatBalance(transfer.value)}
                       </span>
@@ -310,8 +382,8 @@ export default function TransferCard({
                 <div className="flex items-center gap-2 w-full">
                   <div className="flex items-center gap-2 flex-1">
                     {transfer.to_team?.logo_url ? (
-                      <img 
-                        src={transfer.to_team.logo_url} 
+                      <img
+                        src={transfer.to_team.logo_url}
                         alt={transfer.to_team.name}
                         className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
                       />
@@ -352,7 +424,7 @@ export default function TransferCard({
                     <ChevronRight className="w-4 h-4" />
                   )}
                 </Button>
-                
+
                 {showExchangeDetails && (
                   <div className="mt-2">
                     <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />
@@ -458,11 +530,11 @@ export default function TransferCard({
                   {((userTeamId === transfer.from_team_id && transfer.approved_by_seller) ||
                     (userTeamId === transfer.to_team_id && transfer.approved_by_buyer) ||
                     (isAdmin && transfer.approved_by_admin)) && (
-                    <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
-                      <CheckCircle className="w-3 h-3" />
-                      Você já aprovou esta negociação
-                    </p>
-                  )}
+                      <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
+                        <CheckCircle className="w-3 h-3" />
+                        Você já aprovou esta negociação
+                      </p>
+                    )}
                 </div>
               )}
             </div>
@@ -480,8 +552,8 @@ export default function TransferCard({
                     <Gavel className="w-5 h-5 text-white" />
                   </div>
                 ) : transfer.from_team?.logo_url ? (
-                  <img 
-                    src={transfer.from_team.logo_url} 
+                  <img
+                    src={transfer.from_team.logo_url}
                     alt={transfer.from_team.name}
                     className="w-10 h-10 rounded-full object-cover border-2 border-red-500/50 mb-1"
                   />
@@ -515,8 +587,8 @@ export default function TransferCard({
                       )}
                       <span className={cn(
                         "font-bold text-sm",
-                        transfer.is_exchange ? "text-blue-400" : 
-                        isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
+                        transfer.is_exchange ? "text-blue-400" :
+                          isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
                       )}>
                         {formatBalance(transfer.value)}
                       </span>
@@ -532,8 +604,8 @@ export default function TransferCard({
               {/* Time Comprador */}
               <div className="flex flex-col items-center text-center flex-1">
                 {transfer.to_team?.logo_url ? (
-                  <img 
-                    src={transfer.to_team.logo_url} 
+                  <img
+                    src={transfer.to_team.logo_url}
                     alt={transfer.to_team.name}
                     className="w-10 h-10 rounded-full object-cover border-2 border-green-500/50 mb-1"
                   />
@@ -561,13 +633,13 @@ export default function TransferCard({
                     {transfer.transfer_players?.length || 0} Jogadores na Venda
                   </h4>
                 </div>
-                
+
                 <div className="space-y-2 max-h-40 overflow-y-auto">
                   {/* Jogador principal (primeiro da lista) */}
                   <div className="flex items-center gap-3 p-3 bg-purple-900/20 rounded-lg border border-purple-500/30">
                     {transfer.player?.photo_url ? (
-                      <img 
-                        src={transfer.player.photo_url} 
+                      <img
+                        src={transfer.player.photo_url}
                         alt={transfer.player.name}
                         className="w-10 h-10 rounded-full object-cover border-2 border-purple-500"
                       />
@@ -592,7 +664,7 @@ export default function TransferCard({
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Outros jogadores */}
                   {loadingPlayers ? (
                     <div className="flex justify-center py-4">
@@ -605,12 +677,12 @@ export default function TransferCard({
                       const playerPosition = getPlayerPosition(playerId)
                       const playerOverall = getPlayerOverall(playerId)
                       const playerValue = transfer.player_values?.[index + 1]
-                      
+
                       return (
                         <div key={playerId || index} className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg border border-zinc-700/50">
                           {playerPhoto ? (
-                            <img 
-                              src={playerPhoto} 
+                            <img
+                              src={playerPhoto}
                               alt={playerName}
                               className="w-10 h-10 rounded-full object-cover border-2 border-blue-500"
                             />
@@ -647,7 +719,7 @@ export default function TransferCard({
                     })
                   )}
                 </div>
-                
+
                 <div className="mt-3 p-2 bg-zinc-900/50 rounded-lg">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-zinc-400">Total de jogadores:</span>
@@ -663,8 +735,8 @@ export default function TransferCard({
               // Exibir jogador único (para vendas normais ou trocas)
               <div className="flex items-center gap-3 p-3 bg-zinc-800/30 rounded-lg mb-4">
                 {transfer.player?.photo_url ? (
-                  <img 
-                    src={transfer.player.photo_url} 
+                  <img
+                    src={transfer.player.photo_url}
                     alt={transfer.player.name}
                     className="w-12 h-12 rounded-full object-cover border-2 border-purple-500"
                   />
@@ -716,8 +788,8 @@ export default function TransferCard({
                                 <Gavel className="w-3 h-3 text-white" />
                               </div>
                             ) : transfer.from_team?.logo_url ? (
-                              <img 
-                                src={transfer.from_team.logo_url} 
+                              <img
+                                src={transfer.from_team.logo_url}
                                 alt={transfer.from_team.name}
                                 className="w-5 h-5 rounded-full object-cover"
                               />
@@ -742,8 +814,8 @@ export default function TransferCard({
                                 <Gavel className="w-3 h-3 text-white" />
                               </div>
                             ) : transfer.from_team?.logo_url ? (
-                              <img 
-                                src={transfer.from_team.logo_url} 
+                              <img
+                                src={transfer.from_team.logo_url}
                                 alt={transfer.from_team.name}
                                 className="w-5 h-5 rounded-full object-cover"
                               />
@@ -791,8 +863,8 @@ export default function TransferCard({
                         {transfer.approved_by_buyer ? (
                           <>
                             {transfer.to_team?.logo_url ? (
-                              <img 
-                                src={transfer.to_team.logo_url} 
+                              <img
+                                src={transfer.to_team.logo_url}
                                 alt={transfer.to_team.name}
                                 className="w-5 h-5 rounded-full object-cover"
                               />
@@ -811,8 +883,8 @@ export default function TransferCard({
                         ) : (
                           <>
                             {transfer.to_team?.logo_url ? (
-                              <img 
-                                src={transfer.to_team.logo_url} 
+                              <img
+                                src={transfer.to_team.logo_url}
                                 alt={transfer.to_team.name}
                                 className="w-5 h-5 rounded-full object-cover"
                               />
@@ -938,11 +1010,11 @@ export default function TransferCard({
                 {((userTeamId === transfer.from_team_id && transfer.approved_by_seller) ||
                   (userTeamId === transfer.to_team_id && transfer.approved_by_buyer) ||
                   (isAdmin && transfer.approved_by_admin)) && (
-                  <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
-                    <CheckCircle className="w-3 h-3" />
-                    Você já aprovou esta negociação
-                  </p>
-                )}
+                    <p className="text-green-400 font-bold text-xs flex items-center justify-center gap-1 mt-2">
+                      <CheckCircle className="w-3 h-3" />
+                      Você já aprovou esta negociação
+                    </p>
+                  )}
               </div>
             )}
           </div>
@@ -974,8 +1046,8 @@ export default function TransferCard({
                     <Gavel className="w-4 h-4 text-white" />
                   </div>
                 ) : transfer.from_team?.logo_url ? (
-                  <img 
-                    src={transfer.from_team.logo_url} 
+                  <img
+                    src={transfer.from_team.logo_url}
                     alt={transfer.from_team.name}
                     className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
                   />
@@ -1010,16 +1082,16 @@ export default function TransferCard({
                   )}
                   <span className={cn(
                     "font-bold text-sm",
-                    isDismissal ? "text-red-400" : 
-                    transfer.is_exchange ? "text-blue-400" : 
-                    isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
+                    isDismissal ? "text-red-400" :
+                      transfer.is_exchange ? "text-blue-400" :
+                        isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
                   )}>
                     {formatBalance(transfer.value)}
                   </span>
                 </div>
                 <p className="text-zinc-400 text-[10px] mt-1">
-                  {isAuctionTransfer ? 'Leilão' : 
-                   isDismissal ? 'Dispensa' : transfer.is_exchange ? 'Troca' : 'Venda'}
+                  {isAuctionTransfer ? 'Leilão' :
+                    isDismissal ? 'Dispensa' : transfer.is_exchange ? 'Troca' : 'Venda'}
                 </p>
               </div>
 
@@ -1038,8 +1110,8 @@ export default function TransferCard({
                     <Users className="w-4 h-4 text-gray-300" />
                   </div>
                 ) : transfer.to_team?.logo_url ? (
-                  <img 
-                    src={transfer.to_team.logo_url} 
+                  <img
+                    src={transfer.to_team.logo_url}
                     alt={transfer.to_team.name}
                     className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
                   />
@@ -1074,12 +1146,12 @@ export default function TransferCard({
                     <ChevronRight className="w-4 h-4" />
                   )}
                 </Button>
-                
+
                 {/* Jogador principal sempre visível */}
                 <div className="flex items-center gap-2 mb-2">
                   {transfer.player?.photo_url ? (
-                    <img 
-                      src={transfer.player.photo_url} 
+                    <img
+                      src={transfer.player.photo_url}
                       alt={transfer.player.name}
                       className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
                     />
@@ -1106,8 +1178,8 @@ export default function TransferCard({
             {!hasMultiplePlayers && (
               <div className="flex items-center gap-2 pt-2 border-t border-zinc-700/50">
                 {transfer.player?.photo_url ? (
-                  <img 
-                    src={transfer.player.photo_url} 
+                  <img
+                    src={transfer.player.photo_url}
                     alt={transfer.player.name}
                     className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
                   />
@@ -1148,7 +1220,7 @@ export default function TransferCard({
                     <ChevronRight className="w-4 h-4" />
                   )}
                 </Button>
-                
+
                 {showExchangeDetails && (
                   <div className="mt-2">
                     <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />
@@ -1180,8 +1252,8 @@ export default function TransferCard({
                     <Gavel className="w-4 h-4 text-white" />
                   </div>
                 ) : transfer.from_team?.logo_url ? (
-                  <img 
-                    src={transfer.from_team.logo_url} 
+                  <img
+                    src={transfer.from_team.logo_url}
                     alt={transfer.from_team.name}
                     className="w-8 h-8 rounded-full object-cover border-2 border-red-500/50"
                   />
@@ -1197,8 +1269,8 @@ export default function TransferCard({
                     {isAuctionTransfer ? 'Leilão' : transfer.from_team?.name || 'Vendedor'}
                   </p>
                   <p className="text-zinc-400 text-[10px]">
-                    {isAuctionTransfer ? 'Sistema de Leilão' : 
-                     isDismissal ? 'Anterior' : 'Vendedor'}
+                    {isAuctionTransfer ? 'Sistema de Leilão' :
+                      isDismissal ? 'Anterior' : 'Vendedor'}
                   </p>
                 </div>
               </div>
@@ -1219,9 +1291,9 @@ export default function TransferCard({
                     )}
                     <span className={cn(
                       "font-bold text-sm",
-                      isDismissal ? "text-red-400" : 
-                      transfer.is_exchange ? "text-blue-400" : 
-                      isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
+                      isDismissal ? "text-red-400" :
+                        transfer.is_exchange ? "text-blue-400" :
+                          isAuctionTransfer ? "text-orange-400" : "text-emerald-400"
                     )}>
                       {formatBalance(transfer.value)}
                     </span>
@@ -1229,8 +1301,8 @@ export default function TransferCard({
                   <ArrowRight className="w-3 h-3 text-yellow-400" />
                 </div>
                 <p className="text-zinc-400 text-[10px] mt-1">
-                  {isAuctionTransfer ? 'Leilão' : 
-                   isDismissal ? 'Dispensa' : transfer.is_exchange ? 'Troca' : 'Venda'}
+                  {isAuctionTransfer ? 'Leilão' :
+                    isDismissal ? 'Dispensa' : transfer.is_exchange ? 'Troca' : 'Venda'}
                 </p>
               </div>
 
@@ -1249,8 +1321,8 @@ export default function TransferCard({
                     <Users className="w-4 h-4 text-gray-300" />
                   </div>
                 ) : transfer.to_team?.logo_url ? (
-                  <img 
-                    src={transfer.to_team.logo_url} 
+                  <img
+                    src={transfer.to_team.logo_url}
                     alt={transfer.to_team.name}
                     className="w-8 h-8 rounded-full object-cover border-2 border-green-500/50"
                   />
@@ -1274,13 +1346,13 @@ export default function TransferCard({
                     {transfer.transfer_players?.length || 0} Jogadores Transferidos
                   </h4>
                 </div>
-                
+
                 <div className="space-y-2">
                   {/* Jogador principal (primeiro da lista) */}
                   <div className="flex items-center gap-2">
                     {transfer.player?.photo_url ? (
-                      <img 
-                        src={transfer.player.photo_url} 
+                      <img
+                        src={transfer.player.photo_url}
                         alt={transfer.player.name}
                         className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
                       />
@@ -1300,7 +1372,7 @@ export default function TransferCard({
                       </Badge>
                     </div>
                   </div>
-                  
+
                   {/* Outros jogadores (collapsed por padrão) */}
                   {(transfer.transfer_players?.slice(1) || []).length > 0 && (
                     <div className="pl-2 border-l-2 border-purple-500/30 ml-4">
@@ -1308,7 +1380,7 @@ export default function TransferCard({
                         <UserPlus className="w-3 h-3" />
                         <span>+ {(transfer.transfer_players?.slice(1) || []).length} jogadores adicionais</span>
                       </div>
-                      
+
                       {loadingPlayers ? (
                         <div className="flex justify-center py-2">
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-500"></div>
@@ -1319,12 +1391,12 @@ export default function TransferCard({
                             const playerName = getPlayerName(playerId, index)
                             const playerPhoto = getPlayerPhoto(playerId)
                             const playerPosition = getPlayerPosition(playerId)
-                            
+
                             return (
                               <div key={playerId} className="flex items-center gap-2 text-xs">
                                 {playerPhoto ? (
-                                  <img 
-                                    src={playerPhoto} 
+                                  <img
+                                    src={playerPhoto}
                                     alt={playerName}
                                     className="w-5 h-5 rounded-full object-cover"
                                   />
@@ -1345,7 +1417,7 @@ export default function TransferCard({
                     </div>
                   )}
                 </div>
-                
+
                 <div className="mt-2 pt-2 border-t border-zinc-700/30 text-xs">
                   <div className="flex justify-between">
                     <span className="text-zinc-400">Total:</span>
@@ -1357,8 +1429,8 @@ export default function TransferCard({
               // Exibir jogador único para vendas normais
               <div className="flex items-center gap-2 pt-2 border-t border-zinc-700/50">
                 {transfer.player?.photo_url ? (
-                  <img 
-                    src={transfer.player.photo_url} 
+                  <img
+                    src={transfer.player.photo_url}
                     alt={transfer.player.name}
                     className="w-8 h-8 rounded-full object-cover border-2 border-purple-500"
                   />
@@ -1384,6 +1456,17 @@ export default function TransferCard({
             {transfer.is_exchange && <ExchangePlayers transfer={transfer} exchangePlayersDetails={exchangePlayersDetails} />}
           </div>
         </>
+      )}
+
+      {/* Carimbo Visual "ATUALIZADO" - Posicionado Absolutamente no Centro do Card */}
+      {isAdmin && activeTab === 'completed' && isProcessed && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none transform -rotate-12 select-none">
+          <div className="border-[3px] border-double border-green-600/60 rounded-sm px-4 py-1.5 animate-in fade-in zoom-in duration-300 bg-green-500/5 backdrop-blur-[1px] shadow-lg shadow-green-900/10">
+            <span className="text-green-600 font-black text-sm uppercase tracking-[0.2em] opacity-80 whitespace-nowrap drop-shadow-sm">
+              ATUALIZADO
+            </span>
+          </div>
+        </div>
       )}
     </Card>
   )
