@@ -50,7 +50,7 @@ export default function PorPosicao() {
   const fetchMelhoresPorPosicao = async (divisao: "A" | "B") => {
     try {
       setLoading(true);
-      
+
       // Primeiro, buscar os times da divisão selecionada
       const { data: timesDivisao, error: timesError } = await supabase
         .from('teams')
@@ -61,7 +61,7 @@ export default function PorPosicao() {
 
       if (timesDivisao && timesDivisao.length > 0) {
         const teamIds = timesDivisao.map(time => time.id);
-        
+
         // Buscar as estatísticas dos jogadores
         const { data: playerStats, error: statsError } = await supabase
           .from('player_stats')
@@ -75,7 +75,7 @@ export default function PorPosicao() {
 
         if (playerStats && playerStats.length > 0) {
           const playerIds = playerStats.map(stat => stat.player_id);
-          
+
           // Buscar informações dos jogadores
           const { data: players, error: playersError } = await supabase
             .from('players')
@@ -99,7 +99,7 @@ export default function PorPosicao() {
           const jogadoresFormatados: JogadorRating[] = playerStats.map(stat => {
             const player = playersMap.get(stat.player_id);
             const team = teamsMap.get(stat.team_id);
-            
+
             return {
               id: stat.id,
               player_id: stat.player_id,
@@ -117,7 +117,7 @@ export default function PorPosicao() {
           });
 
           // Filtrar apenas jogadores com posições válidas
-          const jogadoresValidos = jogadoresFormatados.filter(j => 
+          const jogadoresValidos = jogadoresFormatados.filter(j =>
             j.posicao && POSITIONS.includes(j.posicao)
           );
 
@@ -134,7 +134,7 @@ export default function PorPosicao() {
 
     } catch (error) {
       console.error('Erro ao buscar jogadores por posição:', error);
-      
+
       // Fallback para dados de exemplo
       const dadosExemplo = criarDadosExemplo(divisao);
       setJogadores(dadosExemplo);
@@ -146,22 +146,22 @@ export default function PorPosicao() {
 
   // Função para criar dados de exemplo
   const criarDadosExemplo = (divisao: "A" | "B"): JogadorRating[] => {
-    const timesDivisao = divisao === "A" 
+    const timesDivisao = divisao === "A"
       ? ['Time A', 'Time B', 'Time C', 'Time D', 'Time E', 'Time F', 'Time G', 'Time H']
       : ['Time I', 'Time J', 'Time K', 'Time L', 'Time M', 'Time N', 'Time O', 'Time P'];
-    
+
     const dados: JogadorRating[] = [];
-    
+
     // Criar 3-5 jogadores por posição
     POSITIONS.forEach(posicao => {
       const qtdJogadores = Math.floor(Math.random() * 3) + 3; // 3-5 jogadores
-      
+
       for (let i = 0; i < qtdJogadores; i++) {
         const timeIndex = Math.floor(Math.random() * timesDivisao.length);
         const jogos = Math.floor(Math.random() * 10) + 15; // 15-24 jogos
         const avgRating = 6 + Math.random() * 3; // 6.0-9.0
         const totalRating = avgRating * jogos;
-        
+
         dados.push({
           id: `${posicao}-${i}-${divisao}`,
           player_id: `player-${posicao}-${i}`,
@@ -177,7 +177,7 @@ export default function PorPosicao() {
         });
       }
     });
-    
+
     return dados;
   };
 
@@ -192,7 +192,7 @@ export default function PorPosicao() {
         return b.total_rating - a.total_rating;
       })
       .slice(0, 10); // Pegar os 10 melhores
-    
+
     setJogadoresPorPosicao(filtrados);
   };
 
@@ -223,7 +223,7 @@ export default function PorPosicao() {
   };
 
   const getPositionClasses = (index: number) => {
-    switch(index) {
+    switch (index) {
       case 0: // Primeiro lugar - Ouro
         return {
           bg: "bg-gradient-to-r from-yellow-500/10 to-yellow-600/5",
@@ -265,7 +265,7 @@ export default function PorPosicao() {
 
   if (loading) {
     return (
-      <div className="bg-gray-900/50 rounded-xl p-6">
+      <div className="bg-gray-900/50 rounded-xl p-4 md:p-6">
         {/* Cabeçalho Loading */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
@@ -274,7 +274,7 @@ export default function PorPosicao() {
               Melhores por Posição
             </h3>
           </div>
-          
+
           {/* Seletor de Divisão Loading */}
           <div className="flex items-center gap-4">
             <div className="flex bg-gray-800 rounded-lg p-1">
@@ -287,7 +287,7 @@ export default function PorPosicao() {
             </div>
           </div>
         </div>
-        
+
         {/* Filtro de Posições Loading */}
         <div className="mb-6">
           <div className="flex gap-2 overflow-x-auto pb-3">
@@ -298,7 +298,7 @@ export default function PorPosicao() {
             ))}
           </div>
         </div>
-        
+
         {/* Lista Loading */}
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
@@ -317,7 +317,7 @@ export default function PorPosicao() {
   }
 
   return (
-    <div className="bg-gray-900/50 rounded-xl p-6">
+    <div className="bg-gray-900/50 rounded-xl p-4 md:p-6">
       {/* Cabeçalho */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
@@ -331,27 +331,25 @@ export default function PorPosicao() {
             </p>
           </div>
         </div>
-        
+
         {/* Seletor de Divisão */}
         <div className="flex items-center gap-4">
           <div className="flex bg-gray-800 rounded-lg p-1">
             <button
               onClick={() => setDivisaoAtiva("A")}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                divisaoAtiva === "A"
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "A"
                   ? "bg-yellow-500 text-black font-semibold"
                   : "text-gray-300 hover:text-white hover:bg-gray-700"
-              }`}
+                }`}
             >
               Série A
             </button>
             <button
               onClick={() => setDivisaoAtiva("B")}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                divisaoAtiva === "B"
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "B"
                   ? "bg-yellow-500 text-black font-semibold"
                   : "text-gray-300 hover:text-white hover:bg-gray-700"
-              }`}
+                }`}
             >
               Série B
             </button>
@@ -367,11 +365,10 @@ export default function PorPosicao() {
             <button
               key={pos}
               onClick={() => setPosicaoAtiva(pos)}
-              className={`px-4 py-3 rounded-lg transition-all whitespace-nowrap font-medium text-lg ${
-                posicaoAtiva === pos
+              className={`px-4 py-3 rounded-lg transition-all whitespace-nowrap font-medium text-lg ${posicaoAtiva === pos
                   ? "bg-yellow-500 text-black font-bold shadow-lg shadow-yellow-500/30"
                   : "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
-              }`}
+                }`}
             >
               {pos}
             </button>
@@ -408,10 +405,10 @@ export default function PorPosicao() {
         {jogadoresPorPosicao.length > 0 ? (
           jogadoresPorPosicao.map((jogador, index) => {
             const classes = getPositionClasses(index);
-            
+
             return (
-              <div 
-                key={jogador.id} 
+              <div
+                key={jogador.id}
                 className={`${classes.bg} ${classes.border} rounded-lg p-4 hover:bg-gray-800/40 transition-all duration-200 hover:scale-[1.005]`}
               >
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -425,8 +422,8 @@ export default function PorPosicao() {
                     {/* Foto do jogador */}
                     <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center border-2 border-gray-600 overflow-hidden">
                       {jogador.foto ? (
-                        <img 
-                          src={jogador.foto} 
+                        <img
+                          src={jogador.foto}
                           alt={jogador.nome}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -480,7 +477,7 @@ export default function PorPosicao() {
                   </div>
 
                   {/* Lado direito - Estatísticas */}
-                  <div className="flex items-center gap-6 md:gap-8">
+                  <div className="flex items-center justify-around sm:justify-end gap-4 md:gap-8 w-full md:w-auto">
                     {/* Average Rating (Destaque) */}
                     <div className="text-center">
                       <div className={`text-3xl font-bold ${getRatingColor(jogador.avg_rating)}`}>
@@ -530,7 +527,7 @@ export default function PorPosicao() {
             {jogadoresPorPosicao.length > 0 && (
               <>
                 <span className="text-green-400">
-                  {jogadoresPorPosicao.length} jogadores • 
+                  {jogadoresPorPosicao.length} jogadores •
                 </span>
                 <span className="ml-2">
                   Posição: <span className="text-yellow-400">{posicaoAtiva}</span>
@@ -541,7 +538,7 @@ export default function PorPosicao() {
               </>
             )}
           </div>
-          
+
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">

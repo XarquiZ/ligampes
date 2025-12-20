@@ -25,7 +25,7 @@ export default function Assistencias() {
   const fetchAssistencias = async (divisao: "A" | "B") => {
     try {
       setLoading(true);
-      
+
       // Primeiro, precisamos buscar os times da divisão selecionada
       const { data: timesDivisao, error: timesError } = await supabase
         .from('teams')
@@ -36,7 +36,7 @@ export default function Assistencias() {
 
       if (timesDivisao && timesDivisao.length > 0) {
         const teamIds = timesDivisao.map(time => time.id);
-        
+
         const { data: playerStats, error: statsError } = await supabase
           .from('player_stats')
           .select('*')
@@ -71,7 +71,7 @@ export default function Assistencias() {
             const player = playersMap.get(stat.player_id);
             const team = teamsMap.get(stat.team_id);
             const media = stat.jogos > 0 ? stat.assistencias / stat.jogos : 0;
-            
+
             return {
               id: stat.player_id,
               nome: player?.name || stat.player_name || 'Jogador',
@@ -84,11 +84,11 @@ export default function Assistencias() {
               foto: player?.photo_url
             };
           })
-          .filter(assistente => assistente.assistencias > 0)
-          .sort((a, b) => {
-            if (b.assistencias !== a.assistencias) return b.assistencias - a.assistencias;
-            return b.media - a.media;
-          });
+            .filter(assistente => assistente.assistencias > 0)
+            .sort((a, b) => {
+              if (b.assistencias !== a.assistencias) return b.assistencias - a.assistencias;
+              return b.media - a.media;
+            });
 
           setAssistentes(assistentesFormatados);
         } else {
@@ -110,7 +110,7 @@ export default function Assistencias() {
 
     } catch (error) {
       console.error('Erro ao buscar assistências:', error);
-      
+
       // Fallback para dados de exemplo baseado na divisão
       const dadosExemplo = {
         A: [
@@ -155,7 +155,7 @@ export default function Assistencias() {
               Líder de Assistências
             </h3>
           </div>
-          
+
           {/* Seletor de Divisão no Loading State */}
           <div className="flex items-center gap-4">
             <div className="flex bg-gray-800 rounded-lg p-1">
@@ -171,7 +171,7 @@ export default function Assistencias() {
             </div>
           </div>
         </div>
-        
+
         <div className="space-y-3">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="flex items-center gap-4 p-4 bg-gray-800/30 rounded-lg animate-pulse">
@@ -189,7 +189,7 @@ export default function Assistencias() {
   }
 
   const getPositionClasses = (index: number) => {
-    switch(index) {
+    switch (index) {
       case 0: // Primeiro lugar - Ouro
         return {
           bg: "bg-gradient-to-r from-yellow-500/10 to-yellow-600/5",
@@ -230,7 +230,7 @@ export default function Assistencias() {
   };
 
   return (
-    <div className="bg-gray-900/50 rounded-xl p-6">
+    <div className="bg-gray-900/50 rounded-xl p-4 md:p-6">
       {/* Cabeçalho */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
@@ -239,34 +239,32 @@ export default function Assistencias() {
             Líder de Assistências
           </h3>
         </div>
-        
+
         <div className="flex items-center gap-4">
           {/* Seletor de Divisão */}
           <div className="flex items-center gap-2">
             <div className="flex bg-gray-800 rounded-lg p-1">
               <button
                 onClick={() => setDivisaoAtiva("A")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  divisaoAtiva === "A"
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "A"
                     ? "bg-yellow-500 text-black font-semibold"
                     : "text-gray-300 hover:text-white hover:bg-gray-700"
-                }`}
+                  }`}
               >
                 Série A
               </button>
               <button
                 onClick={() => setDivisaoAtiva("B")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  divisaoAtiva === "B"
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "B"
                     ? "bg-yellow-500 text-black font-semibold"
                     : "text-gray-300 hover:text-white hover:bg-gray-700"
-                }`}
+                  }`}
               >
                 Série B
               </button>
             </div>
           </div>
-          
+
         </div>
       </div>
 
@@ -275,15 +273,15 @@ export default function Assistencias() {
         {assistentes.length > 0 ? (
           assistentes.map((assistente, index) => {
             const classes = getPositionClasses(index);
-            
+
             return (
-              <div 
-                key={assistente.id} 
+              <div
+                key={assistente.id}
                 className={`${classes.bg} ${classes.border} rounded-lg p-4 hover:bg-gray-800/40 transition-colors`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-0">
                   {/* Lado esquerdo - Posição e Informações */}
-                  <div className="flex items-center gap-4 flex-1">
+                  <div className="flex items-center gap-4 flex-1 w-full sm:w-auto">
                     {/* Posição */}
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold ${classes.positionBg} ${classes.positionText}`}>
                       {index < 3 ? classes.icon : index + 1}
@@ -292,8 +290,8 @@ export default function Assistencias() {
                     {/* Foto do jogador */}
                     <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center border-2 border-gray-600 overflow-hidden">
                       {assistente.foto ? (
-                        <img 
-                          src={assistente.foto} 
+                        <img
+                          src={assistente.foto}
                           alt={assistente.nome}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -343,7 +341,7 @@ export default function Assistencias() {
                   </div>
 
                   {/* Lado direito - Estatísticas */}
-                  <div className="flex items-center gap-8">
+                  <div className="flex items-center justify-around sm:justify-end gap-4 sm:gap-8 w-full sm:w-auto mt-2 sm:mt-0">
                     {/* Assistências */}
                     <div className="text-center">
                       <div className={`text-3xl font-bold ${classes.assistText}`}>
@@ -386,7 +384,7 @@ export default function Assistencias() {
               </span>
             )}
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
               <div className="w-3 h-3 rounded-full bg-gradient-to-r from-yellow-500 to-yellow-600"></div>

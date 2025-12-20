@@ -57,10 +57,10 @@ export interface Player {
   is_favorite?: boolean
 }
 
-export interface Team { 
-  id: string; 
-  name: string; 
-  logo_url: string | null 
+export interface Team {
+  id: string;
+  name: string;
+  logo_url: string | null
 }
 
 // Atualizado com informações de formação
@@ -177,6 +177,9 @@ export interface StatItemProps {
   icon: React.ReactNode
   value: string | number
   label: string
+  highlight?: boolean
+  warning?: boolean
+  danger?: boolean
 }
 
 // Interface para formações salvas
@@ -217,7 +220,7 @@ export interface SavedFormationsModalProps {
 }
 
 // Constantes atualizadas para PES 21
-export const POSITIONS = ['GO','ZC','LE','LD','VOL','MLG','MAT','MLE','MLD','PTE','PTD','SA','CA']
+export const POSITIONS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'MLE', 'MLD', 'PTE', 'PTD', 'SA', 'CA']
 
 // Mapeamento detalhado das posições do PES 21
 export const POSITION_MAP = {
@@ -240,135 +243,135 @@ export const PLAYSTYLES = ['Artilheiro', 'Armador criativo', 'Atacante surpresa'
 
 // Formações com siglas do PES 21
 export const DEFAULT_FORMATIONS: Formation[] = [
-  { 
-    id: '4-3-3', 
-    name: '4-3-3', 
+  {
+    id: '4-3-3',
+    name: '4-3-3',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'VOL', 'MLG', 'MLG', 'PTD', 'CA', 'PTE'],
     description: 'Formação ofensiva com três atacantes',
     defenseLine: 4,
     midfieldLine: 3,
     attackLine: 3
   },
-  { 
-    id: '4-2-3-1', 
-    name: '4-2-3-1', 
+  {
+    id: '4-2-3-1',
+    name: '4-2-3-1',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'VOL', 'VOL', 'MLD', 'MLG', 'MLE', 'CA'],
     description: 'Formação equilibrada com meia-armador',
     defenseLine: 4,
     midfieldLine: 5,
     attackLine: 1
   },
-  { 
-    id: '4-4-2', 
-    name: '4-4-2', 
+  {
+    id: '4-4-2',
+    name: '4-4-2',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'MLD', 'VOL', 'VOL', 'MLE', 'CA', 'CA'],
     description: 'Formação clássica com dois atacantes',
     defenseLine: 4,
     midfieldLine: 4,
     attackLine: 2
   },
-  { 
-    id: '4-1-4-1', 
-    name: '4-1-4-1', 
+  {
+    id: '4-1-4-1',
+    name: '4-1-4-1',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'VOL', 'MLD', 'MLG', 'MLG', 'MLE', 'CA'],
     description: 'Formação defensiva com volante único',
     defenseLine: 4,
     midfieldLine: 5,
     attackLine: 1
   },
-  { 
-    id: '3-5-2', 
-    name: '3-5-2', 
+  {
+    id: '3-5-2',
+    name: '3-5-2',
     positions: ['GO', 'ZC', 'ZC', 'ZC', 'MLD', 'VOL', 'MLG', 'MLG', 'MLE', 'CA', 'CA'],
     description: 'Formação ofensiva com laterais avançados',
     defenseLine: 3,
     midfieldLine: 5,
     attackLine: 2
   },
-  { 
-    id: '3-4-3', 
-    name: '3-4-3', 
+  {
+    id: '3-4-3',
+    name: '3-4-3',
     positions: ['GO', 'ZC', 'ZC', 'ZC', 'MLD', 'VOL', 'VOL', 'MLE', 'PTD', 'CA', 'PTE'],
     description: 'Formação muito ofensiva',
     defenseLine: 3,
     midfieldLine: 4,
     attackLine: 3
   },
-  { 
-    id: '5-3-2', 
-    name: '5-3-2', 
+  {
+    id: '5-3-2',
+    name: '5-3-2',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'ZC', 'LE', 'VOL', 'MLG', 'MLG', 'CA', 'CA'],
     description: 'Formação defensiva com três zagueiros',
     defenseLine: 5,
     midfieldLine: 3,
     attackLine: 2
   },
-  { 
-    id: '4-2-4', 
-    name: '4-2-4', 
+  {
+    id: '4-2-4',
+    name: '4-2-4',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'VOL', 'VOL', 'PTD', 'CA', 'CA', 'PTE'],
     description: 'Formação extremamente ofensiva',
     defenseLine: 4,
     midfieldLine: 2,
     attackLine: 4
   },
-  { 
-    id: '4-3-1-2', 
-    name: '4-3-1-2', 
+  {
+    id: '4-3-1-2',
+    name: '4-3-1-2',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'VOL', 'MLG', 'MLG', 'MAT', 'CA', 'CA'],
     description: 'Formação com meia-atacante',
     defenseLine: 4,
     midfieldLine: 4,
     attackLine: 2
   },
-  { 
-    id: '3-4-2-1', 
-    name: '3-4-2-1', 
+  {
+    id: '3-4-2-1',
+    name: '3-4-2-1',
     positions: ['GO', 'ZC', 'ZC', 'ZC', 'MLD', 'VOL', 'VOL', 'MLE', 'SA', 'SA', 'CA'],
     description: 'Formação com dois segundos atacantes',
     defenseLine: 3,
     midfieldLine: 4,
     attackLine: 3
   },
-  { 
-    id: '4-3-2-1', 
-    name: '4-3-2-1 (Árvore de Natal)', 
+  {
+    id: '4-3-2-1',
+    name: '4-3-2-1 (Árvore de Natal)',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'VOL', 'MLG', 'MLG', 'SA', 'SA', 'CA'],
     description: 'Formação ofensiva em formato de árvore',
     defenseLine: 4,
     midfieldLine: 3,
     attackLine: 3
   },
-  { 
-    id: '4-5-1', 
-    name: '4-5-1', 
+  {
+    id: '4-5-1',
+    name: '4-5-1',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'MLD', 'VOL', 'MLG', 'VOL', 'MLE', 'CA'],
     description: 'Formação defensiva com meio-campo forte',
     defenseLine: 4,
     midfieldLine: 5,
     attackLine: 1
   },
-  { 
-    id: '4-1-2-3', 
-    name: '4-1-2-3', 
+  {
+    id: '4-1-2-3',
+    name: '4-1-2-3',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'LE', 'VOL', 'MLG', 'MLG', 'PTD', 'CA', 'PTE'],
     description: 'Formação com volante único e dois meias',
     defenseLine: 4,
     midfieldLine: 3,
     attackLine: 3
   },
-  { 
-    id: '3-3-3-1', 
-    name: '3-3-3-1', 
+  {
+    id: '3-3-3-1',
+    name: '3-3-3-1',
     positions: ['GO', 'ZC', 'ZC', 'ZC', 'VOL', 'MLG', 'VOL', 'MLD', 'MLG', 'MLE', 'CA'],
     description: 'Formação moderna com linhas definidas',
     defenseLine: 3,
     midfieldLine: 6,
     attackLine: 1
   },
-  { 
-    id: '5-4-1', 
-    name: '5-4-1', 
+  {
+    id: '5-4-1',
+    name: '5-4-1',
     positions: ['GO', 'LD', 'ZC', 'ZC', 'ZC', 'LE', 'MLD', 'VOL', 'MLG', 'MLE', 'CA'],
     description: 'Formação extremamente defensiva',
     defenseLine: 5,

@@ -21,17 +21,17 @@ interface TeamRowProps {
 }
 
 export default function TeamRow({ team, totalTeams = 20 }: TeamRowProps) {
-  
+
   // Lógica das bolinhas de últimos jogos (W/D/L)
   const getFormStyles = (result: string) => {
     const r = result ? result.toUpperCase() : '';
 
     if (r === 'V' || r === 'WIN' || r === 'W') {
       return { bg: "bg-green-500", letter: "W", title: "Vitória" };
-    } 
+    }
     if (r === 'E' || r === 'DRAW') {
       return { bg: "bg-gray-500", letter: "D", title: "Empate" };
-    } 
+    }
     if (r === 'D' || r === 'LOSS' || r === 'L') {
       return { bg: "bg-red-500", letter: "L", title: "Derrota" };
     }
@@ -40,8 +40,8 @@ export default function TeamRow({ team, totalTeams = 20 }: TeamRowProps) {
 
   // Lógica de cores da posição (Classificação)
   const getPositionColor = () => {
-    const divisao = team.divisao || 'A'; 
-    
+    const divisao = team.divisao || 'A';
+
     if (divisao === 'A') {
       // SÉRIE A (Exemplo padrão)
       if (team.position <= 4) return "bg-green-500/20 text-green-400"; // G4
@@ -49,12 +49,12 @@ export default function TeamRow({ team, totalTeams = 20 }: TeamRowProps) {
       if (team.position >= totalTeams - 3) return "bg-red-500/20 text-red-400"; // Z4
     } else if (divisao === 'B') {
       // SÉRIE B (Regras Customizadas)
-      
+
       // 1º ao 3º -> Verde
       if (team.position <= 3) {
         return "bg-green-500/20 text-green-400";
       }
-      
+
       // 4º ao 7º -> Laranja
       if (team.position >= 4 && team.position <= 7) {
         return "bg-orange-500/20 text-orange-400";
@@ -64,7 +64,7 @@ export default function TeamRow({ team, totalTeams = 20 }: TeamRowProps) {
       if (team.position >= 8 && team.position <= 14) {
         return "bg-blue-500/20 text-blue-400";
       }
-      
+
       // Resto (incluindo Z4/Rebaixamento) -> Vermelho
       // Assumindo que "o resto" inclui o Z4, ou seja, do 15 para baixo.
       // Se quiser que apenas o Z4 seja vermelho e o meio (15-16) seja cinza, ajuste aqui.
@@ -73,7 +73,7 @@ export default function TeamRow({ team, totalTeams = 20 }: TeamRowProps) {
         return "bg-red-500/20 text-red-400";
       }
     }
-    
+
     // Fallback (Meio de tabela neutro)
     return "bg-gray-800 text-gray-300";
   };
@@ -81,17 +81,17 @@ export default function TeamRow({ team, totalTeams = 20 }: TeamRowProps) {
   return (
     <tr className="hover:bg-gray-800/50 transition-colors border-b border-gray-800/50 last:border-b-0">
       {/* Posição */}
-      <td className="py-4 px-4">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${getPositionColor()}`}>
+      <td className="py-4 px-2 md:px-4">
+        <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-bold text-xs md:text-sm ${getPositionColor()}`}>
           {team.position}
         </div>
       </td>
-      
+
       {/* Nome do Time */}
-      <td className="py-4 px-4">
-        <div className="flex items-center gap-3">
+      <td className="py-4 px-2 md:px-4">
+        <div className="flex items-center gap-2 md:gap-3">
           {team.logo_url ? (
-            <div className="relative w-8 h-8 flex-shrink-0">
+            <div className="relative w-6 h-6 md:w-8 md:h-8 flex-shrink-0">
               <img
                 src={team.logo_url}
                 alt={`Logo ${team.name}`}
@@ -100,42 +100,41 @@ export default function TeamRow({ team, totalTeams = 20 }: TeamRowProps) {
               />
             </div>
           ) : (
-            <div className="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-xs font-bold text-gray-300">{team.name.substring(0,2).toUpperCase()}</span>
+            <div className="w-6 h-6 md:w-8 md:h-8 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-[10px] md:text-xs font-bold text-gray-300">{team.name.substring(0, 2).toUpperCase()}</span>
             </div>
           )}
-          <span className="font-medium text-white">{team.name}</span>
+          <span className="font-medium text-white text-sm md:text-base">{team.name}</span>
         </div>
       </td>
-      
+
       {/* Pontos */}
-      <td className="py-4 px-4 font-bold text-yellow-400 text-lg">{team.pontos}</td>
-      
+      <td className="py-4 px-2 md:px-4 font-bold text-yellow-400 text-base md:text-lg">{team.pontos}</td>
+
       {/* Jogos */}
-      <td className="py-4 px-4 text-white text-center">{team.jogos}</td>
-      
+      <td className="py-4 px-2 md:px-4 text-white text-center text-sm md:text-base">{team.jogos}</td>
+
       {/* Vitórias */}
-      <td className="py-4 px-4 text-green-400 text-center">{team.vitorias}</td>
-      
+      <td className="py-4 px-4 text-green-400 text-center hidden md:table-cell">{team.vitorias}</td>
+
       {/* Empates */}
-      <td className="py-4 px-4 text-gray-400 text-center">{team.empates}</td>
-      
+      <td className="py-4 px-4 text-gray-400 text-center hidden md:table-cell">{team.empates}</td>
+
       {/* Derrotas */}
-      <td className="py-4 px-4 text-red-400 text-center">{team.derrotas}</td>
-      
+      <td className="py-4 px-4 text-red-400 text-center hidden md:table-cell">{team.derrotas}</td>
+
       {/* Gols */}
       <td className="py-4 px-4 text-gray-300 text-center hidden md:table-cell">{team.golsMarcados}</td>
       <td className="py-4 px-4 text-gray-300 text-center hidden md:table-cell">{team.golsSofridos}</td>
-      
+
       {/* Saldo */}
-      <td className={`py-4 px-4 font-medium text-center ${
-        team.saldo > 0 ? "text-green-400" : team.saldo < 0 ? "text-red-400" : "text-gray-300"
-      }`}>
+      <td className={`py-4 px-2 md:px-4 font-medium text-center text-sm md:text-base ${team.saldo > 0 ? "text-green-400" : team.saldo < 0 ? "text-red-400" : "text-gray-300"
+        }`}>
         {team.saldo > 0 ? "+" : ""}{team.saldo}
       </td>
-      
+
       {/* Últimos 5 jogos */}
-      <td className="py-4 px-4">
+      <td className="py-4 px-4 hidden md:table-cell">
         <div className="flex gap-1.5 justify-center md:justify-start">
           {team.ultimosJogos && team.ultimosJogos.length > 0 ? (
             team.ultimosJogos.slice(0, 5).map((result, index) => {

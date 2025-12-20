@@ -52,7 +52,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   const formattedPrice = formatPrice(Number(player.base_price))
 
   return (
-    <div 
+    <div
       className="group relative bg-zinc-900/90 rounded-xl lg:rounded-2xl overflow-hidden border border-zinc-800 hover:border-purple-500/70 transition-all duration-300 hover:scale-[1.03] hover:shadow-xl lg:hover:shadow-2xl hover:shadow-purple-600/20 cursor-pointer select-none"
       onClick={handleCardClick}
       onMouseDown={(e) => e.preventDefault()}
@@ -93,8 +93,8 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
         {activeSection === 'favoritos' && player.club && (
           <div className="absolute bottom-2 lg:bottom-3 left-2 lg:left-3 bg-black/70 backdrop-blur px-2 lg:px-3 py-1 lg:py-1.5 rounded-lg border border-zinc-700 flex items-center gap-2">
             {player.logo_url && (
-              <img 
-                src={player.logo_url} 
+              <img
+                src={player.logo_url}
                 alt={player.club}
                 className="w-4 h-4 lg:w-5 lg:h-5 rounded-full object-contain"
               />
@@ -158,7 +158,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           <p className="text-center text-lg lg:text-xl font-black text-emerald-400">
             {formattedPrice}
           </p>
-          
+
           <div className="flex gap-2 w-full">
             {activeSection === 'favoritos' && showProposeButton && onShareClick ? (
               <Button
@@ -186,7 +186,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                     <DollarSign className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
                   </Button>
                 )}
-                
+
                 {player.overall <= 74 && onDismissClick && (
                   <Button
                     onClick={(e) => {

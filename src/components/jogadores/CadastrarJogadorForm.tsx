@@ -50,11 +50,11 @@ interface Team { id: string; name: string; logo_url: string | null }
 
 const OVERALL_VALUE_MAP = [
   { ovr: 85, value: 170_000_000 }, { ovr: 84, value: 150_000_000 }, { ovr: 83, value: 130_000_000 },
-  { ovr: 82, value: 110_000_000 }, { ovr: 81, value: 95_000_000 },  { ovr: 80, value: 85_000_000 },
-  { ovr: 79, value: 70_000_000 },  { ovr: 78, value: 55_000_000 },  { ovr: 77, value: 40_000_000 },
-  { ovr: 76, value: 30_000_000 },  { ovr: 75, value: 25_000_000 },  { ovr: 74, value: 15_000_000 },
-  { ovr: 73, value: 12_000_000 },  { ovr: 72, value: 8_000_000 },   { ovr: 71, value: 6_000_000 },
-  { ovr: 70, value: 4_000_000 },   { ovr: 0,   value: 1_000 },
+  { ovr: 82, value: 110_000_000 }, { ovr: 81, value: 95_000_000 }, { ovr: 80, value: 85_000_000 },
+  { ovr: 79, value: 70_000_000 }, { ovr: 78, value: 55_000_000 }, { ovr: 77, value: 40_000_000 },
+  { ovr: 76, value: 30_000_000 }, { ovr: 75, value: 25_000_000 }, { ovr: 74, value: 15_000_000 },
+  { ovr: 73, value: 12_000_000 }, { ovr: 72, value: 8_000_000 }, { ovr: 71, value: 6_000_000 },
+  { ovr: 70, value: 4_000_000 }, { ovr: 0, value: 1_000 },
 ]
 
 const calculateBasePrice = (ovr: number, position: string) => {
@@ -67,12 +67,12 @@ const calculateBasePrice = (ovr: number, position: string) => {
 }
 
 // Posições OBRIGATÓRIAS (sem "Nenhum")
-const POSITIONS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA','MLE','MLD', 'PTE', 'PTD', 'CA'] as const
-const ALT_POS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA','MLE','MLD', 'PTE', 'PTD', 'CA'] as const
+const POSITIONS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA'] as const
+const ALT_POS = ['GO', 'ZC', 'LE', 'LD', 'VOL', 'MLG', 'MAT', 'SA', 'MLE', 'MLD', 'PTE', 'PTD', 'CA'] as const
 const PREFERRED_FOOT = ['Direito', 'Esquerdo', 'Ambos', 'Nenhum'] as const
 const PLAYSTYLES = ['Artilheiro', 'Armador criativo', 'Atacante surpresa', 'Clássica nº 10', 'Especialista em cruz.', 'Goleiro defensivo', 'Goleiro ofensivo', 'Homem de área', 'Jog. de infiltração', 'Jog. de Lado de Campo', 'Lateral móvel', 'Meia versátil', 'Nenhum', 'Orquestrador', 'Pivô', 'Ponta velocista', 'Primeiro volante', 'Provocador', 'Puxa marcação', 'Volantão', 'Zagueiro defensivo', 'Zagueiro ofensivo'] as const;
 const SKILLS = ['360 graus', 'Afastamento acrobático', 'Arremesso lateral longo', 'Arremesso longo do GO', 'Cabeçada', 'Chapéu', 'Chute ascendente', 'Chute com o peito do pé', 'Chute de longe', 'Chute de primeira', 'Controle da cavadinha', 'Controle de domínio', 'Corte de calcanhar', 'Cruzamento preciso', 'Curva para fora', 'De letra', 'Elástico', 'Especialista em Pênaltis', 'Espírito guerreiro', 'Finalização acrobática', 'Finta de letra', 'Folha seca', 'Interceptação', 'Liderança', 'Malícia', 'Marcação individual', 'Passe aéreo baixo', 'Passe de primeira', 'Passe em profundidade', 'Passe na medida', 'Passe sem olhar', 'Pedalada simples', 'Pegador de pênaltis', 'Precisão à distância', 'Puxada de letra', 'Reposição alta do GO', 'Reposição baixa do GO', 'Super substituto', 'Toque de calcanhar', 'Toque duplo', 'Volta para marcar'] as const
-const NATIONALITIES = ['Angola', 'Argélia', 'Argentina', 'Bolívia', 'Brasil','Camarões', 'Chile', 'Colômbia', 'Coreia do Sul', 'Costa do Marfim', 'Costa Rica', 'Dinamarca', 'Equador', 'Espanha', 'França', 'Gâmbia', 'Guiné', 'Holanda', 'Itália', 'México', 'Paraguai', 'Peru', 'Portugal', 'República do Congo', 'Senegal', 'Suíça', 'Uruguai', 'Venezuela', 'Desconhecida'] as const
+const NATIONALITIES = ['Angola', 'Argélia', 'Argentina', 'Bolívia', 'Brasil', 'Camarões', 'Chile', 'Colômbia', 'Coreia do Sul', 'Costa do Marfim', 'Costa Rica', 'Dinamarca', 'Equador', 'Espanha', 'França', 'Gâmbia', 'Guiné', 'Holanda', 'Itália', 'México', 'Paraguai', 'Peru', 'Portugal', 'República do Congo', 'Senegal', 'Suíça', 'Uruguai', 'Venezuela', 'Desconhecida'] as const
 
 // Alturas de 1,40m até 2,30m (140cm até 230cm)
 const HEIGHT_OPTIONS = Array.from({ length: 91 }, (_, i) => {
@@ -146,6 +146,7 @@ type PlayerFormValues = z.infer<typeof formSchema>
 interface CadastrarJogadorFormProps {
   playerToEdit?: (PlayerFormValues & { id: string }) | null
   onPlayerAdded: () => void
+  onCancel?: () => void
 }
 
 // ===========================================================================
@@ -271,7 +272,7 @@ const MultiSelect = ({ control, name, label, options, placeholder, Icon }: any) 
 // COMPONENTE PRINCIPAL
 // ===========================================================================
 
-export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJogadorFormProps) {
+export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded, onCancel }: CadastrarJogadorFormProps) {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -379,10 +380,10 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
 
           <Tabs defaultValue="general" className="w-full">
-            <TabsList className="grid grid-cols-3 w-full h-14 bg-zinc-900/80 rounded-xl border border-zinc-800">
-              <TabsTrigger value="general" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-l-xl">Gerais</TabsTrigger>
-              <TabsTrigger value="attributes" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white">Atributos</TabsTrigger>
-              <TabsTrigger value="details" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-r-xl">Detalhes</TabsTrigger>
+            <TabsList className="flex flex-col sm:grid sm:grid-cols-3 w-full h-auto sm:h-14 bg-zinc-900/80 rounded-xl border border-zinc-800 p-1 sm:p-0 gap-1 sm:gap-0">
+              <TabsTrigger value="general" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none sm:rounded-l-xl py-3 sm:py-0">Gerais</TabsTrigger>
+              <TabsTrigger value="attributes" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none py-3 sm:py-0">Atributos</TabsTrigger>
+              <TabsTrigger value="details" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none sm:rounded-r-xl py-3 sm:py-0">Detalhes</TabsTrigger>
             </TabsList>
 
             {/* GERAIS */}
@@ -428,8 +429,8 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                       <Ruler className="w-5 h-5 text-purple-400" />
                       Altura
                     </FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(value ? Number(value) : null)} 
+                    <Select
+                      onValueChange={(value) => field.onChange(value ? Number(value) : null)}
                       value={field.value ? String(field.value) : ""}
                     >
                       <FormControl>
@@ -480,7 +481,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                         {teams.map(t => (
                           <SelectItem key={t.id} value={t.id}>
                             <div className="flex items-center gap-3">
-                              {t.logo_url && <img src={t.logo_url} alt="" className="w-6 h-6 rounded" onError={e => (e.target as any).style.display='none'} />}
+                              {t.logo_url && <img src={t.logo_url} alt="" className="w-6 h-6 rounded" onError={e => (e.target as any).style.display = 'none'} />}
                               {t.name}
                             </div>
                           </SelectItem>
@@ -531,7 +532,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
             <TabsContent value="attributes" className="space-y-12 mt-8">
               <section>
                 <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Goal className="w-10 h-10" /> Ataque & Técnica</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                   <Attr control={form.control} name="offensive_talent" label="Talento Ofensivo" />
                   <Attr control={form.control} name="ball_control" label="Controle de Bola" />
                   <Attr control={form.control} name="dribbling" label="Drible" />
@@ -577,7 +578,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                 <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8">
                   <Circle className="w-10 h-10" /> Goleiro {isGK && <span className="text-yellow-400 text-lg">(apenas GO)</span>}
                 </h3>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
                   <Attr control={form.control} name="gk_awareness" label="Talento de GO" />
                   <Attr control={form.control} name="gk_catching" label="Firmeza de GO" />
                   <Attr control={form.control} name="gk_clearing" label="Afast. de bola de GO" />
@@ -590,7 +591,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
             {/* DETALHES & SKILLS */}
             <TabsContent value="details" className="space-y-12 mt-8">
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 min-[450px]:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                 <FormField control={form.control} name="preferred_foot" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-lg font-semibold text-white">Pé Preferido</FormLabel>
@@ -689,6 +690,17 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded }: CadastrarJ
                 isEditMode ? "SALVAR ALTERAÇÕES" : "CADASTRAR JOGADOR"
               )}
             </Button>
+
+            {onCancel && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onCancel}
+                className="w-full h-12 mt-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 font-semibold rounded-2xl md:hidden"
+              >
+                Cancelar
+              </Button>
+            )}
           </div>
         </form>
       </Form>

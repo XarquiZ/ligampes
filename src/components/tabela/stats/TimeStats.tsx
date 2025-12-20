@@ -33,7 +33,7 @@ export default function TimeStats() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        
+
         // Buscar apenas times com divisão A ou B (ignorar null)
         const { data: teamsData, error: teamsError } = await supabase
           .from('teams')
@@ -104,31 +104,31 @@ export default function TimeStats() {
         }
       } catch (error) {
         console.error('Erro ao buscar dados:', error);
-        
+
         // Fallback com dados de exemplo (apenas times com divisão)
         const divisaoAExemplo = [
-          { 
-            id: 1, 
-            nome: "Time A", 
-            golsFeitos: 42, 
-            golsSofridos: 18, 
-            saldo: 24, 
-            posseMedia: null, 
-            finalizacoes: null, 
-            cartoesAmarelos: 25, 
+          {
+            id: 1,
+            nome: "Time A",
+            golsFeitos: 42,
+            golsSofridos: 18,
+            saldo: 24,
+            posseMedia: null,
+            finalizacoes: null,
+            cartoesAmarelos: 25,
             cartoesVermelhos: 1,
             logo_url: undefined,
             divisao: 'A'
           },
-          { 
-            id: 2, 
-            nome: "Time B", 
-            golsFeitos: 35, 
-            golsSofridos: 22, 
-            saldo: 13, 
-            posseMedia: null, 
-            finalizacoes: null, 
-            cartoesAmarelos: 32, 
+          {
+            id: 2,
+            nome: "Time B",
+            golsFeitos: 35,
+            golsSofridos: 22,
+            saldo: 13,
+            posseMedia: null,
+            finalizacoes: null,
+            cartoesAmarelos: 32,
             cartoesVermelhos: 2,
             logo_url: undefined,
             divisao: 'A'
@@ -136,28 +136,28 @@ export default function TimeStats() {
         ];
 
         const divisaoBExemplo = [
-          { 
-            id: 3, 
-            nome: "Time C", 
-            golsFeitos: 28, 
-            golsSofridos: 23, 
-            saldo: 5, 
-            posseMedia: null, 
-            finalizacoes: null, 
-            cartoesAmarelos: 19, 
+          {
+            id: 3,
+            nome: "Time C",
+            golsFeitos: 28,
+            golsSofridos: 23,
+            saldo: 5,
+            posseMedia: null,
+            finalizacoes: null,
+            cartoesAmarelos: 19,
             cartoesVermelhos: 1,
             logo_url: undefined,
             divisao: 'B'
           },
-          { 
-            id: 4, 
-            nome: "Time D", 
-            golsFeitos: 27, 
-            golsSofridos: 24, 
-            saldo: 3, 
-            posseMedia: null, 
-            finalizacoes: null, 
-            cartoesAmarelos: 35, 
+          {
+            id: 4,
+            nome: "Time D",
+            golsFeitos: 27,
+            golsSofridos: 24,
+            saldo: 3,
+            posseMedia: null,
+            finalizacoes: null,
+            cartoesAmarelos: 35,
             cartoesVermelhos: 3,
             logo_url: undefined,
             divisao: 'B'
@@ -193,11 +193,11 @@ export default function TimeStats() {
   const sortedTimes = [...timesAtivos].sort((a, b) => {
     const aValue = a[sortBy];
     const bValue = b[sortBy];
-    
+
     if (aValue === null || bValue === null) {
       return 0;
     }
-    
+
     if (sortOrder === "asc") {
       return aValue > bValue ? 1 : -1;
     } else {
@@ -216,7 +216,7 @@ export default function TimeStats() {
   }
 
   return (
-    <div className="bg-gray-900/50 rounded-xl p-6">
+    <div className="bg-gray-900/50 rounded-xl p-4 md:p-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h3 className="text-xl font-bold text-yellow-400 flex items-center gap-2">
@@ -224,63 +224,58 @@ export default function TimeStats() {
             Estatísticas dos Times - Divisão {divisaoAtiva}
           </h3>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           {/* Seletor de Divisão */}
           <div className="flex items-center gap-2">
             <div className="flex bg-gray-800 rounded-lg p-1">
               <button
                 onClick={() => setDivisaoAtiva("A")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  divisaoAtiva === "A"
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "A"
                     ? "bg-yellow-500 text-black font-semibold"
                     : "text-gray-300 hover:text-white hover:bg-gray-700"
-                }`}
+                  }`}
               >
                 Série A
               </button>
               <button
                 onClick={() => setDivisaoAtiva("B")}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  divisaoAtiva === "B"
+                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${divisaoAtiva === "B"
                     ? "bg-yellow-500 text-black font-semibold"
                     : "text-gray-300 hover:text-white hover:bg-gray-700"
-                }`}
+                  }`}
               >
                 Série B
               </button>
             </div>
           </div>
-          
+
           {/* Botões de Ordenação */}
           <div className="flex gap-2 flex-wrap">
-            <button 
+            <button
               onClick={() => handleSort("golsFeitos")}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                sortBy === "golsFeitos" 
-                  ? "bg-yellow-500 text-black font-semibold" 
+              className={`px-3 py-1 rounded-lg text-sm transition-colors ${sortBy === "golsFeitos"
+                  ? "bg-yellow-500 text-black font-semibold"
                   : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-              }`}
+                }`}
             >
               GF {sortIcon("golsFeitos")}
             </button>
-            <button 
+            <button
               onClick={() => handleSort("saldo")}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                sortBy === "saldo" 
-                  ? "bg-yellow-500 text-black font-semibold" 
+              className={`px-3 py-1 rounded-lg text-sm transition-colors ${sortBy === "saldo"
+                  ? "bg-yellow-500 text-black font-semibold"
                   : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-              }`}
+                }`}
             >
               Saldo {sortIcon("saldo")}
             </button>
-            <button 
+            <button
               onClick={() => handleSort("posseMedia")}
-              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                sortBy === "posseMedia" 
-                  ? "bg-yellow-500 text-black font-semibold" 
+              className={`px-3 py-1 rounded-lg text-sm transition-colors ${sortBy === "posseMedia"
+                  ? "bg-yellow-500 text-black font-semibold"
                   : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-              }`}
+                }`}
             >
               Posse {sortIcon("posseMedia")}
             </button>
@@ -289,24 +284,24 @@ export default function TimeStats() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px]">
+        <table className="w-full min-w-full md:min-w-[800px]">
           <thead>
             <tr className="border-b border-gray-800">
               <th className="text-left py-3 px-4 text-yellow-400 font-semibold min-w-[200px]">Time</th>
               <th className="text-left py-3 px-4 text-yellow-400 font-semibold">GF</th>
               <th className="text-left py-3 px-4 text-yellow-400 font-semibold">GS</th>
               <th className="text-left py-3 px-4 text-yellow-400 font-semibold">Saldo</th>
-              <th className="text-left py-3 px-4 text-yellow-400 font-semibold">Posse</th>
-              <th className="text-left py-3 px-4 text-yellow-400 font-semibold">Finalizações</th>
-              <th className="text-left py-3 px-4 text-yellow-400 font-semibold">CA</th>
-              <th className="text-left py-3 px-4 text-yellow-400 font-semibold">CV</th>
+              <th className="text-left py-3 px-4 text-yellow-400 font-semibold hidden md:table-cell">Posse</th>
+              <th className="text-left py-3 px-4 text-yellow-400 font-semibold hidden md:table-cell">Finalizações</th>
+              <th className="text-left py-3 px-4 text-yellow-400 font-semibold hidden md:table-cell">CA</th>
+              <th className="text-left py-3 px-4 text-yellow-400 font-semibold hidden md:table-cell">CV</th>
             </tr>
           </thead>
           <tbody>
             {sortedTimes.length > 0 ? (
               sortedTimes.map((time) => (
-                <tr 
-                  key={time.id} 
+                <tr
+                  key={time.id}
                   className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors"
                 >
                   <td className="py-3 px-4">
@@ -349,18 +344,17 @@ export default function TimeStats() {
                     </div>
                   </td>
                   <td className="py-3 px-4">
-                    <div className={`text-xl font-bold ${
-                      time.saldo > 0 ? "text-green-400" : time.saldo < 0 ? "text-red-400" : "text-gray-300"
-                    }`}>
+                    <div className={`text-xl font-bold ${time.saldo > 0 ? "text-green-400" : time.saldo < 0 ? "text-red-400" : "text-gray-300"
+                      }`}>
                       {time.saldo > 0 ? "+" : ""}{time.saldo}
                     </div>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 hidden md:table-cell">
                     {time.posseMedia !== null ? (
                       <div className="flex items-center gap-3">
                         <div className="w-16 bg-gray-700 rounded-full h-2">
-                          <div 
-                            className="bg-yellow-500 h-2 rounded-full" 
+                          <div
+                            className="bg-yellow-500 h-2 rounded-full"
                             style={{ width: `${time.posseMedia}%` }}
                           ></div>
                         </div>
@@ -370,21 +364,21 @@ export default function TimeStats() {
                       <div className="text-gray-500">-</div>
                     )}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 hidden md:table-cell">
                     {time.finalizacoes !== null ? (
                       <div className="text-white">{time.finalizacoes}</div>
                     ) : (
                       <div className="text-gray-500">-</div>
                     )}
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 hidden md:table-cell">
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-8 h-8 bg-yellow-500/20 text-yellow-400 rounded-full flex items-center justify-center text-sm">
                         {time.cartoesAmarelos}
                       </div>
                     </div>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 hidden md:table-cell">
                     <div className="flex items-center justify-center gap-2">
                       <div className="w-8 h-8 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center text-sm">
                         {time.cartoesVermelhos}
@@ -406,7 +400,7 @@ export default function TimeStats() {
 
       <div className="mt-6 p-4 bg-gray-800/30 rounded-lg border border-yellow-500/20">
         <div className="text-sm text-gray-400">
-    
+
           <span className="text-yellow-400 font-semibold">Legenda:</span> GF = Gols Feitos • GS = Gols Sofridos • CA = Cartões Amarelos • CV = Cartões Vermelhos
         </div>
       </div>

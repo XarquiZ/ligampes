@@ -40,7 +40,7 @@ export default function SerieATable() {
   const fetchTeamsWithStats = async () => {
     try {
       setLoading(true);
-      
+
       const { data: teamsData, error: teamsError } = await supabase
         .from('teams')
         .select('id, name, logo_url, divisao')
@@ -48,7 +48,7 @@ export default function SerieATable() {
         .order('name');
 
       if (teamsError) throw teamsError;
-      
+
       if (!teamsData || teamsData.length === 0) {
         setTeams([]);
         setLoading(false);
@@ -122,26 +122,29 @@ export default function SerieATable() {
   return (
     <div className="bg-gray-900/70 rounded-xl overflow-hidden shadow-lg border border-gray-800">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px]">
+        <table className="w-full min-w-full md:min-w-[800px]">
           <thead>
             <tr className="bg-yellow-500/10 border-b border-yellow-500/20 text-sm uppercase tracking-wider">
-              <th className="text-left py-4 px-4 text-yellow-400 font-semibold min-w-[60px]">Pos</th>
-              <th className="text-left py-4 px-4 text-yellow-400 font-semibold min-w-[200px]">Time</th>
-              <th className="text-left py-4 px-4 text-yellow-400 font-semibold min-w-[70px]">PTS</th>
-              <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px]">PJ</th>
-              <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px]">V</th>
-              <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px]">E</th>
-              <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px]">D</th>
+              <th className="text-left py-4 px-2 md:px-4 text-yellow-400 font-semibold min-w-[40px] md:min-w-[60px]">Pos</th>
+              <th className="text-left py-4 px-2 md:px-4 text-yellow-400 font-semibold min-w-[150px] md:min-w-[200px]">Time</th>
+              <th className="text-left py-4 px-2 md:px-4 text-yellow-400 font-semibold min-w-[40px] md:min-w-[70px]">PTS</th>
+              <th className="text-center py-4 px-2 md:px-4 text-yellow-400 font-semibold min-w-[30px] md:min-w-[50px]">PJ</th>
+              <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px] hidden md:table-cell">V</th>
+              <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px] hidden md:table-cell">E</th>
+              <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px] hidden md:table-cell">D</th>
               <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px] hidden md:table-cell">GM</th>
               <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px] hidden md:table-cell">GS</th>
-              <th className="text-center py-4 px-4 text-yellow-400 font-semibold min-w-[50px]">SG</th>
-              <th className="text-left py-4 px-4 text-yellow-400 font-semibold min-w-[120px]">Últimas 5</th>
+              <th className="text-center py-4 px-2 md:px-4 text-yellow-400 font-semibold min-w-[30px] md:min-w-[50px]">SG</th>
+              <th className="text-left py-4 px-4 text-yellow-400 font-semibold min-w-[120px] hidden md:table-cell">Últimas 5</th>
             </tr>
           </thead>
           <tbody>
             {teams.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-gray-500">
+                <td colSpan={5} className="py-8 text-center text-gray-500 md:hidden">
+                  Nenhum time encontrado na divisão A
+                </td>
+                <td colSpan={11} className="py-8 text-center text-gray-500 hidden md:table-cell">
                   Nenhum time encontrado na divisão A
                 </td>
               </tr>

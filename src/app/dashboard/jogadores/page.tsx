@@ -19,20 +19,20 @@ import {
 } from '@/components/ui/sheet'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { CadastrarJogadorForm } from '@/components/jogadores/CadastrarJogadorForm'
-import { 
-  PlusCircle, 
-  Loader2, 
-  AlertCircle, 
-  Search, 
-  Filter, 
-  X, 
-  ChevronDown, 
-  Pencil, 
-  Grid3X3, 
-  List, 
-  Star, 
+import {
+  PlusCircle,
+  Loader2,
+  AlertCircle,
+  Search,
+  Filter,
+  X,
+  ChevronDown,
+  Pencil,
+  Grid3X3,
+  List,
+  Star,
   Ruler,
-  Check 
+  Check
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
@@ -125,7 +125,7 @@ export default function ListaJogadores() {
 
   // Estado para filtro de altura
   const [filterMinHeight, setFilterMinHeight] = useState<string>('all')
-  
+
   // Estado para filtro de overall
   const [filterOverall, setFilterOverall] = useState<string>('Todos')
 
@@ -192,26 +192,26 @@ export default function ListaJogadores() {
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
       />
     ) : null
-  , [])
+    , [])
 
   // Função para navegação via grid
   const handleGridCardClick = useCallback((playerId: string) => {
     setIsTransitioning(true)
     setViewMode('list')
-    
+
     setTimeout(() => {
-      setOpenedPlayers(prev => 
+      setOpenedPlayers(prev =>
         prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
       )
-      
+
       setTimeout(() => {
         const element = document.getElementById(`player-${playerId}`)
         if (element) {
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
+          element.scrollIntoView({
+            behavior: 'smooth',
             block: 'center'
           })
-          
+
           element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl')
           setTimeout(() => {
             element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl')
@@ -266,7 +266,7 @@ export default function ListaJogadores() {
           .eq('player_id', playerId)
 
         if (error) throw error
-        
+
         setFavoritePlayers(prev => prev.filter(id => id !== playerId))
         setToastMessage('Jogador removido dos favoritos!')
       } else {
@@ -278,7 +278,7 @@ export default function ListaJogadores() {
           ])
 
         if (error) throw error
-        
+
         setFavoritePlayers(prev => [...prev, playerId])
         setToastMessage('Jogador adicionado aos favoritos!')
       }
@@ -341,7 +341,7 @@ export default function ListaJogadores() {
         }
 
         const conversationIds = conversations.map(conv => conv.id)
-        
+
         const { count } = await supabase
           .from('private_messages')
           .select('*', { count: 'exact', head: true })
@@ -382,37 +382,37 @@ export default function ListaJogadores() {
   useEffect(() => {
     const handleHashChange = () => {
       if (typeof window === 'undefined') return;
-      
+
       const hash = window.location.hash;
-      
+
       if (hash && hash.startsWith('#player-')) {
         const playerId = hash.replace('#player-', '');
-        
+
         // Garantir que está na view de lista
         setViewMode('list');
-        
+
         // Aguardar um pouco para a view mudar e os elementos renderizarem
         setTimeout(() => {
           // Abrir o card do jogador
-          setOpenedPlayers(prev => 
+          setOpenedPlayers(prev =>
             prev.includes(playerId) ? prev : [...prev, playerId]
           );
-          
+
           // Scroll para o jogador após abrir o card
           setTimeout(() => {
             const element = document.getElementById(`player-${playerId}`);
-            
+
             if (element) {
               // Scroll suave para o elemento
-              element.scrollIntoView({ 
-                behavior: 'smooth', 
+              element.scrollIntoView({
+                behavior: 'smooth',
                 block: 'center',
                 inline: 'nearest'
               });
-              
+
               // Adicionar destaque visual
               element.classList.add('ring-2', 'ring-purple-500', 'rounded-xl', 'transition-all', 'duration-500');
-              
+
               // Remover o destaque após 3 segundos
               setTimeout(() => {
                 element.classList.remove('ring-2', 'ring-purple-500', 'rounded-xl');
@@ -422,9 +422,9 @@ export default function ListaJogadores() {
               setTimeout(() => {
                 const retryElement = document.getElementById(`player-${playerId}`);
                 if (retryElement) {
-                  retryElement.scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'center' 
+                  retryElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
                   });
                   retryElement.classList.add('ring-2', 'ring-purple-500', 'rounded-xl');
                   setTimeout(() => {
@@ -441,14 +441,14 @@ export default function ListaJogadores() {
     handleHashChange();
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('load', handleHashChange);
-    
+
     const interval = setInterval(() => {
       if (window.location.hash && window.location.hash.startsWith('#player-')) {
         handleHashChange();
         clearInterval(interval);
       }
     }, 500);
-    
+
     setTimeout(() => clearInterval(interval), 5000);
 
     return () => {
@@ -528,25 +528,25 @@ export default function ListaJogadores() {
   const filteredPlayers = useMemo(() => {
     return jogadores.filter(j => {
       const name = j.name.toLowerCase().includes(searchName.toLowerCase())
-      
+
       // Filtro de posições (múltipla seleção) - ATUALIZADO PARA RESPEITAR O CHECKBOX
       const hasPrimaryPosition = selectedPositions.includes(j.position)
       const hasSecondaryPosition = includeSecondaryPositions && j.alternative_positions && j.alternative_positions.some(altPos => selectedPositions.includes(altPos))
-      
+
       const pos = selectedPositions.length === 0 || hasPrimaryPosition || hasSecondaryPosition
-      
+
       const playstyle = selectedPlaystyles.length === 0 || (j.playstyle && selectedPlaystyles.includes(j.playstyle))
       const foot = filterFoot === 'Todos' || j.preferred_foot === filterFoot
       const team = filterTeam === 'Todos' || (filterTeam === 'Sem Time' ? !j.team_id : j.team_id === filterTeam)
       const skills = selectedSkills.length === 0 || selectedSkills.every(s => j.skills?.includes(s))
       const attrs = Object.entries(attrFilters).every(([k, min]) => min === null || (j[k as keyof Player] as number ?? 0) >= min)
-      
+
       // Filtro de altura
       const height = filterMinHeight === 'all' || (j.height && j.height >= parseInt(filterMinHeight))
-      
+
       // Filtro de overall
       const overall = filterOverall === 'Todos' || j.overall.toString() === filterOverall
-      
+
       return name && pos && playstyle && foot && team && skills && attrs && height && overall
     })
   }, [jogadores, searchName, selectedPositions, selectedPlaystyles, filterFoot, filterTeam, selectedSkills, attrFilters, filterMinHeight, filterOverall, includeSecondaryPositions]) // Adicionado includeSecondaryPositions
@@ -576,7 +576,7 @@ export default function ListaJogadores() {
   }, [attrFilters])
 
   // Opções de altura (140cm até 230cm)
-  const HEIGHT_OPTIONS = useMemo(() => 
+  const HEIGHT_OPTIONS = useMemo(() =>
     Array.from({ length: 91 }, (_, i) => {
       const height = 140 + i;
       return {
@@ -628,7 +628,7 @@ export default function ListaJogadores() {
                 <p className="text-zinc-400 mt-2 text-sm lg:text-lg">Base de Jogadores • {jogadores.length} jogadores disponíveis</p>
               </div>
 
-              <div className="flex items-center gap-3 lg:gap-4">
+              <div className="flex flex-wrap items-center gap-3 lg:gap-4">
                 {/* Toggle de Visualização */}
                 <div className="flex bg-zinc-900/70 rounded-xl p-1 border border-zinc-700">
                   <Button
@@ -666,8 +666,8 @@ export default function ListaJogadores() {
 
                 {/* Botão Novo Jogador */}
                 {userRole === 'admin' && (
-                  <Button 
-                    size="lg" 
+                  <Button
+                    size="lg"
                     className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 font-bold text-sm lg:text-lg px-6 lg:px-8"
                     onClick={() => setIsCadastroOpen(true)}
                   >
@@ -722,7 +722,7 @@ export default function ListaJogadores() {
 
             {/* GRID VIEW */}
             {viewMode === 'grid' && !loading && filteredPlayers.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
                 {filteredPlayers.map(j => (
                   <PlayerCardGrid
                     key={j.id}
@@ -770,7 +770,10 @@ export default function ListaJogadores() {
                   </SheetDescription>
                 </SheetHeader>
                 <div className="p-6">
-                  <CadastrarJogadorForm onPlayerAdded={handleSuccess} />
+                  <CadastrarJogadorForm
+                    onPlayerAdded={handleSuccess}
+                    onCancel={() => setIsCadastroOpen(false)}
+                  />
                 </div>
               </SheetContent>
             </Sheet>
@@ -786,9 +789,10 @@ export default function ListaJogadores() {
                 </SheetHeader>
                 <div className="p-6">
                   {jogadorEditando && (
-                    <CadastrarJogadorForm 
-                      playerToEdit={jogadorEditando as any} 
-                      onPlayerAdded={handleSuccess} 
+                    <CadastrarJogadorForm
+                      playerToEdit={jogadorEditando as any}
+                      onPlayerAdded={handleSuccess}
+                      onCancel={() => setIsEdicaoOpen(false)}
                     />
                   )}
                 </div>
@@ -909,7 +913,7 @@ export default function ListaJogadores() {
 
             {!loading && filteredPlayers.length === 0 && (
               <div className="text-center py-20 lg:py-32">
-                <div className="max-w-md mx-auto bg-zinc-900/80 rounded-2xl lg:rounded-3xl p-8 lg:p-16 border border-zinc-800">
+                <div className="max-w-md mx-auto bg-zinc-900/80 rounded-2xl lg:rounded-3xl p-6 md:p-8 lg:p-16 border border-zinc-800">
                   <h3 className="text-2xl lg:text-4xl font-bold text-white mb-4">Nenhum jogador encontrado</h3>
                   <p className="text-zinc-400 text-sm lg:text-lg">Tente ajustar os filtros.</p>
                 </div>
@@ -918,22 +922,22 @@ export default function ListaJogadores() {
           </div>
 
           {/* Toast de Feedback para Favoritos */}
-          <FavoriteToast 
-            show={showFavoriteToast} 
-            message={toastMessage} 
+          <FavoriteToast
+            show={showFavoriteToast}
+            message={toastMessage}
           />
         </div>
 
         {/* Chat Components */}
         {user && team && (
           <>
-            <FloatingChatButton 
+            <FloatingChatButton
               currentUser={chatUser}
               currentTeam={chatTeam}
               unreadCount={unreadCount}
               onOpenChat={() => setIsChatOpen(true)}
             />
-            
+
             <ChatPopup
               isOpen={isChatOpen}
               onClose={() => setIsChatOpen(false)}
