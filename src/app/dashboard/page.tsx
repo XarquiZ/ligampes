@@ -141,15 +141,15 @@ function MatchResult({ match }: { match: MatchSchedule }) {
   return (
     <div className="flex items-center justify-center gap-1">
       <span className={`font-bold ${match.home_score && match.away_score && match.home_score > match.away_score
-          ? 'text-green-400'
-          : 'text-zinc-300'
+        ? 'text-green-400'
+        : 'text-zinc-300'
         }`}>
         {match.home_score}
       </span>
       <span className="text-zinc-500">-</span>
       <span className={`font-bold ${match.home_score && match.away_score && match.away_score > match.home_score
-          ? 'text-green-400'
-          : 'text-zinc-300'
+        ? 'text-green-400'
+        : 'text-zinc-300'
         }`}>
         {match.away_score}
       </span>
@@ -1135,7 +1135,7 @@ export default function Dashboard() {
       title: 'INFORMAÇÕES',
       icon: ScrollText,
       color: 'indigo',
-      value: 'Regras',
+      value: 'Avisos',
       subtitle: 'regulamento oficial',
       link: '/dashboard/informacoes',
       buttonText: 'Ler regras',
@@ -1356,21 +1356,21 @@ export default function Dashboard() {
                   <div
                     key={teamTable.id}
                     className={`flex items-center justify-between p-2 rounded text-xs ${teamTable.team_id === team?.id
-                        ? 'bg-yellow-500/10 border border-yellow-500/20'
-                        : 'bg-zinc-800/30'
+                      ? 'bg-yellow-500/10 border border-yellow-500/20'
+                      : 'bg-zinc-800/30'
                       }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className={`w-6 text-center font-bold ${teamTable.position === 1 ? 'text-yellow-400' :
-                          teamTable.position === 2 ? 'text-zinc-300' :
-                            teamTable.position === 3 ? 'text-amber-700' :
-                              'text-zinc-400'
+                        teamTable.position === 2 ? 'text-zinc-300' :
+                          teamTable.position === 3 ? 'text-amber-700' :
+                            'text-zinc-400'
                         }`}>
                         {teamTable.position}º
                       </span>
                       <span className={`font-medium ${teamTable.team_id === team?.id
-                          ? 'text-yellow-300'
-                          : 'text-white'
+                        ? 'text-yellow-300'
+                        : 'text-white'
                         }`}>
                         {teamTable.team_name}
                       </span>
@@ -1635,8 +1635,8 @@ export default function Dashboard() {
                 <Card
                   key={tile.title}
                   className={`group relative overflow-hidden rounded-xl lg:rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg lg:shadow-xl transition-all duration-700 cursor-pointer ${expandedTile === tile.title
-                      ? getTilePositionClass(tile.title, index)
-                      : 'hover:scale-105 hover:shadow-purple-600/40'
+                    ? getTilePositionClass(tile.title, index)
+                    : 'hover:scale-105 hover:shadow-purple-600/40'
                     }`}
                   onClick={() => setExpandedTile(expandedTile === tile.title ? null : tile.title)}
                 >
