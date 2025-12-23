@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { PlayerCardProps } from './types'
 import { Target, Footprints, Square, Pencil, DollarSign, X, MessageCircle, Trash2 } from 'lucide-react'
 import { StatItem } from './StatItem'
+import { useRouter } from 'next/navigation'
 
 // Função para formatar o preço
 const formatPrice = (price: number): string => {
@@ -44,6 +45,8 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
     redCards: player.total_red_cards || 0,
     averageRating: player.average_rating ? Number(player.average_rating).toFixed(1) : '0.0'
   }
+
+  const router = useRouter()
 
   const handleCardClick = () => {
     onCardClick(player)
@@ -105,7 +108,15 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
       </div>
 
       <div className="p-3 lg:p-4 space-y-2 lg:space-y-3">
-        <h3 className="font-bold text-base lg:text-lg text-center leading-tight line-clamp-2">{player.name}</h3>
+        <h3
+          className="font-bold text-base lg:text-lg text-center leading-tight line-clamp-2 hover:text-purple-400 cursor-pointer transition-colors"
+          onClick={(e) => {
+            e.stopPropagation()
+            router.push(`/dashboard/jogadores/${player.id}`)
+          }}
+        >
+          {player.name}
+        </h3>
 
         <div className="flex justify-center">
           <Badge className="bg-purple-600 text-white text-xs font-bold px-3 lg:px-4 py-1 lg:py-1.5">

@@ -104,7 +104,7 @@ const PlayerAvatar = ({ url, name }: { url?: string, name: string }) => {
 
 export default function AdminMatchModal({ isOpen, onClose, match, currentUser }: AdminMatchModalProps) {
   const [saving, setSaving] = useState(false);
-  const [loadingPhase, setLoadingPhase] = useState<string>(""); 
+  const [loadingPhase, setLoadingPhase] = useState<string>("");
   const [activeTab, setActiveTab] = useState<'match' | 'home_players' | 'away_players'>('match');
   const [loadingPlayers, setLoadingPlayers] = useState(false);
 
@@ -153,12 +153,12 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
 
         const prepareStats = (players: Player[], teamId: string) => {
           const teamExistingStats = (existingStats || []).filter(s => s.team_id === teamId);
-          
+
           return players.map(player => {
             const existing = teamExistingStats.find(s => s.player_id === player.id);
             if (existing) {
-              return { 
-                ...existing, 
+              return {
+                ...existing,
                 player: existing.player as Player,
                 played: true,
                 goals: existing.goals ?? 0,
@@ -178,7 +178,7 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
               red_cards: 0,
               rating: 6.0,
               player,
-              played: true
+              played: false // Padrão: Não jogou
             };
           });
         };
@@ -201,17 +201,17 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
     setMatchData(prev => {
       // Se for campo de texto (status ou video_url), usa o valor direto
       if (field === 'status' || field === 'video_url') {
-         return { ...prev, [field]: value };
+        return { ...prev, [field]: value };
       }
 
       // Se for numérico, converte e valida
       const safeValue = value === '' ? 0 : (isNaN(Number(value)) ? 0 : Number(value));
       const newData = { ...prev, [field]: safeValue };
-      
+
       // Atualização automática de posse de bola
       if (field === 'possession_home') newData.possession_away = 100 - safeValue;
       if (field === 'possession_away') newData.possession_home = 100 - safeValue;
-      
+
       return newData;
     });
   };
@@ -220,21 +220,21 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
     const setStats = team === 'home' ? setHomePlayerStats : setAwayPlayerStats;
 
     if (field === 'played') {
-        setStats(prev => prev.map(stat => 
-            stat.player_id === playerId ? { ...stat, played: value } : stat
-        ));
-        return;
+      setStats(prev => prev.map(stat =>
+        stat.player_id === playerId ? { ...stat, played: value } : stat
+      ));
+      return;
     }
 
     if (value === '') {
-      setStats(prev => prev.map(stat => 
+      setStats(prev => prev.map(stat =>
         stat.player_id === playerId ? { ...stat, [field]: '' } : stat
       ));
       return;
     }
 
     let numValue = Number(value);
-    if (isNaN(numValue)) return; 
+    if (isNaN(numValue)) return;
 
     if (field === 'rating') {
       numValue = Math.max(0, Math.min(9.99, numValue));
@@ -246,9 +246,21 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
       numValue = Math.max(0, numValue);
     }
 
-    setStats(prev => prev.map(stat => 
-      stat.player_id === playerId ? { ...stat, [field]: numValue } : stat
-    ));
+    setStats(prev => prev.map(stat => {
+      if (stat.player_id !== playerId) return stat;
+
+      // Auto-mark as played if modifying a stat (excluding played toggle itself which is handled above)
+      // and checking if the value corresponds to active participation (e.g. > 0 goals/cards/rating change)
+      // Actually, simply touching a stat implies they might have played.
+      // But let's be strict: if value is effectively 0/empty, we don't force 'played=true' unless it was already true?
+      // User asked: "conforme eu for aplicando os stats eu ativar"
+
+      const updates: any = { [field]: numValue };
+      if (!stat.played) {
+        updates.played = true;
+      }
+      return { ...stat, ...updates };
+    }));
   };
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -274,17 +286,17 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
       gols_marcados: 0,
       gols_sofridos: 0,
       ultimos_jogos: [] as string[],
-      posse_total: 0, 
+      posse_total: 0,
       finalizacoes: 0
     };
 
     matches.forEach(m => {
       stats.jogos++;
-      
+
       const isHome = m.home_team_id === teamId;
       const myScore = isHome ? (m.home_score ?? 0) : (m.away_score ?? 0);
       const opponentScore = isHome ? (m.away_score ?? 0) : (m.home_score ?? 0);
-      
+
       const myShots = isHome ? (m.shots_home ?? 0) : (m.shots_away ?? 0);
       const myPossession = isHome ? (m.possession_home ?? 50) : (m.possession_away ?? 50);
 
@@ -395,7 +407,7 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
 
     setSaving(true);
     setLoadingPhase("Salvando partida...");
-    
+
     try {
       const { error: matchError } = await supabase
         .from('matches')
@@ -409,13 +421,13 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
 
       if (matchData.status === 'finished') {
         setLoadingPhase("Salvando estatísticas dos jogadores...");
-        
+
         const allPlayerStats = [...homePlayerStats, ...awayPlayerStats];
-        
+
         const matchStatsPromises = allPlayerStats.map(async (stat) => {
           if (!stat.played) {
             if (stat.id) {
-                return supabase.from('player_match_stats').delete().eq('id', stat.id);
+              return supabase.from('player_match_stats').delete().eq('id', stat.id);
             }
             return Promise.resolve();
           }
@@ -425,7 +437,7 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
           const yellow = stat.yellow_cards === '' ? 0 : Number(stat.yellow_cards);
           const red = stat.red_cards === '' ? 0 : Number(stat.red_cards);
           const ratingVal = stat.rating === '' ? 6.0 : Number(stat.rating);
-          
+
           const safeRating = Math.min(9.99, Math.max(0, ratingVal));
 
           const statData = {
@@ -450,7 +462,7 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
         setLoadingPhase("Atualizando estatísticas gerais...");
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const playerAggPromises = allPlayerStats.map(stat => 
+        const playerAggPromises = allPlayerStats.map(stat =>
           recalculatePlayerStats(stat.player_id, stat.team_id, stat.player?.name || 'Unknown')
         );
         await Promise.all(playerAggPromises);
@@ -463,7 +475,7 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
       }
 
       toast.success('Partida e estatísticas atualizadas com sucesso!');
-      
+
       setTimeout(() => {
         onClose();
         window.dispatchEvent(new Event('match-updated'));
@@ -482,104 +494,34 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-5xl h-[90vh] flex flex-col p-0 bg-zinc-950 border-zinc-800 text-white overflow-hidden" aria-describedby="match-modal-description">
+      <DialogContent className="w-full max-w-full sm:max-w-5xl h-[100dvh] sm:h-[90vh] flex flex-col p-0 bg-zinc-950 border-zinc-800 text-white overflow-hidden" aria-describedby="match-modal-description">
         <DialogDescription id="match-modal-description" className="sr-only">
           Janela de edição de detalhes da partida, incluindo placar e estatísticas dos jogadores.
         </DialogDescription>
-        
-        {/* CABEÇALHO DO PLACAR */}
-        <div className="bg-zinc-900 border-b border-zinc-800 p-6 shrink-0 shadow-xl z-10 space-y-6">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Timer className="w-5 h-5 text-yellow-500" />
-              Gerenciar Partida
-            </DialogTitle>
-            
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Status:</span>
-              <Select 
-                value={matchData.status} 
-                onValueChange={(value: any) => handleMatchDataChange('status', value)}
-              >
-                <SelectTrigger className="w-[140px] h-8 text-xs border-zinc-700 bg-zinc-800 focus:ring-yellow-500/20">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="border-zinc-700 bg-zinc-800">
-                  <SelectItem value="scheduled">Agendado</SelectItem>
-                  <SelectItem value="in_progress">Em Andamento</SelectItem>
-                  <SelectItem value="finished">Finalizado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          <div className="flex items-center justify-center gap-8 md:gap-16">
-            {/* Time da Casa */}
-            <div className="flex flex-col items-center gap-3 w-1/3 transition-opacity hover:opacity-80">
-              <TeamLogo url={match.time_casa.logo_url} name={match.time_casa.name} size="lg" />
-              <span className="font-bold text-lg text-center leading-tight tracking-tight">{match.time_casa.name}</span>
-            </div>
-
-            {/* Placar Central */}
-            <div className="flex items-center gap-4 shrink-0 bg-black/40 p-4 rounded-xl border border-zinc-800 backdrop-blur-sm shadow-inner">
-              <Input
-                type="number"
-                min="0"
-                value={matchData.home_score}
-                onChange={(e) => handleMatchDataChange('home_score', e.target.value)}
-                onFocus={handleFocus}
-                className="w-16 h-14 text-4xl font-bold text-center border-zinc-700 bg-zinc-900 focus:border-yellow-500 focus:ring-yellow-500/20 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-              <span className="text-2xl text-zinc-600 font-light">X</span>
-              <Input
-                type="number"
-                min="0"
-                value={matchData.away_score}
-                onChange={(e) => handleMatchDataChange('away_score', e.target.value)}
-                onFocus={handleFocus}
-                className="w-16 h-14 text-4xl font-bold text-center border-zinc-700 bg-zinc-900 focus:border-yellow-500 focus:ring-yellow-500/20 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </div>
-
-            {/* Time Visitante */}
-            <div className="flex flex-col items-center gap-3 w-1/3 transition-opacity hover:opacity-80">
-              <TeamLogo url={match.time_fora.logo_url} name={match.time_fora.name} size="lg" />
-              <span className="font-bold text-lg text-center leading-tight tracking-tight">{match.time_fora.name}</span>
-            </div>
-          </div>
-
-          {/* Campo de Link da Transmissão */}
-          <div className="flex justify-center w-full">
-            <div className="w-full max-w-lg relative group">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Youtube className="h-4 w-4 text-red-500/70 group-focus-within:text-red-500 transition-colors" />
-              </div>
-              <Input
-                type="text"
-                placeholder="Link da transmissão (YouTube)"
-                value={matchData.video_url}
-                onChange={(e) => handleMatchDataChange('video_url', e.target.value)}
-                className="pl-9 h-9 bg-zinc-900/50 border-zinc-700 text-sm text-center focus:text-left transition-all"
-              />
-            </div>
-          </div>
+        {/* CABEÇALHO DO PLACAR (MINIMIZADO) */}
+        <div className="bg-zinc-900 border-b border-zinc-800 p-4 shrink-0 shadow-xl z-10 flex items-center justify-between">
+          <DialogTitle className="text-lg font-bold flex items-center gap-2">
+            <Timer className="w-5 h-5 text-yellow-500" />
+            Gerenciar Partida
+          </DialogTitle>
         </div>
 
         {/* NAVEGAÇÃO */}
         <div className="flex border-b border-zinc-800 bg-zinc-900/50 px-6 gap-6 text-sm font-medium shrink-0 backdrop-blur-sm">
-          <button 
+          <button
             onClick={() => setActiveTab('match')}
             className={`py-4 border-b-2 transition-all duration-200 ${activeTab === 'match' ? 'border-yellow-500 text-yellow-500 font-bold' : 'border-transparent text-zinc-400 hover:text-white'}`}
           >
             Estatísticas da Partida
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('home_players')}
             className={`py-4 border-b-2 transition-all duration-200 ${activeTab === 'home_players' ? 'border-yellow-500 text-yellow-500 font-bold' : 'border-transparent text-zinc-400 hover:text-white'}`}
           >
             Jogadores {match.time_casa.name}
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('away_players')}
             className={`py-4 border-b-2 transition-all duration-200 ${activeTab === 'away_players' ? 'border-yellow-500 text-yellow-500 font-bold' : 'border-transparent text-zinc-400 hover:text-white'}`}
           >
@@ -589,10 +531,85 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
 
         {/* CONTEÚDO SCROLLABLE */}
         <div className="flex-1 overflow-y-auto bg-zinc-950/50 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-          
+
           {/* ABA 1: ESTATÍSTICAS DO JOGO */}
           {activeTab === 'match' && (
             <div className="max-w-3xl mx-auto space-y-8 p-6 animate-in fade-in duration-300">
+
+              {/* PLACAR E STATUS (MOVIDO DO HEADER) */}
+              <div className="bg-zinc-900/40 p-6 rounded-xl border border-zinc-800/50 space-y-6">
+                <div className="flex items-center justify-between border-b border-zinc-800/50 pb-4">
+                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Status da Partida</h3>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={matchData.status}
+                      onValueChange={(value: any) => handleMatchDataChange('status', value)}
+                    >
+                      <SelectTrigger className="w-[140px] h-8 text-xs border-zinc-700 bg-zinc-800 focus:ring-yellow-500/20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="border-zinc-700 bg-zinc-800">
+                        <SelectItem value="scheduled">Agendado</SelectItem>
+                        <SelectItem value="in_progress">Em Andamento</SelectItem>
+                        <SelectItem value="finished">Finalizado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Score Board */}
+                <div className="flex items-center justify-center gap-4 md:gap-16">
+                  {/* Time da Casa */}
+                  <div className="flex flex-col items-center gap-2 md:gap-3 w-1/3">
+                    <TeamLogo url={match.time_casa.logo_url} name={match.time_casa.name} size="md" />
+                    <span className="font-bold text-sm md:text-lg text-center leading-tight tracking-tight line-clamp-2">{match.time_casa.name}</span>
+                  </div>
+
+                  {/* Placar Central */}
+                  <div className="flex items-center gap-2 md:gap-4 shrink-0 bg-black/40 p-2 md:p-4 rounded-xl border border-zinc-800 backdrop-blur-sm shadow-inner">
+                    <Input
+                      type="number"
+                      min="0"
+                      value={matchData.home_score}
+                      onChange={(e) => handleMatchDataChange('home_score', e.target.value)}
+                      onFocus={handleFocus}
+                      className="w-12 h-10 md:w-16 md:h-14 text-2xl md:text-4xl font-bold text-center border-zinc-700 bg-zinc-900 focus:border-yellow-500 focus:ring-yellow-500/20 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-xl md:text-2xl text-zinc-600 font-light">X</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={matchData.away_score}
+                      onChange={(e) => handleMatchDataChange('away_score', e.target.value)}
+                      onFocus={handleFocus}
+                      className="w-12 h-10 md:w-16 md:h-14 text-2xl md:text-4xl font-bold text-center border-zinc-700 bg-zinc-900 focus:border-yellow-500 focus:ring-yellow-500/20 shadow-inner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                  </div>
+
+                  {/* Time Visitante */}
+                  <div className="flex flex-col items-center gap-2 md:gap-3 w-1/3">
+                    <TeamLogo url={match.time_fora.logo_url} name={match.time_fora.name} size="md" />
+                    <span className="font-bold text-sm md:text-lg text-center leading-tight tracking-tight line-clamp-2">{match.time_fora.name}</span>
+                  </div>
+                </div>
+
+                {/* Link Transmissão */}
+                <div className="flex justify-center w-full pt-2 border-t border-zinc-800/50">
+                  <div className="w-full max-w-lg relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Youtube className="h-4 w-4 text-red-500/70 group-focus-within:text-red-500 transition-colors" />
+                    </div>
+                    <Input
+                      type="text"
+                      placeholder="Link da transmissão (YouTube)"
+                      value={matchData.video_url}
+                      onChange={(e) => handleMatchDataChange('video_url', e.target.value)}
+                      className="pl-9 h-9 bg-zinc-900/50 border-zinc-700 text-sm text-center focus:text-left transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Barra de Posse */}
               <div className="space-y-3 bg-zinc-900/40 p-5 rounded-xl border border-zinc-800/50">
                 <div className="flex justify-between text-sm font-bold text-zinc-400 uppercase tracking-wider">
@@ -610,9 +627,9 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
                     <span className="absolute right-3 top-2.5 text-zinc-500 text-xs">%</span>
                   </div>
                   <div className="h-3 w-full bg-zinc-800 rounded-full overflow-hidden flex shadow-inner">
-                    <div 
-                      className="bg-gradient-to-r from-yellow-700 to-yellow-500 h-full transition-all duration-500 ease-out" 
-                      style={{ width: `${matchData.possession_home}%` }} 
+                    <div
+                      className="bg-gradient-to-r from-yellow-700 to-yellow-500 h-full transition-all duration-500 ease-out"
+                      style={{ width: `${matchData.possession_home}%` }}
                     />
                     <div className="bg-zinc-700 h-full flex-1 transition-all duration-500" />
                   </div>
@@ -666,163 +683,167 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
           {/* ABA 2 & 3: JOGADORES */}
           {(activeTab === 'home_players' || activeTab === 'away_players') && (
             <div className="animate-in slide-in-from-bottom-2 duration-300">
-               {loadingPlayers ? (
+              {loadingPlayers ? (
                 <div className="flex flex-col items-center justify-center h-40 gap-3 text-zinc-500 p-6">
                   <Loader2 className="h-8 w-8 animate-spin text-yellow-600" />
                   <p>Carregando elenco e estatísticas...</p>
                 </div>
               ) : (
                 <div className="flex flex-col">
-                  {/* Cabeçalho Fixo - Corrigido */}
-                  <div className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800 shadow-lg px-6 py-3">
-                    <div className="grid grid-cols-12 gap-2 text-xs font-bold text-zinc-500 uppercase tracking-wider">
-                      <div className="col-span-4 pl-2">Jogador</div>
-                      <div className="col-span-1 text-center">Gols</div>
-                      <div className="col-span-1 text-center">Assis</div>
-                      <div className="col-span-2 text-center">Cartões</div>
-                      <div className="col-span-2 text-center">Nota</div>
-                      <div className="col-span-2 text-center">Status</div>
-                    </div>
-                  </div>
-
-                  {/* Lista com scroll */}
-                  <div className="p-6 space-y-2">
-                    {(activeTab === 'home_players' ? homePlayerStats : awayPlayerStats).map((stat) => (
-                      <div 
-                        key={`${stat.team_id}-${stat.player_id}`} 
-                        className={cn(
-                          "grid grid-cols-12 gap-2 items-center p-2.5 rounded-lg border transition-all duration-200",
-                          stat.played 
-                            ? "bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800" 
-                            : "bg-zinc-950 border-zinc-900 opacity-60"
-                        )}
-                      >
-                        {/* Avatar e Nome */}
-                        <div className="col-span-4 flex items-center gap-3">
-                          <PlayerAvatar url={stat.player?.photo_url} name={stat.player?.name || "?"} />
-                          <div className="flex flex-col overflow-hidden">
-                            <span className={cn("font-medium text-sm truncate", stat.played ? "text-zinc-200" : "text-zinc-500")} title={stat.player?.name}>
-                              {stat.player?.name}
-                            </span>
-                            <div className="flex items-center gap-2 text-xs text-zinc-500">
-                              <span className="bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 text-[10px] uppercase font-bold tracking-wider">
-                                {stat.player?.position}
-                              </span>
-                              <span className="text-[10px]">OVR: {stat.player?.overall}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Inputs de Stats */}
-                        <div className="col-span-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={stat.goals}
-                            disabled={!stat.played}
-                            onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'goals', e.target.value)}
-                            onFocus={handleFocus}
-                            className={cn(
-                              "h-9 text-center px-0 border-zinc-800 bg-zinc-950 focus:border-green-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                              Number(stat.goals) > 0 && stat.played ? 'text-green-500 font-bold bg-green-950/20 border-green-900/50' : ''
-                            )}
-                          />
-                        </div>
-
-                        <div className="col-span-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            value={stat.assists}
-                            disabled={!stat.played}
-                            onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'assists', e.target.value)}
-                            onFocus={handleFocus}
-                            className={cn(
-                              "h-9 text-center px-0 border-zinc-800 bg-zinc-950 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                              Number(stat.assists) > 0 && stat.played ? 'text-blue-500 font-bold bg-blue-950/20 border-blue-900/50' : ''
-                            )}
-                          />
-                        </div>
-
-                        <div className="col-span-2 flex gap-1">
-                          <Input
-                            type="number"
-                            min="0"
-                            max="2"
-                            value={stat.yellow_cards}
-                            placeholder="0"
-                            disabled={!stat.played}
-                            onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'yellow_cards', e.target.value)}
-                            onFocus={handleFocus}
-                            className={cn(
-                              "h-9 text-center px-0 border-zinc-800 bg-zinc-950 focus:border-yellow-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                              Number(stat.yellow_cards) > 0 && stat.played ? 'text-yellow-500 font-bold bg-yellow-950/20 border-yellow-900/50' : ''
-                            )}
-                          />
-                          <Input
-                            type="number"
-                            min="0"
-                            max="1"
-                            value={stat.red_cards}
-                            placeholder="0"
-                            disabled={!stat.played}
-                            onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'red_cards', e.target.value)}
-                            onFocus={handleFocus}
-                            className={cn(
-                              "h-9 text-center px-0 border-zinc-800 bg-zinc-950 focus:border-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                              Number(stat.red_cards) > 0 && stat.played ? 'text-red-500 font-bold bg-red-950/20 border-red-900/50' : ''
-                            )}
-                          />
-                        </div>
-
-                        <div className="col-span-2 pl-2">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="9.99"
-                            value={stat.rating}
-                            disabled={!stat.played}
-                            onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'rating', e.target.value)}
-                            onFocus={handleFocus}
-                            className={cn(
-                              "h-9 text-center font-bold border-zinc-800 bg-zinc-950 focus:border-yellow-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                              stat.played && Number(stat.rating) >= 8.0 ? 'text-green-500 border-green-900/30' : 
-                              stat.played && Number(stat.rating) >= 6.0 ? 'text-yellow-500 border-yellow-900/30' : 
-                              stat.played ? 'text-red-500 border-red-900/30' : ''
-                            )}
-                          />
-                        </div>
-
-                        {/* Coluna de Ações / Status Jogou */}
-                        <div className="col-span-2 flex justify-center items-center gap-2">
-                           {stat.played ? (
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'played', false)}
-                               className="h-8 w-8 p-0 text-green-500 hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                               title="Jogou (Clique para marcar como não jogou)"
-                             >
-                               <UserCheck className="w-4 h-4" />
-                             </Button>
-                           ) : (
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'played', true)}
-                               className="h-8 w-8 p-0 text-zinc-600 hover:text-green-500 hover:bg-green-500/10 transition-colors"
-                               title="Não jogou (Clique para marcar como jogou)"
-                             >
-                               <UserX className="w-4 h-4" />
-                             </Button>
-                           )}
-                           
-                           {stat.played && Number(stat.rating) >= 9.0 && <Trophy className="w-4 h-4 text-yellow-500 animate-pulse ml-1" />}
-                           {stat.played && Number(stat.goals) >= 3 && <div className="text-[10px] bg-zinc-800 px-1 rounded border border-zinc-700">HAT</div>}
+                  <div className="flex-1 overflow-auto">
+                    <div className="min-w-[800px]">
+                      {/* Cabeçalho Fixo - Corrigido */}
+                      <div className="sticky top-0 z-20 bg-zinc-950 border-b border-zinc-800 shadow-lg px-6 py-3">
+                        <div className="grid grid-cols-12 gap-2 text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                          <div className="col-span-4 pl-2">Jogador</div>
+                          <div className="col-span-1 text-center">Gols</div>
+                          <div className="col-span-1 text-center">Assis</div>
+                          <div className="col-span-2 text-center">Cartões</div>
+                          <div className="col-span-2 text-center">Nota</div>
+                          <div className="col-span-2 text-center">Status</div>
                         </div>
                       </div>
-                    ))}
+
+                      {/* Lista com scroll */}
+                      <div className="p-6 space-y-2">
+                        {(activeTab === 'home_players' ? homePlayerStats : awayPlayerStats).map((stat) => (
+                          <div
+                            key={`${stat.team_id}-${stat.player_id}`}
+                            className={cn(
+                              "grid grid-cols-12 gap-2 items-center p-2.5 rounded-lg border transition-all duration-200",
+                              stat.played
+                                ? "bg-zinc-900/50 border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-800"
+                                : "bg-zinc-950 border-zinc-900 opacity-60"
+                            )}
+                          >
+                            {/* Avatar e Nome */}
+                            <div className="col-span-4 flex items-center gap-3">
+                              <PlayerAvatar url={stat.player?.photo_url} name={stat.player?.name || "?"} />
+                              <div className="flex flex-col overflow-hidden">
+                                <span className={cn("font-medium text-sm truncate", stat.played ? "text-zinc-200" : "text-zinc-500")} title={stat.player?.name}>
+                                  {stat.player?.name}
+                                </span>
+                                <div className="flex items-center gap-2 text-xs text-zinc-500">
+                                  <span className="bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 text-[10px] uppercase font-bold tracking-wider">
+                                    {stat.player?.position}
+                                  </span>
+                                  <span className="text-[10px]">OVR: {stat.player?.overall}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Inputs de Stats */}
+                            <div className="col-span-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={stat.goals}
+                                disabled={!stat.played}
+                                onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'goals', e.target.value)}
+                                onFocus={handleFocus}
+                                className={cn(
+                                  "h-9 text-center px-0 border-zinc-800 bg-zinc-950 focus:border-green-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                                  Number(stat.goals) > 0 && stat.played ? 'text-green-500 font-bold bg-green-950/20 border-green-900/50' : ''
+                                )}
+                              />
+                            </div>
+
+                            <div className="col-span-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={stat.assists}
+                                disabled={!stat.played}
+                                onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'assists', e.target.value)}
+                                onFocus={handleFocus}
+                                className={cn(
+                                  "h-9 text-center px-0 border-zinc-800 bg-zinc-950 focus:border-blue-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                                  Number(stat.assists) > 0 && stat.played ? 'text-blue-500 font-bold bg-blue-950/20 border-blue-900/50' : ''
+                                )}
+                              />
+                            </div>
+
+                            <div className="col-span-2 flex gap-1">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="2"
+                                value={stat.yellow_cards}
+                                placeholder="0"
+                                disabled={!stat.played}
+                                onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'yellow_cards', e.target.value)}
+                                onFocus={handleFocus}
+                                className={cn(
+                                  "h-9 text-center px-0 border-zinc-800 bg-zinc-950 focus:border-yellow-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                                  Number(stat.yellow_cards) > 0 && stat.played ? 'text-yellow-500 font-bold bg-yellow-950/20 border-yellow-900/50' : ''
+                                )}
+                              />
+                              <Input
+                                type="number"
+                                min="0"
+                                max="1"
+                                value={stat.red_cards}
+                                placeholder="0"
+                                disabled={!stat.played}
+                                onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'red_cards', e.target.value)}
+                                onFocus={handleFocus}
+                                className={cn(
+                                  "h-9 text-center px-0 border-zinc-800 bg-zinc-950 focus:border-red-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                                  Number(stat.red_cards) > 0 && stat.played ? 'text-red-500 font-bold bg-red-950/20 border-red-900/50' : ''
+                                )}
+                              />
+                            </div>
+
+                            <div className="col-span-2 pl-2">
+                              <Input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                max="9.99"
+                                value={stat.rating}
+                                disabled={!stat.played}
+                                onChange={(e) => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'rating', e.target.value)}
+                                onFocus={handleFocus}
+                                className={cn(
+                                  "h-9 text-center font-bold border-zinc-800 bg-zinc-950 focus:border-yellow-500 transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                                  stat.played && Number(stat.rating) >= 8.0 ? 'text-green-500 border-green-900/30' :
+                                    stat.played && Number(stat.rating) >= 6.0 ? 'text-yellow-500 border-yellow-900/30' :
+                                      stat.played ? 'text-red-500 border-red-900/30' : ''
+                                )}
+                              />
+                            </div>
+
+                            {/* Coluna de Ações / Status Jogou */}
+                            <div className="col-span-2 flex justify-center items-center gap-2">
+                              {stat.played ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'played', false)}
+                                  className="h-8 w-8 p-0 text-green-500 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                  title="Jogou (Clique para marcar como não jogou)"
+                                >
+                                  <UserCheck className="w-4 h-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handlePlayerStatChange(activeTab === 'home_players' ? 'home' : 'away', stat.player_id, 'played', true)}
+                                  className="h-8 w-8 p-0 text-zinc-600 hover:text-green-500 hover:bg-green-500/10 transition-colors"
+                                  title="Não jogou (Clique para marcar como jogou)"
+                                >
+                                  <UserX className="w-4 h-4" />
+                                </Button>
+                              )}
+
+                              {stat.played && Number(stat.rating) >= 9.0 && <Trophy className="w-4 h-4 text-yellow-500 animate-pulse ml-1" />}
+                              {stat.played && Number(stat.goals) >= 3 && <div className="text-[10px] bg-zinc-800 px-1 rounded border border-zinc-700">HAT</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -833,7 +854,7 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
         {/* RODAPÉ FIXO */}
         <DialogFooter className="p-4 bg-zinc-900 border-t border-zinc-800 flex justify-between items-center shrink-0">
           <div className="text-xs text-zinc-500 flex items-center gap-2">
-             {saving && <span className="animate-pulse text-yellow-500">{loadingPhase}</span>}
+            {saving && <span className="animate-pulse text-yellow-500">{loadingPhase}</span>}
           </div>
           <div className="flex gap-3">
             <Button
@@ -844,7 +865,7 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
             >
               Cancelar
             </Button>
-            
+
             <Button
               onClick={handleSave}
               disabled={saving}

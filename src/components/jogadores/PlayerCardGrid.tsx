@@ -1,4 +1,5 @@
 import { Pencil, Target, Footprints, Square } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { StatItem } from '../elenco/StatItem'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,6 +36,13 @@ export function PlayerCardGrid({
     yellowCards: player.total_yellow_cards || 0,
     redCards: player.total_red_cards || 0,
     averageRating: player.average_rating ? Number(player.average_rating).toFixed(1) : '0.0'
+  }
+
+  const router = useRouter()
+
+  const handleNameClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/dashboard/jogadores/${player.id}`)
   }
 
   return (
@@ -90,7 +98,12 @@ export function PlayerCardGrid({
       </div>
 
       <div className="p-2 sm:p-3 lg:p-4 space-y-1.5 sm:space-y-2 lg:space-y-3">
-        <h3 className="font-bold text-sm sm:text-base lg:text-lg text-center leading-tight line-clamp-2 min-h-[2.5em]">{player.name}</h3>
+        <h3
+          className="font-bold text-sm sm:text-base lg:text-lg text-center leading-tight line-clamp-2 min-h-[2.5em] hover:text-purple-400 cursor-pointer transition-colors"
+          onClick={handleNameClick}
+        >
+          {player.name}
+        </h3>
 
         <div className="flex justify-center">
           <Badge className="bg-purple-600 text-white text-[10px] sm:text-xs font-bold px-2 sm:px-3 lg:px-4 py-0.5 sm:py-1 lg:py-1.5">{player.position}</Badge>

@@ -63,10 +63,10 @@ interface ChatPopupProps {
 
 type TabType = 'conversations' | 'coaches';
 
-export default function ChatPopup({ 
-  isOpen, 
-  onClose, 
-  currentUser, 
+export default function ChatPopup({
+  isOpen,
+  onClose,
+  currentUser,
   currentTeam,
   onUnreadCountChange
 }: ChatPopupProps) {
@@ -100,22 +100,22 @@ export default function ChatPopup({
     // Filtra conversas sem data (coloca no final)
     const withDates = conversations.filter(c => c.last_message_at);
     const withoutDates = conversations.filter(c => !c.last_message_at);
-    
+
     // Ordena as com datas - MAIS RECENTE PRIMEIRO
     const sortedWithDates = [...withDates].sort((a, b) => {
       try {
         const aDate = new Date(a.last_message_at!);
         const bDate = new Date(b.last_message_at!);
-        
+
         if (isNaN(aDate.getTime())) return 1;
         if (isNaN(bDate.getTime())) return -1;
-        
+
         return bDate.getTime() - aDate.getTime();
       } catch (error) {
         return 0;
       }
     });
-    
+
     // Concatena as sem datas no final
     return [...sortedWithDates, ...withoutDates];
   };
@@ -127,8 +127,8 @@ export default function ChatPopup({
     }
     // Disparar evento para outros componentes
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('chatUnreadCountUpdated', { 
-        detail: { totalUnread: count } 
+      window.dispatchEvent(new CustomEvent('chatUnreadCountUpdated', {
+        detail: { totalUnread: count }
       }));
     }
   }, [onUnreadCountChange]);
@@ -157,8 +157,8 @@ export default function ChatPopup({
 
   // Função para atualizar conversa (com tratamento de erro)
   const updateConversation = async (
-    conversationId: string, 
-    lastMessage: string, 
+    conversationId: string,
+    lastMessage: string,
     lastMessageAt: string
   ) => {
     try {
@@ -211,7 +211,7 @@ export default function ChatPopup({
   const loadConversations = async () => {
     try {
       console.log('🔍 Carregando conversas para usuário:', currentUser.id);
-      
+
       // 1. Buscar conversas
       const { data: conversationsData, error } = await supabase
         .from('conversations')
@@ -315,14 +315,14 @@ export default function ChatPopup({
 
       // 5. Ordenar
       const sortedConversations = sortConversations(formattedConversations);
-      
+
       // 6. Aplicar ao state
       setConversations(sortedConversations);
-      
+
       // 7. Calcular e notificar o total de mensagens não lidas
       const totalUnread = calculateTotalUnread(sortedConversations);
       notifyUnreadCountChange(totalUnread);
-      
+
     } catch (error) {
       console.error('❌ Erro ao processar conversas:', error);
     }
@@ -406,7 +406,7 @@ export default function ChatPopup({
       });
 
       setMessages(formattedMessages);
-      
+
     } catch (error) {
       console.error('Erro ao processar mensagens:', error);
     }
@@ -417,13 +417,13 @@ export default function ChatPopup({
     if (!selectedConversation) return;
 
     const teams: Team[] = [];
-    
+
     if (currentTeam.id) {
       teams.push(currentTeam);
     }
 
     const otherUser = getOtherUser(selectedConversation);
-    
+
     const { data: otherUserTeam } = await supabase
       .from('profiles')
       .select('teams(id, name, logo_url)')
@@ -478,7 +478,7 @@ export default function ChatPopup({
   // Abrir seletor de jogadores
   const openPlayerSelector = async () => {
     if (!selectedConversation) return;
-    
+
     setShowPlayerSelector(true);
     await loadAvailableTeams();
   };
@@ -498,13 +498,40 @@ export default function ChatPopup({
   // Compartilhar jogador
   const sharePlayer = async () => {
     if (!selectedPlayer || !selectedConversation) return;
-  
+
+    // 0. Optimistic Update (UI Imediata)
+    const tempId = `temp-${Date.now()}`;
+    const timestamp = new Date();
+
+    // Cria mensagem temporária
+    const tempMessage: Message = {
+      id: tempId,
+      text: `Jogador: ${selectedPlayer.name}`,
+      sender: 'user',
+      timestamp: timestamp,
+      senderId: currentUser.id,
+      conversationId: selectedConversation.id,
+      type: 'player',
+      playerData: selectedPlayer
+    };
+
+    // Atualiza UI instantaneamente
+    setMessages(prev => [...prev, tempMessage]);
+
+    // Fecha modais e limpa estados
+    setShowPlayerSelector(false);
+    setSelectedPlayer(null);
+    setPlayerSearch('');
+
+    // Scroll para o fim
+    scrollToBottom();
+
     try {
       console.log(`🎮 Compartilhando jogador: ${selectedPlayer.name}`);
 
       // 1. Atualizar conversa
-      const updateTimestamp = new Date().toISOString();
-      
+      const updateTimestamp = timestamp.toISOString();
+
       const updateSuccess = await updateConversation(
         selectedConversation.id,
         `Compartilhou: ${selectedPlayer.name}`,
@@ -513,11 +540,11 @@ export default function ChatPopup({
 
       if (!updateSuccess) {
         console.error('❌ Falha ao atualizar conversa');
+        // Rollback opcional: setMessages(prev => prev.filter(m => m.id !== tempId));
         return;
       }
 
       // 2. Enviar mensagem
-      const messageTimestamp = new Date().toISOString();
       const { error: messageError } = await supabase
         .from('private_messages')
         .insert({
@@ -525,34 +552,32 @@ export default function ChatPopup({
           sender_id: currentUser.id,
           message: `Jogador: ${selectedPlayer.name}`,
           player_data: selectedPlayer,
-          created_at: messageTimestamp
+          created_at: updateTimestamp
         });
 
       if (messageError) {
         console.error('❌ Erro ao enviar jogador:', messageError);
+        // Rollback opcional
         return;
       }
 
-      // 3. Recarregar tudo
-      await loadConversations();
-      await loadMessages(selectedConversation.id);
-      
-      // Fechar seletor
-      setShowPlayerSelector(false);
-      setSelectedPlayer(null);
-      setPlayerSearch('');
-      
+      // 3. Recarregar (Opcional, pois o realtime já deve tratar)
+      // await loadConversations();
+      // await loadMessages(selectedConversation.id); // Comentado para evitar flash
+
       console.log('✅ Jogador compartilhado com sucesso');
-      
+
     } catch (error) {
       console.error('❌ Erro ao processar compartilhamento:', error);
+      // Remove mensagem otimista em caso de erro crítico
+      setMessages(prev => prev.filter(m => m.id !== tempId));
     }
   };
 
   // Iniciar nova conversa
   const startNewConversation = async (coach: User) => {
     // Verificar se já existe conversa
-    const existingConversation = conversations.find(conv => 
+    const existingConversation = conversations.find(conv =>
       (conv.user1.id === coach.id && conv.user2.id === currentUser.id) ||
       (conv.user2.id === coach.id && conv.user1.id === currentUser.id)
     );
@@ -608,9 +633,9 @@ export default function ChatPopup({
       setSelectedConversation(formattedConversation);
       setMessages([]);
       setActiveTab('conversations');
-      
+
       await loadConversations();
-      
+
     } catch (error) {
       console.error('Erro ao processar nova conversa:', error);
     }
@@ -619,17 +644,36 @@ export default function ChatPopup({
   // Enviar mensagem
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!newMessage.trim() || !selectedConversation) return;
 
     const messageText = newMessage.trim();
-    
+
+    // 0. Optimistic Update (UI Imediata)
+    const tempId = `temp-${Date.now()}`;
+    const timestamp = new Date(); // Data atual para exibição imediata
+
+    const tempMessage: Message = {
+      id: tempId,
+      text: messageText,
+      sender: 'user',
+      timestamp: timestamp,
+      senderId: currentUser.id,
+      conversationId: selectedConversation.id,
+      type: 'text'
+    };
+
+    // Atualiza estado local imediatamente
+    setMessages(prev => [...prev, tempMessage]);
+    setNewMessage(''); // Limpa input
+    scrollToBottom();
+
     try {
       console.log('✉️ Enviando mensagem...');
 
       // 1. Atualizar conversa
-      const updateTimestamp = new Date().toISOString();
-      
+      const updateTimestamp = timestamp.toISOString();
+
       const updateSuccess = await updateConversation(
         selectedConversation.id,
         messageText,
@@ -638,46 +682,51 @@ export default function ChatPopup({
 
       if (!updateSuccess) {
         console.error('❌ Falha ao atualizar conversa');
+        // Rollback silencioso ou visual se necessário
         return;
       }
 
       // 2. Enviar mensagem
-      const messageTimestamp = new Date().toISOString();
-      
       const { error: messageError } = await supabase
         .from('private_messages')
         .insert({
           conversation_id: selectedConversation.id,
           sender_id: currentUser.id,
           message: messageText,
-          created_at: messageTimestamp
+          created_at: updateTimestamp
         });
 
       if (messageError) {
         console.error('❌ Erro ao enviar mensagem:', messageError);
+        // Rollback: em caso de erro, poderíamos remover a mensagem ou mostrar erro
+        // setMessages(prev => prev.filter(m => m.id !== tempId));
         return;
       }
 
-      // 3. Recarregar tudo
-      await loadConversations();
-      await loadMessages(selectedConversation.id);
-      
-      setNewMessage('');
-      
+      // 3. Não precisamos recarregar tudo imediatamente pois o realtime cuidará disso
+      // Mas podemos atualizar a lista de conversas em background para garantir ordenação
+      loadConversations();
+
+      // NOTA: Não chamamos loadMessages() aqui para evitar que a mensagem "pisque"
+      // O realtime event irá disparar, e lá podemos decidir se recarregamos ou não
+
       console.log('✅ Mensagem enviada com sucesso');
 
     } catch (error) {
       console.error('💥 Erro ao processar envio:', error);
+      // Rollback em erro crítico
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setNewMessage(messageText); // Devolve o texto para o input
     }
   };
 
   // Função para navegar para o jogador
   const navigateToPlayer = (playerId: string) => {
     onClose();
-    
+
     setTimeout(() => {
       const playerUrl = `/dashboard/jogadores#player-${playerId}`;
-      
+
       if (window.location.pathname.includes('/dashboard/jogadores')) {
         window.location.href = playerUrl;
       } else {
@@ -694,34 +743,34 @@ export default function ChatPopup({
     }
 
     console.log('🎯 Selecionando conversa:', conversation.id);
-    
+
     setIsProcessingConversation(true);
     setLastProcessedConversation(conversation.id);
-    
+
     try {
       setSelectedConversation(conversation);
       await loadMessages(conversation.id);
-      
+
       if (conversation.unread_count && conversation.unread_count > 0) {
         console.log('🔴 Marcando mensagens como lidas...');
-        
+
         const success = await markMessagesAsRead(conversation.id);
-        
+
         if (success) {
-          const updatedConversations = conversations.map(conv => 
-            conv.id === conversation.id 
+          const updatedConversations = conversations.map(conv =>
+            conv.id === conversation.id
               ? { ...conv, unread_count: 0 }
               : conv
           );
-          
+
           const sortedUpdatedConversations = sortConversations(updatedConversations);
           setConversations(sortedUpdatedConversations);
-          
+
           const totalUnread = calculateTotalUnread(sortedUpdatedConversations);
           notifyUnreadCountChange(totalUnread);
         }
       }
-      
+
     } catch (error) {
       console.error('💥 Erro ao selecionar conversa:', error);
     } finally {
@@ -747,12 +796,12 @@ export default function ChatPopup({
         },
         async (payload) => {
           console.log('🔄 Nova mensagem detectada:', payload.new.id);
-          
+
           await loadConversations();
-          
+
           if (selectedConversation?.id === payload.new.conversation_id) {
             await loadMessages(selectedConversation.id);
-            
+
             if (payload.new.sender_id !== currentUser.id) {
               await markMessagesAsRead(selectedConversation.id);
             }
@@ -771,9 +820,9 @@ export default function ChatPopup({
     const handleFocusConversation = async (event: CustomEvent) => {
       const { conversationId } = event.detail;
       console.log('🎯 Evento focusConversation recebido:', conversationId);
-      
+
       await loadConversations();
-      
+
       const conversation = conversations.find(conv => conv.id === conversationId);
       if (conversation) {
         handleSelectConversation(conversation);
@@ -797,9 +846,9 @@ export default function ChatPopup({
   }, [messages]);
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('pt-BR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return date.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -824,7 +873,7 @@ export default function ChatPopup({
   // Função para renderizar conversas ordenadas
   const renderConversations = () => {
     const sortedConversations = sortConversations(conversations);
-    
+
     if (sortedConversations.length === 0) {
       return (
         <div className="text-center text-gray-500 py-6">
@@ -849,8 +898,8 @@ export default function ChatPopup({
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
                 {otherUser.team_logo ? (
-                  <img 
-                    src={otherUser.team_logo} 
+                  <img
+                    src={otherUser.team_logo}
                     alt={otherUser.team_name}
                     className="w-full h-full object-cover"
                   />
@@ -878,7 +927,7 @@ export default function ChatPopup({
                 </p>
               </div>
             </div>
-            
+
             {/* Indicador de mensagens não lidas */}
             {conversation.unread_count && conversation.unread_count > 0 && (
               <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
@@ -921,21 +970,19 @@ export default function ChatPopup({
       <div className="flex border-b border-white/10 bg-zinc-800/50">
         <button
           onClick={() => handleTabClick('conversations')}
-          className={`flex-1 py-2 px-3 text-xs font-bold transition-all ${
-            activeTab === 'conversations'
+          className={`flex-1 py-2 px-3 text-xs font-bold transition-all ${activeTab === 'conversations'
               ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-400 border-b-2 border-purple-400'
               : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
+            }`}
         >
           CONVERSAS
         </button>
         <button
           onClick={() => handleTabClick('coaches')}
-          className={`flex-1 py-2 px-3 text-xs font-bold transition-all ${
-            activeTab === 'coaches'
+          className={`flex-1 py-2 px-3 text-xs font-bold transition-all ${activeTab === 'coaches'
               ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-400 border-b-2 border-purple-400'
               : 'text-gray-400 hover:text-white hover:bg-white/5'
-          }`}
+            }`}
         >
           TREINADORES
         </button>
@@ -957,8 +1004,8 @@ export default function ChatPopup({
                 </button>
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   {getOtherUser(selectedConversation).team_logo ? (
-                    <img 
-                      src={getOtherUser(selectedConversation).team_logo} 
+                    <img
+                      src={getOtherUser(selectedConversation).team_logo}
                       alt={getOtherUser(selectedConversation).team_name}
                       className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                     />
@@ -998,9 +1045,8 @@ export default function ChatPopup({
                 messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${
-                      message.sender === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
+                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'
+                      }`}
                   >
                     {message.type === 'player' && message.playerData ? (
                       // Mensagem de jogador compartilhado - AGORA CLICÁVEL
@@ -1010,8 +1056,8 @@ export default function ChatPopup({
                       >
                         <div className="flex items-center gap-3">
                           {message.playerData.photo_url ? (
-                            <img 
-                              src={message.playerData.photo_url} 
+                            <img
+                              src={message.playerData.photo_url}
                               alt={message.playerData.name}
                               className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400 transition-all"
                             />
@@ -1043,19 +1089,17 @@ export default function ChatPopup({
                     ) : (
                       // Mensagem de texto normal
                       <div
-                        className={`max-w-[85%] rounded-lg p-2 backdrop-blur-xl ${
-                          message.sender === 'user'
+                        className={`max-w-[85%] rounded-lg p-2 backdrop-blur-xl ${message.sender === 'user'
                             ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-br-none shadow-lg'
                             : 'bg-white/10 text-white rounded-bl-none border border-white/10'
-                        }`}
+                          }`}
                       >
                         <p className="text-xs font-medium break-words">{message.text}</p>
                         <p
-                          className={`text-[10px] mt-1 font-medium ${
-                            message.sender === 'user'
+                          className={`text-[10px] mt-1 font-medium ${message.sender === 'user'
                               ? 'text-purple-200'
                               : 'text-gray-400'
-                          }`}
+                            }`}
                         >
                           {formatTime(message.timestamp)}
                         </p>
@@ -1081,7 +1125,7 @@ export default function ChatPopup({
                 >
                   <Paperclip size={14} />
                 </button>
-                
+
                 <input
                   type="text"
                   value={newMessage}
@@ -1143,8 +1187,8 @@ export default function ChatPopup({
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
                           {coach.team_logo ? (
-                            <img 
-                              src={coach.team_logo} 
+                            <img
+                              src={coach.team_logo}
                               alt={coach.team_name}
                               className="w-full h-full object-cover"
                             />
@@ -1174,7 +1218,7 @@ export default function ChatPopup({
           </>
         )}
       </div>
-        
+
       {/* Modal de seleção de jogadores */}
       {showPlayerSelector && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1221,16 +1265,15 @@ export default function ChatPopup({
                   <button
                     key={player.id}
                     onClick={() => setSelectedPlayer(player)}
-                    className={`w-full p-3 rounded-lg border transition-all ${
-                      selectedPlayer?.id === player.id
+                    className={`w-full p-3 rounded-lg border transition-all ${selectedPlayer?.id === player.id
                         ? 'bg-purple-600/20 border-purple-500'
                         : 'bg-white/5 border-white/10 hover:bg-white/10'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       {player.photo_url ? (
-                        <img 
-                          src={player.photo_url} 
+                        <img
+                          src={player.photo_url}
                           alt={player.name}
                           className="w-10 h-10 rounded-full object-cover border border-purple-500/50"
                         />

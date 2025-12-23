@@ -41,7 +41,7 @@ export function PlayerCardList({
 
   const handleCompareClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    
+
     // Armazenar o jogador selecionado para comparação
     const compareData = {
       comparePlayer: {
@@ -59,11 +59,16 @@ export function PlayerCardList({
       timestamp: Date.now(),
       source: 'jogadores_page'
     }
-    
+
     sessionStorage.setItem('comparePlayer1', JSON.stringify(compareData))
-    
+
     // Redirecionar para a página de elenco na seção de comparação
     router.push('/dashboard/elenco?section=comparacao')
+  }
+
+  const handleNameClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/dashboard/jogadores/${player.id}`)
   }
 
   // Handler para lidar com clicks no card
@@ -105,7 +110,12 @@ export function PlayerCardList({
           <div className="md:hidden">
             <div className="flex justify-between items-start mb-2">
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm sm:text-base lg:text-lg truncate">{player.name}</p>
+                <p
+                  className="font-bold text-sm sm:text-base lg:text-lg truncate hover:text-purple-400 cursor-pointer transition-colors"
+                  onClick={handleNameClick}
+                >
+                  {player.name}
+                </p>
                 <p className="text-zinc-400 text-xs sm:text-sm lg:text-sm mt-0.5 truncate">{player.playstyle || 'Nenhum estilo de jogo'}</p>
               </div>
               <div className="ml-2 text-right">
@@ -122,7 +132,7 @@ export function PlayerCardList({
                   <Badge className="bg-purple-600 text-xs px-2 py-0.5">{player.position}</Badge>
                 </div>
               </div>
-              
+
               <div>
                 <p className="text-zinc-500 text-xs">Clube</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -200,16 +210,21 @@ export function PlayerCardList({
           <div className="hidden md:grid grid-cols-1 md:grid-cols-9 gap-3 lg:gap-4 text-xs lg:text-sm items-center">
             {/* Nome e Playstyle */}
             <div className="md:col-span-2">
-              <p className="font-bold text-base lg:text-lg leading-tight">{player.name}</p>
+              <p
+                className="font-bold text-base lg:text-lg leading-tight hover:text-purple-400 cursor-pointer transition-colors"
+                onClick={handleNameClick}
+              >
+                {player.name}
+              </p>
               <p className="text-zinc-400 text-xs lg:text-sm mt-1 line-clamp-1">{player.playstyle || 'Nenhum estilo de jogo'}</p>
             </div>
-            
+
             {/* Posição */}
             <div className="flex flex-col">
               <p className="text-zinc-500 text-xs">Posição</p>
               <Badge className="bg-purple-600 text-xs mt-1 w-fit">{player.position}</Badge>
             </div>
-            
+
             {/* Clube */}
             <div className="flex flex-col">
               <p className="text-zinc-500 text-xs">Clube</p>
@@ -220,7 +235,7 @@ export function PlayerCardList({
                 </span>
               </div>
             </div>
-            
+
             {/* Overall */}
             <div className="flex flex-col items-center">
               <p className="text-zinc-500 text-xs">Overall</p>
@@ -228,7 +243,7 @@ export function PlayerCardList({
                 {player.overall}
               </p>
             </div>
-            
+
             {/* Botão de Comparação */}
             <div className="flex flex-col items-center justify-center">
               <Button
@@ -242,7 +257,7 @@ export function PlayerCardList({
               </Button>
               <span className="text-[12px] text-zinc-500 mt-1 hidden lg:block">Comparar</span>
             </div>
-            
+
             {/* Botão de Favorito */}
             <div className="flex flex-col items-center justify-center">
               <FavoriteButton
@@ -260,7 +275,7 @@ export function PlayerCardList({
                 {formatBasePrice(player.base_price)}
               </p>
             </div>
-            
+
             {/* Botão de Edição e Seta */}
             <div className="flex items-center justify-end gap-2 lg:gap-2" onClick={(e) => e.stopPropagation()}>
               {userRole === 'admin' && (
@@ -297,7 +312,7 @@ export function PlayerCardList({
 
       {/* Detalhes expandidos */}
       {isOpen && (
-        <div 
+        <div
           className="border-t border-zinc-800 bg-zinc-900/50 px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6"
           onClick={(e) => e.stopPropagation()}
         >

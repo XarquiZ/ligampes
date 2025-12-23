@@ -81,7 +81,7 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
             </div>
           </div>
         </DialogHeader>
-        
+
         <div className="py-4">
           <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
             <div className="flex items-center gap-3">
@@ -100,7 +100,7 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
             </div>
           </div>
         </div>
-        
+
         <DialogFooter className="gap-2">
           <Button
             variant="outline"
@@ -125,11 +125,11 @@ const RemoveConfirmationModal: React.FC<RemoveConfirmationModalProps> = ({
   )
 }
 
-const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({ 
-  isOpen, 
-  onClose, 
+const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({
+  isOpen,
+  onClose,
   onSave,
-  loading 
+  loading
 }) => {
   const [name, setName] = useState('')
 
@@ -184,12 +184,12 @@ const SaveFormationDialog: React.FC<SaveFormationDialogProps> = ({
   )
 }
 
-const LoadFormationDialog: React.FC<LoadFormationDialogProps> = ({ 
-  isOpen, 
-  onClose, 
-  formations, 
-  onLoadFormation, 
-  onDeleteFormation 
+const LoadFormationDialog: React.FC<LoadFormationDialogProps> = ({
+  isOpen,
+  onClose,
+  formations,
+  onLoadFormation,
+  onDeleteFormation
 }) => {
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
 
@@ -227,7 +227,7 @@ const LoadFormationDialog: React.FC<LoadFormationDialogProps> = ({
               {formations.map((formation) => {
                 const formationData = formation.formation_data || formation
                 const stats = formationData.stats
-                
+
                 return (
                   <div
                     key={formation.id || formation.name}
@@ -260,7 +260,7 @@ const LoadFormationDialog: React.FC<LoadFormationDialogProps> = ({
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex gap-2 ml-4">
                         <Button
                           onClick={() => {
@@ -286,7 +286,7 @@ const LoadFormationDialog: React.FC<LoadFormationDialogProps> = ({
               })}
             </div>
           )}
-          
+
           <div className="flex justify-end mt-6">
             <Button
               variant="outline"
@@ -301,6 +301,25 @@ const LoadFormationDialog: React.FC<LoadFormationDialogProps> = ({
     </Dialog>
   )
 }
+
+const MoveButton = ({ onStartDrag }: { onStartDrag: (e: React.TouchEvent | React.MouseEvent) => void }) => (
+  <button
+    onTouchStart={(e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      onStartDrag(e)
+    }}
+    onMouseDown={(e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      onStartDrag(e)
+    }}
+    className="w-8 h-8 rounded-lg bg-orange-500/20 border border-orange-500/50 flex items-center justify-center hover:bg-orange-500/30 transition-colors group/btn cursor-grab active:cursor-grabbing"
+    title="Arrastar jogador"
+  >
+    <Move className="w-3 h-3 text-orange-400 group-hover/btn:text-orange-300" />
+  </button>
+)
 
 export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers, allPlayers }) => {
   const [fieldSlots, setFieldSlots] = useState<FieldSlot[]>([])
@@ -319,6 +338,10 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
   const [userTeamId, setUserTeamId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [savingFormation, setSavingFormation] = useState(false)
+  const [windowWidth, setWindowWidth] = useState(1200) // Default to desktop
+  const isMobile = windowWidth < 768
+  const isTablet = windowWidth >= 768 && windowWidth < 1024
+
   const [dragging, setDragging] = useState<DraggingState>({
     isDragging: false,
     slotId: null,
@@ -327,17 +350,31 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
     currentX: 0,
     currentY: 0
   })
-  
+
   const [hovering, setHovering] = useState<HoverState>({
     isHovering: false,
     slotId: null,
     showOptions: false
   })
-  
+
   const fieldRef = useRef<HTMLDivElement>(null)
   const optionsContainerRef = useRef<HTMLDivElement>(null)
   const dragTimeoutRef = useRef<NodeJS.Timeout>()
   const hoverTimeoutRef = useRef<NodeJS.Timeout>()
+  const hasDraggedRef = useRef(false) // New ref to track if a drag occurred
+
+  // Detect Window Size
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth)
+    }
+
+    // Set initial size
+    handleResize()
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Cores das posições conforme especificado
   const getPositionColor = (position: string) => {
@@ -352,13 +389,13 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
   useEffect(() => {
     const allSlots = [...fieldSlots, ...reserveSlots]
     const newSelectedPlayers = new Set<number>()
-    
+
     allSlots.forEach(slot => {
       if (slot.player?.id) {
         newSelectedPlayers.add(slot.player.id)
       }
     })
-    
+
     setSelectedPlayers(newSelectedPlayers)
   }, [fieldSlots, reserveSlots])
 
@@ -367,16 +404,16 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
     const loadUserAndTeam = async () => {
       try {
         setLoading(true)
-        
+
         // Obter usuário atual
         const { data: { user }, error: userError } = await supabase.auth.getUser()
-        
+
         if (userError) {
           console.error('Erro ao obter usuário:', userError)
           setLoading(false)
           return
         }
-        
+
         if (!user) {
           console.log('Usuário não autenticado')
           setUserId(null)
@@ -384,17 +421,17 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           setLoading(false)
           return
         }
-        
+
         console.log('Usuário ID:', user.id)
         setUserId(user.id)
-        
+
         // Buscar o perfil do usuário para obter o team_id
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('team_id')
           .eq('id', user.id)
           .single()
-        
+
         if (profileError) {
           console.error('Erro ao buscar perfil:', profileError)
           // Tentar buscar de outra maneira
@@ -403,7 +440,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
             .select('team_id')
             .eq('id', user.id)
             .maybeSingle()
-          
+
           if (!profilesError && profiles) {
             console.log('Team ID encontrado no perfil:', profiles.team_id)
             setUserTeamId(profiles.team_id)
@@ -416,15 +453,15 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         } else {
           console.warn('Perfil encontrado mas sem team_id')
         }
-        
+
         setLoading(false)
-        
+
       } catch (error) {
         console.error('Erro ao carregar usuário/time:', error)
         setLoading(false)
       }
     }
-    
+
     loadUserAndTeam()
   }, [])
 
@@ -432,13 +469,13 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
   const loadSavedFormations = async () => {
     try {
       console.log('Carregando formações... userId:', userId, 'userTeamId:', userTeamId)
-      
+
       if (!userTeamId) {
         console.warn('Usuário não tem team_id associado')
         alert('Você precisa ter um time associado ao seu perfil para salvar formações.')
         return
       }
-      
+
       // Buscar formações APENAS do team_id do usuário
       const { data: formations, error: formationsError } = await supabase
         .from('formations')
@@ -459,7 +496,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         console.log('Nenhuma formação encontrada para este time')
         setSavedFormations([])
       }
-      
+
     } catch (error) {
       console.error('Erro ao carregar formações salvas:', error)
       alert('Erro ao carregar formações.')
@@ -494,9 +531,9 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       let position = ''
       let x = 50
       let y = 50
-      
+
       // Distribuição inicial das posições para campo comprido (mais longo que largo)
-      switch(i) {
+      switch (i) {
         case 0: position = 'GO'; x = 50; y = 88; break; // Goleiro mais atrás
         case 1: position = 'LE'; x = 20; y = 70; break;  // Lateral direito
         case 2: position = 'ZC'; x = 35; y = 70; break;  // Zagueiro central
@@ -509,7 +546,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         case 9: position = 'CA'; x = 50; y = 15; break;  // Centroavante
         case 10: position = 'PTD'; x = 80; y = 20; break; // Ponta esquerda
       }
-      
+
       return {
         id: `field-${i + 1}`,
         position,
@@ -532,42 +569,49 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
     setFieldSlots(initialFieldSlots)
     setReserveSlots(initialReserveSlots)
-    
+
     return () => {
       if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current)
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
     }
   }, [])
 
-  // Event listeners para arrastar
+  // Event listeners para arrastar (Mouse e Touch)
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      // Se estiver sobre as opções, não arrasta
-      if (isMouseOverOptions(e) && dragging.isDragging) {
-        const handleMouseUp = () => {
-          if (dragging.isDragging) {
-            setDragging({ isDragging: false, slotId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 })
-          }
-        }
-        handleMouseUp()
-        return
+    const handleMove = (clientX: number, clientY: number) => {
+      if (isMouseOverOptions({ clientX, clientY } as any) && dragging.isDragging && !isMobile) {
+        // Lógica desktop para cancelar se passar por cima do menu (se necessário)
       }
-      
+
       if (!dragging.isDragging || !dragging.slotId || !fieldRef.current) return
-      
+
       const fieldRect = fieldRef.current.getBoundingClientRect()
-      const x = ((e.clientX - fieldRect.left) / fieldRect.width) * 100
-      const y = ((e.clientY - fieldRect.top) / fieldRect.height) * 100
-      
+      const x = ((clientX - fieldRect.left) / fieldRect.width) * 100
+      const y = ((clientY - fieldRect.top) / fieldRect.height) * 100
+
       // Atualizar posição do slot em tempo real
-      setFieldSlots(prev => prev.map(slot => 
-        slot.id === dragging.slotId 
-          ? { ...slot, x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) }
+      setFieldSlots(prev => prev.map(slot =>
+        slot.id === dragging.slotId
+          ? { ...slot, x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) }
           : slot
       ))
+
+      // Mark as dragged
+      hasDraggedRef.current = true
     }
 
-    const handleMouseUp = () => {
+    const handleMouseMove = (e: MouseEvent) => {
+      handleMove(e.clientX, e.clientY)
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      // Prevent scrolling while dragging
+      if (e.cancelable) e.preventDefault();
+      const touch = e.touches[0]
+      handleMove(touch.clientX, touch.clientY)
+    }
+
+    const handleEnd = () => {
       if (dragging.isDragging) {
         setDragging({ isDragging: false, slotId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 })
       }
@@ -575,53 +619,74 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
     if (dragging.isDragging) {
       document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
+      document.addEventListener('mouseup', handleEnd)
+      document.addEventListener('touchmove', handleTouchMove, { passive: false })
+      document.addEventListener('touchend', handleEnd)
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mouseup', handleEnd)
+      document.removeEventListener('touchmove', handleTouchMove)
+      document.removeEventListener('touchend', handleEnd)
     }
-  }, [dragging.isDragging, dragging.slotId])
+  }, [dragging.isDragging, dragging.slotId, isMobile])
 
-  const handleMouseDown = (e: React.MouseEvent, slotId: string) => {
-    e.preventDefault()
+  const handleMouseDown = (e: React.MouseEvent | React.TouchEvent, slotId: string, isMoveButton: boolean = false) => {
+    // Only proceed if it is a move button action OR we are on desktop
+    // On mobile, tap on player icon is handled by onClick solely to open menu
+    if (isMobile && !isMoveButton) return;
+
+    // Prevent default selectively
+    if (e.cancelable && e.type !== 'click') e.preventDefault()
     e.stopPropagation()
-    
-    // Começar arrasto após um pequeno delay (para distinguir de click)
-    dragTimeoutRef.current = setTimeout(() => {
-      setDragging({
-        isDragging: true,
-        slotId,
-        startX: e.clientX,
-        startY: e.clientY,
-        currentX: e.clientX,
-        currentY: e.clientY
-      })
-      // Esconder opções de hover quando começa a arrastar
-      setHovering({ isHovering: false, slotId: null, showOptions: false })
-    }, 200) // 200ms de delay para começar arrasto
+
+    // Get coordinates
+    // Reset drag tracking
+    hasDraggedRef.current = false
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY
+
+    setDragging({
+      isDragging: true,
+      slotId,
+      startX: clientX,
+      startY: clientY,
+      currentX: clientX,
+      currentY: clientY
+    })
+
+    // Esconder opções de hover quando começa a arrastar
+    setHovering({ isHovering: false, slotId: null, showOptions: false })
   }
 
-  const handleMouseUp = (e: React.MouseEvent, slotId: string) => {
+  const handleSlotClick = (e: React.MouseEvent, slotId: string) => {
     e.preventDefault()
     e.stopPropagation()
-    
-    // Se estava arrastando, não fazer nada
-    if (dragging.isDragging) return
-    
-    // Cancelar timeout de arrasto
-    if (dragTimeoutRef.current) {
-      clearTimeout(dragTimeoutRef.current)
-    }
-    
-    // Se não estava arrastando e tem jogador, é um click - abrir modal de posição
+
+    // Se estava arrastando, ignorar
+    // If drag was active or just finished, do not process as click
+    if (dragging.isDragging || hasDraggedRef.current) return;
+
     const slot = fieldSlots.find(s => s.id === slotId)
+
+    // Se é mobile e tem jogador, toggle menu
+    if (isMobile && slot?.player) {
+      if (hovering.slotId === slotId && hovering.showOptions) {
+        setHovering({ isHovering: false, slotId: null, showOptions: false })
+      } else {
+        setHovering({ isHovering: true, slotId, showOptions: true })
+      }
+      return
+    }
+
+    // Comportamento normal (Desktop ou Mobile sem jogador)
     if (slot?.player) {
       setSelectedSlot(slot)
       setShowPositionModal(true)
     } else if (slot) {
-      // Slot vazio - abrir modal de seleção de jogador
+      // Slot vazio
       setSelectedSlot(slot)
       setShowPlayerModal(true)
     }
@@ -632,7 +697,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
     if (slot?.player) {
       // Verificar se já está mostrando opções para este slot
       if (hovering.slotId === slotId && hovering.showOptions) return
-      
+
       hoverTimeoutRef.current = setTimeout(() => {
         setHovering({ isHovering: true, slotId, showOptions: true })
       }, 150) // 150ms de delay para mostrar opções
@@ -643,7 +708,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current)
     }
-    
+
     // Pequeno delay para permitir mover o mouse para as opções
     setTimeout(() => {
       setHovering({ isHovering: false, slotId: null, showOptions: false })
@@ -660,16 +725,16 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
       if (selectedSlot.id.includes('reserve')) {
         // Atualizar slot de reserva
-        const updatedReserveSlots = reserveSlots.map(slot => 
-          slot.id === selectedSlot.id 
+        const updatedReserveSlots = reserveSlots.map(slot =>
+          slot.id === selectedSlot.id
             ? { ...slot, player, isOccupied: !!player }
             : slot
         )
         setReserveSlots(updatedReserveSlots)
       } else {
         // Atualizar slot do campo
-        const updatedFieldSlots = fieldSlots.map(slot => 
-          slot.id === selectedSlot.id 
+        const updatedFieldSlots = fieldSlots.map(slot =>
+          slot.id === selectedSlot.id
             ? { ...slot, player, isOccupied: !!player }
             : slot
         )
@@ -682,8 +747,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
   const handleSelectPosition = (position: string) => {
     if (selectedSlot) {
-      const updatedSlots = fieldSlots.map(slot => 
-        slot.id === selectedSlot.id 
+      const updatedSlots = fieldSlots.map(slot =>
+        slot.id === selectedSlot.id
           ? { ...slot, position }
           : slot
       )
@@ -707,10 +772,10 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
   const handleDropOnField = (e: React.DragEvent, targetSlotId: string) => {
     e.preventDefault()
-    
+
     const sourceSlotId = e.dataTransfer.getData('slotId')
     const isReserve = e.dataTransfer.getData('isReserve') === 'true'
-    
+
     if (isReserve) {
       // Arrastando do banco de reservas para o campo
       const sourceReserveSlot = reserveSlots.find(s => s.id === sourceSlotId)
@@ -718,13 +783,13 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         const updatedReserveSlots = reserveSlots.map(slot =>
           slot.id === sourceSlotId ? { ...slot, player: null, isOccupied: false } : slot
         )
-        
+
         const updatedFieldSlots = fieldSlots.map(slot =>
-          slot.id === targetSlotId 
+          slot.id === targetSlotId
             ? { ...slot, player: sourceReserveSlot.player, isOccupied: true }
             : slot
         )
-        
+
         setReserveSlots(updatedReserveSlots)
         setFieldSlots(updatedFieldSlots)
       }
@@ -732,7 +797,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       // Arrastando dentro do campo
       const sourceFieldSlot = fieldSlots.find(s => s.id === sourceSlotId)
       const targetFieldSlot = fieldSlots.find(s => s.id === targetSlotId)
-      
+
       if (sourceFieldSlot && targetFieldSlot) {
         const updatedFieldSlots = fieldSlots.map(slot => {
           if (slot.id === sourceSlotId) {
@@ -743,7 +808,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           }
           return slot
         })
-        
+
         setFieldSlots(updatedFieldSlots)
       }
     }
@@ -751,10 +816,10 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
   const handleDropOnReserve = (e: React.DragEvent, targetReserveId: string) => {
     e.preventDefault()
-    
+
     const sourceSlotId = e.dataTransfer.getData('slotId')
     const isReserve = e.dataTransfer.getData('isReserve') === 'true'
-    
+
     if (!isReserve) {
       // Arrastando do campo para o banco
       const sourceFieldSlot = fieldSlots.find(s => s.id === sourceSlotId)
@@ -762,15 +827,15 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
         const updatedFieldSlots = fieldSlots.map(slot =>
           slot.id === sourceSlotId ? { ...slot, player: null, isOccupied: false } : slot
         )
-        
+
         const targetReserveSlot = reserveSlots.find(s => s.id === targetReserveId)
         if (targetReserveSlot) {
           const updatedReserveSlots = reserveSlots.map(slot =>
-            slot.id === targetReserveId 
+            slot.id === targetReserveId
               ? { ...slot, player: sourceFieldSlot.player, isOccupied: true }
               : slot
           )
-          
+
           setFieldSlots(updatedFieldSlots)
           setReserveSlots(updatedReserveSlots)
         }
@@ -779,7 +844,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       // Arrastando dentro do banco
       const sourceReserveSlot = reserveSlots.find(s => s.id === sourceSlotId)
       const targetReserveSlot = reserveSlots.find(s => s.id === targetReserveId)
-      
+
       if (sourceReserveSlot && targetReserveSlot) {
         const updatedReserveSlots = reserveSlots.map(slot => {
           if (slot.id === sourceSlotId) {
@@ -790,7 +855,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           }
           return slot
         })
-        
+
         setReserveSlots(updatedReserveSlots)
       }
     }
@@ -803,21 +868,21 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       e.preventDefault()
       e.stopPropagation()
     }
-    
+
     // Cancelar qualquer timeout de arrasto pendente
     if (dragTimeoutRef.current) {
       clearTimeout(dragTimeoutRef.current)
     }
-    
+
     // Resetar estado de arrasto imediatamente
     setDragging({ isDragging: false, slotId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 })
-    
+
     const slot = fieldSlots.find(s => s.id === slotId)
     if (slot?.player) {
       setSlotToRemove(slotId)
       setShowRemoveConfirmation(true)
     }
-    
+
     // Fechar opções de hover
     setHovering({ isHovering: false, slotId: null, showOptions: false })
   }
@@ -829,17 +894,17 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       if (slot?.player) {
         // Tentar mover para o banco de reservas se houver espaço
         const emptyReserveSlot = reserveSlots.find(s => !s.player)
-        
+
         if (emptyReserveSlot) {
           // Move para o banco
           const updatedFieldSlots = fieldSlots.map(s =>
             s.id === slotToRemove ? { ...s, player: null, isOccupied: false } : s
           )
-          
+
           const updatedReserveSlots = reserveSlots.map(s =>
             s.id === emptyReserveSlot.id ? { ...s, player: slot.player, isOccupied: true } : s
           )
-          
+
           setFieldSlots(updatedFieldSlots)
           setReserveSlots(updatedReserveSlots)
         } else {
@@ -850,7 +915,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           setFieldSlots(updatedFieldSlots)
         }
       }
-      
+
       setSlotToRemove(null)
       setShowRemoveConfirmation(false)
     }
@@ -878,14 +943,14 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
     const overalls = players.map(p => p.player!.overall)
     const ages = players.map(p => p.player!.age || 25)
     const values = players.map(p => p.player!.base_price || 0)
-    
-    const defensePlayers = fieldSlots.filter(slot => 
+
+    const defensePlayers = fieldSlots.filter(slot =>
       slot.player && ['GO', 'LD', 'LE', 'ZC'].includes(slot.position)
     )
-    const midfieldPlayers = fieldSlots.filter(slot => 
+    const midfieldPlayers = fieldSlots.filter(slot =>
       slot.player && ['VOL', 'MLD', 'MLG', 'MLE', 'MAT'].includes(slot.position)
     )
-    const attackPlayers = fieldSlots.filter(slot => 
+    const attackPlayers = fieldSlots.filter(slot =>
       slot.player && ['SA', 'PTD', 'PTE', 'CA'].includes(slot.position)
     )
 
@@ -895,7 +960,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       totalValue: values.reduce((a, b) => a + b, 0),
       playerCount: players.length,
       fieldPlayerCount: fieldSlots.filter(s => s.player).length,
-      defenseAvg: defensePlayers.length > 0 
+      defenseAvg: defensePlayers.length > 0
         ? Math.round(defensePlayers.reduce((sum, slot) => sum + slot.player!.overall, 0) / defensePlayers.length)
         : 0,
       midfieldAvg: midfieldPlayers.length > 0
@@ -975,7 +1040,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
       alert(`Formação "${formationName}" salva com sucesso!`)
       setShowSaveDialog(false)
-      
+
     } catch (error) {
       console.error('Erro ao salvar formação:', error)
       alert('Erro ao salvar formação. Tente novamente.')
@@ -987,11 +1052,11 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
   const handleLoadFormation = (formationData: any) => {
     const clearedFieldSlots = fieldSlots.map(slot => ({ ...slot, player: null, isOccupied: false }))
     const clearedReserveSlots = reserveSlots.map(slot => ({ ...slot, player: null, isOccupied: false }))
-    
+
     const savedFormation = formationData.formation_data || formationData
     const savedSlots = savedFormation.slots || []
     const savedReserves = savedFormation.reserves || []
-    
+
     const updatedFieldSlots = clearedFieldSlots.map(slot => {
       const savedSlot = savedSlots.find((s: any) => s.id === slot.id)
       if (savedSlot) {
@@ -1009,22 +1074,27 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
               photo_url: savedSlot.player.photo_url,
               club: savedSlot.player.club,
               base_price: 0,
-              age: 25
+              age: 25,
+              nationality: 'BR', // Default or placeholder
+              logo_url: '/placeholder.png', // Default
+              preferred_foot: 'R', // Default
+              team_id: userTeamId || '',
+              skills: []
             }
           }
         }
-        return { 
-          ...slot, 
+        return {
+          ...slot,
           position: savedSlot.position || slot.position,
           x: savedSlot.x || slot.x,
           y: savedSlot.y || slot.y,
-          player: player, 
-          isOccupied: !!player 
+          player: player || null,
+          isOccupied: !!player
         }
       }
       return slot
     })
-    
+
     const updatedReserveSlots = clearedReserveSlots.map((slot, index) => {
       const savedReserve = savedReserves[index]
       if (savedReserve && savedReserve.player) {
@@ -1039,14 +1109,19 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
             photo_url: savedReserve.player.photo_url,
             club: savedReserve.player.club,
             base_price: 0,
-            age: 25
+            age: 25,
+            nationality: 'BR',
+            logo_url: '/placeholder.png',
+            preferred_foot: 'R',
+            team_id: userTeamId || '',
+            skills: []
           }
         }
         return { ...slot, player: player || null, isOccupied: !!player }
       }
       return slot
     })
-    
+
     setFieldSlots(updatedFieldSlots)
     setReserveSlots(updatedReserveSlots)
     setShowLoadDialog(false)
@@ -1067,7 +1142,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
 
       // Atualizar lista local
       setSavedFormations(prev => prev.filter(f => f.id !== id))
-      
+
     } catch (error) {
       console.error('Erro ao deletar formação:', error)
       alert('Erro ao excluir formação.')
@@ -1129,52 +1204,52 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       {/* Campo de Futebol com resumo ao lado */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Campo de Futebol - CAMPO COMPRIDO */}
-        <div className="lg:w-2/3 relative bg-gradient-to-b from-emerald-900/20 to-emerald-950/40 rounded-2xl border-2 border-emerald-800 p-4">
-          <div 
+        <div className="lg:w-2/3 relative bg-gradient-to-b from-emerald-900/20 to-emerald-950/40 rounded-2xl border-2 border-emerald-800 p-2 sm:p-4">
+          <div
             ref={fieldRef}
-            className="relative w-full aspect-[4/4] bg-gradient-to-b from-emerald-900/30 to-emerald-950/60 border-2 border-emerald-700 rounded-xl overflow-hidden"
+            className="relative w-full aspect-[4/5] sm:aspect-[4/4] bg-gradient-to-b from-emerald-900/30 to-emerald-950/60 border-2 border-emerald-700 rounded-xl overflow-visible md:overflow-hidden touch-none"
             onDragOver={handleDragOver}
           >
             {/* Gramado com padrão de campo */}
             <div className="absolute inset-0 bg-gradient-to-b from-emerald-700/40 via-emerald-800/30 to-emerald-900/40"></div>
-            
+
             {/* Linhas do campo - ajustadas para campo comprido */}
             <div className="absolute inset-6 border-2 border-white/20 rounded-lg"></div>
-            
+
             {/* Linha do meio de campo */}
             <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/30 transform -translate-y-1/2"></div>
-            
+
             {/* Círculo central */}
             <div className="absolute top-1/2 left-1/2 w-16 h-16 border-2 border-white/20 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
             <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-white/50 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
-            
+
             {/* Área grande */}
             <div className="absolute top-4 left-6 right-6 h-32 border-2 border-white/20 rounded-t-lg"></div>
             <div className="absolute bottom-4 left-6 right-6 h-32 border-2 border-white/20 rounded-b-lg"></div>
-            
+
             {/* Área pequena */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 w-64 h-24 border-2 border-white/20 rounded-t-lg"></div>
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-64 h-24 border-2 border-white/20 rounded-b-lg"></div>
-            
+
             {/* Ponto do pênalti */}
             <div className="absolute top-32 left-1/2 w-3 h-3 bg-white/50 rounded-full transform -translate-x-1/2"></div>
             <div className="absolute bottom-32 left-1/2 w-3 h-3 bg-white/50 rounded-full transform -translate-x-1/2"></div>
-            
+
             {/* Arco do gol (semicírculos) */}
             <div className="absolute top-4 left-1/2 w-40 h-20 border-2 border-white/20 border-b-0 rounded-t-lg transform -translate-x-1/2"></div>
             <div className="absolute bottom-4 left-1/2 w-40 h-20 border-2 border-white/20 border-t-0 rounded-b-lg transform -translate-x-1/2"></div>
-            
+
             {/* Bandeirinhas de canto (opcional) */}
             <div className="absolute top-0 left-0 w-2 h-6 bg-yellow-500/70"></div>
             <div className="absolute top-0 right-0 w-2 h-6 bg-yellow-500/70"></div>
             <div className="absolute bottom-0 left-0 w-2 h-6 bg-yellow-500/70"></div>
             <div className="absolute bottom-0 right-0 w-2 h-6 bg-yellow-500/70"></div>
-            
+
             {/* Posições dos jogadores no campo */}
             {fieldSlots.map(slot => {
               const isHoveringThisSlot = hovering.slotId === slot.id && hovering.showOptions
               const isDraggingThisSlot = dragging.slotId === slot.id
-              
+
               return (
                 <div
                   key={slot.id}
@@ -1182,84 +1257,47 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                   onDragStart={(e) => !dragging.isDragging && handleDragStart(e, slot.id, false)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDropOnField(e, slot.id)}
-                  onMouseDown={(e) => {
-                    // Verificar se o clique foi no ícone do jogador
-                    const target = e.target as HTMLElement;
-                    const clickedOnPlayerIcon = 
-                      target.closest('.player-icon-container') || 
-                      target.classList.contains('player-icon-container');
-                    
-                    if (slot.player && clickedOnPlayerIcon) {
-                      // Não iniciar arrasto imediatamente ao clicar no jogador
-                      // Só arrasta se segurar o mouse
-                      handleMouseDown(e, slot.id)
-                    }
-                  }}
+                  onMouseDown={(e) => !isMobile && handleMouseDown(e, slot.id)} // Desktop/Tablet drag start
                   onMouseUp={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    
-                    // Se estava arrastando, não fazer nada
-                    if (dragging.isDragging) return
-                    
-                    // Cancelar timeout de arrasto
-                    if (dragTimeoutRef.current) {
-                      clearTimeout(dragTimeoutRef.current)
-                    }
-                    
-                    // Verifica se o clique foi no jogador (ícone circular)
-                    const target = e.target as HTMLElement;
-                    const clickedOnPlayerIcon = 
-                      target.closest('.player-icon-container') || 
-                      target.classList.contains('player-icon-container');
-                    
-                    if (slot.player && clickedOnPlayerIcon) {
-                      setSelectedSlot(slot)
-                      setShowPositionModal(true)
-                    } else if (slot) {
-                      // Slot vazio - abrir modal de seleção de jogador
-                      setSelectedSlot(slot)
-                      setShowPlayerModal(true)
-                    }
+                    // Ensure checks clean up timeout on release
+                    if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current)
                   }}
-                  onMouseEnter={() => slot.player && handleMouseEnter(slot.id)}
-                  onMouseLeave={handleMouseLeave}
+                  onClick={(e) => handleSlotClick(e, slot.id)} // Handle click
+                  onMouseEnter={() => !isMobile && slot.player && handleMouseEnter(slot.id)}
+                  onMouseLeave={() => !isMobile && handleMouseLeave()}
                   className={cn(
                     "absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center transition-all group",
                     dragging.slotId === slot.id ? "z-50 cursor-grabbing" : "cursor-pointer",
                     slot.isOccupied ? "" : "border-2 border-dashed border-white/30"
                   )}
-                  style={{ 
-                    left: `${slot.x}%`, 
+                  style={{
+                    left: `${slot.x}%`,
                     top: `${slot.y}%`,
                     transition: dragging.slotId === slot.id ? 'none' : 'all 0.2s ease',
-                    width: isHoveringThisSlot ? 'calc(7rem + 6rem)' : '7rem',
-                    height: '7rem'
+                    width: isHoveringThisSlot && !isMobile ? 'calc(7rem + 6rem)' : (isMobile ? '3rem' : (isTablet ? '5rem' : '7rem')),
+                    height: isMobile ? '3rem' : (isTablet ? '5rem' : '7rem')
                   }}
                 >
                   {slot.player ? (
                     <div className="relative w-full h-full flex flex-col items-center justify-center">
                       {/* Container principal com área estendida para as opções */}
                       <div className="relative flex flex-col items-center">
-                        {/* Opções de Hover - à esquerda com área de hover estendida */}
+                        {/* Opções de Hover - MENU MOBILE & DESKTOP */}
                         {isHoveringThisSlot && !dragging.isDragging && (
-                          <div 
+                          <div
                             ref={optionsContainerRef}
-                            className="absolute -left-16 z-40 flex flex-col gap-2 bg-zinc-900/90 backdrop-blur-sm rounded-xl p-2 border border-zinc-700 shadow-xl"
-                            onMouseEnter={() => handleMouseEnter(slot.id)}
-                            onMouseLeave={handleMouseLeave}
+                            className={cn(
+                              "absolute z-40 flex gap-2 bg-zinc-900/95 backdrop-blur-sm rounded-xl p-2 border border-zinc-700 shadow-xl",
+                              isMobile ? "-top-16 left-1/2 -translate-x-1/2 flex-row" : "-left-16 flex-col"
+                            )}
+                            onMouseEnter={() => !isMobile && handleMouseEnter(slot.id)}
+                            onMouseLeave={() => !isMobile && handleMouseLeave()}
                           >
                             {/* Remover jogador */}
                             <button
                               onMouseDown={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                // Cancelar arrasto imediatamente
-                                if (dragTimeoutRef.current) {
-                                  clearTimeout(dragTimeoutRef.current)
-                                }
-                                setDragging({ isDragging: false, slotId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 })
-                                // Chamar função de remoção
                                 handleRemovePlayerWithConfirmation(slot.id, e)
                               }}
                               onClick={(e) => {
@@ -1271,18 +1309,12 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             >
                               <Trash2 className="w-3 h-3 text-red-400 group-hover/btn:text-red-300" />
                             </button>
-                            
+
                             {/* Mudar posição */}
                             <button
                               onMouseDown={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                // Cancelar arrasto imediatamente
-                                if (dragTimeoutRef.current) {
-                                  clearTimeout(dragTimeoutRef.current)
-                                }
-                                setDragging({ isDragging: false, slotId: null, startX: 0, startY: 0, currentX: 0, currentY: 0 })
-                                // Abrir modal de posição
                                 setSelectedSlot(slot)
                                 setShowPositionModal(true)
                                 setHovering({ isHovering: false, slotId: null, showOptions: false })
@@ -1296,49 +1328,45 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             >
                               <Edit2 className="w-3 h-3 text-blue-400 group-hover/btn:text-blue-300" />
                             </button>
-                            
-        
+
+                            {/* Arrastar (Mobile e Desktop agora podem usar este botão) */}
+                            <MoveButton onStartDrag={(e) => handleMouseDown(e, slot.id, true)} />
+
                           </div>
                         )}
-                        
-                        {/* Jogador - adicionada classe player-icon-container para identificar clique */}
-                        <div 
+
+                        {/* Jogador - visual */}
+                        <div
                           className={cn(
-                            "player-icon-container w-16 h-16 rounded-full overflow-hidden border-2 shadow-lg flex flex-col items-center justify-center relative",
+                            "player-icon-container rounded-full overflow-hidden border-2 shadow-lg flex flex-col items-center justify-center relative transition-transform",
                             getPositionColor(slot.position),
-                            isDraggingThisSlot ? "scale-110 shadow-2xl" : "hover:scale-105"
+                            isDraggingThisSlot ? "scale-110 shadow-2xl" : "hover:scale-105",
+                            isMobile ? "w-10 h-10" : (isTablet ? "w-14 h-14" : "w-16 h-16")
                           )}
                         >
                           {slot.player.photo_url ? (
-                            <img 
-                              src={slot.player.photo_url} 
+                            <img
+                              src={slot.player.photo_url}
                               alt={slot.player.name}
                               className="w-full h-full object-cover"
                             />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center p-1">
-                              <span className="text-xs font-bold text-white">{slot.player.position}</span>
-                              <span className="text-lg font-black text-white">{slot.player.overall}</span>
-                            </div>
-                          )}
-                          
-                          {/* Overlay de arrasto */}
-                          {!isHoveringThisSlot && !dragging.isDragging && (
-                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                              <GripVertical className="w-5 h-5 text-white/70" />
+                              <span className="text-[10px] md:text-sm font-bold text-white">{slot.player.position}</span>
+                              <span className="text-sm md:text-2xl font-black text-white">{slot.player.overall}</span>
                             </div>
                           )}
                         </div>
-                        
+
                         {/* Badge do OVR */}
-                        <div className="absolute -top-1 -right-1 bg-black/90 backdrop-blur px-1.5 py-0.5 rounded-lg border border-emerald-500 shadow-lg z-10">
-                          <span className="text-xs font-bold text-yellow-400">{slot.player.overall}</span>
+                        <div className="absolute -top-1 -right-1 bg-black/90 backdrop-blur px-1.5 py-0.5 rounded-lg border border-emerald-500 shadow-lg z-10 pointer-events-none">
+                          <span className="text-[10px] md:text-xs font-bold text-yellow-400">{slot.player.overall}</span>
                         </div>
-                        
-                        {/* Nome da posição + nome do jogador abaixo - NOME COMPLETO */}
-                        <div className="flex flex-col items-center mt-1 gap-0.5">
+
+                        {/* Nome da posição + nome do jogador */}
+                        <div className="flex flex-col items-center mt-1 gap-0.5 pointer-events-none">
                           <div className={cn(
-                            "px-2 py-1 rounded-lg border text-xs whitespace-nowrap",
+                            "px-1.5 py-0.5 rounded-lg border text-[10px] whitespace-nowrap",
                             getPositionColor(slot.position)
                           )}>
                             <span className="font-bold text-white">
@@ -1346,8 +1374,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             </span>
                           </div>
                           {/* Nome completo do jogador */}
-                          <div className="max-w-[90px]">
-                            <span className="text-[10px] font-medium text-white truncate block text-center px-1">
+                          <div className={cn("text-center", isMobile ? "max-w-[60px]" : "max-w-[90px]")}>
+                            <span className="text-[8px] md:text-[10px] font-medium text-white truncate block px-1 drop-shadow-md">
                               {slot.player.name}
                             </span>
                           </div>
@@ -1355,34 +1383,21 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                       </div>
                     </div>
                   ) : (
-                    <>
+                    <div className="w-full h-full flex items-center justify-center">
                       <div className={cn(
-                        "w-14 h-14 rounded-full flex items-center justify-center border-2 text-xs",
-                        getPositionColor(slot.position)
+                        "rounded-full flex items-center justify-center border-2 text-xs",
+                        getPositionColor(slot.position),
+                        isMobile ? "w-10 h-10" : "w-14 h-14"
                       )}>
                         <span className="font-bold text-white">{slot.position || '?'}</span>
                       </div>
-                      <div 
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedSlot(slot)
-                          setShowPlayerModal(true)
-                        }}
-                        className="absolute inset-0 cursor-pointer flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-                      >
-                        <div className="bg-black/70 backdrop-blur-sm rounded-full w-full h-full flex items-center justify-center">
-                          <span className="text-[10px] text-white font-medium text-center px-1">
-                            Clique para adicionar
-                          </span>
-                        </div>
-                      </div>
-                    </>
+                    </div>
                   )}
                 </div>
               )
             })}
           </div>
-          
+
           {/* Legenda do campo */}
           <div className="flex justify-center mt-4">
             <div className="flex items-center gap-4 text-xs text-zinc-400">
@@ -1440,7 +1455,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                 {stats?.avgAge || '-'} anos
               </span>
             </div>
-            
+
             {showStats && stats && (
               <div className="border-t border-zinc-700 pt-4 mt-2">
                 <h5 className="font-bold text-white mb-3">Médias por Setor</h5>
@@ -1449,8 +1464,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                     <span className="text-sm text-blue-400">Defesa</span>
                     <div className="flex items-center gap-2">
                       <div className="w-20 bg-zinc-700 rounded-full h-2">
-                        <div 
-                          className="bg-blue-500 h-2 rounded-full" 
+                        <div
+                          className="bg-blue-500 h-2 rounded-full"
                           style={{ width: `${Math.min(100, (stats.defenseAvg / 99) * 100)}%` }}
                         ></div>
                       </div>
@@ -1461,8 +1476,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                     <span className="text-sm text-green-400">Meio-Campo</span>
                     <div className="flex items-center gap-2">
                       <div className="w-20 bg-zinc-700 rounded-full h-2">
-                        <div 
-                          className="bg-green-500 h-2 rounded-full" 
+                        <div
+                          className="bg-green-500 h-2 rounded-full"
                           style={{ width: `${Math.min(100, (stats.midfieldAvg / 99) * 100)}%` }}
                         ></div>
                       </div>
@@ -1473,8 +1488,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                     <span className="text-sm text-red-400">Ataque</span>
                     <div className="flex items-center gap-2">
                       <div className="w-20 bg-zinc-700 rounded-full h-2">
-                        <div 
-                          className="bg-red-500 h-2 rounded-full" 
+                        <div
+                          className="bg-red-500 h-2 rounded-full"
                           style={{ width: `${Math.min(100, (stats.attackAvg / 99) * 100)}%` }}
                         ></div>
                       </div>
@@ -1505,17 +1520,18 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
               }}
               className={cn(
                 "aspect-square rounded-full flex items-center justify-center transition-all cursor-pointer group relative",
-                slot.player 
-                  ? "border-2 border-emerald-500 shadow-lg hover:scale-105 hover:shadow-emerald-500/20" 
-                  : "border-2 border-dashed border-zinc-600 hover:border-emerald-500 hover:bg-zinc-800/50"
+                slot.player
+                  ? "border-2 border-emerald-500 shadow-lg hover:scale-105 hover:shadow-emerald-500/20"
+                  : "border-2 border-dashed border-zinc-600 hover:border-emerald-500 hover:bg-zinc-800/50",
+                isMobile ? "w-10 h-10" : (isTablet ? "w-14 h-14" : "w-16 h-16")
               )}
             >
               {slot.player ? (
                 <>
                   <div className="w-full h-full rounded-full overflow-hidden border-2 border-emerald-500 flex flex-col items-center justify-center">
                     {slot.player.photo_url ? (
-                      <img 
-                        src={slot.player.photo_url} 
+                      <img
+                        src={slot.player.photo_url}
                         alt={slot.player.name}
                         className="w-full h-full object-cover"
                       />
@@ -1525,7 +1541,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                         <span className="text-xs font-black text-white">{slot.player.overall}</span>
                       </div>
                     )}
-                    
+
                     {/* Nome completo do jogador abaixo */}
                     <div className="absolute -bottom-5 w-full">
                       <span className="text-[7px] text-white text-center truncate block px-0.5">
@@ -1533,7 +1549,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                       </span>
                     </div>
                   </div>
-                  
+
                   {/* Botão remover */}
                   <div
                     onClick={(e) => {
@@ -1544,7 +1560,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                   >
                     <X className="w-2 h-2 text-white" />
                   </div>
-                  
+
                   {/* Ícone arrastar */}
                   <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <GripVertical className="w-2.5 h-2.5 text-zinc-300" />
@@ -1603,7 +1619,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           allPlayers={allPlayers}
           position={selectedSlot.position || ''}
           isReserveSlot={selectedSlot.id.includes('reserve')}
-          selectedPlayers={selectedPlayers}
+        // selectedPlayers prop might not be needed or is invalid for this component depending on version
         />
       )}
 

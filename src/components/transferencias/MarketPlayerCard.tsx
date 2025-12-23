@@ -50,19 +50,19 @@ export default function MarketPlayerCard({
   const teamName = listing.team_name || 'Time desconhecido'
   const teamLogo = listing.team_logo
   const safeTeamName = teamName || 'Time'
-  
+
   // Verifica se é negociável pela descrição (pode conter palavras-chave)
-  const isNegotiable = listing.description?.toLowerCase().includes('negoci') || 
-                      listing.description?.toLowerCase().includes('proposta') ||
-                      listing.description?.toLowerCase().includes('aceito')
+  const isNegotiable = listing.description?.toLowerCase().includes('negoci') ||
+    listing.description?.toLowerCase().includes('proposta') ||
+    listing.description?.toLowerCase().includes('aceito')
 
   const navigateToPlayerPage = (playerId: string) => {
-    router.push(`/dashboard/jogadores#player-${playerId}`)
+    router.push(`/dashboard/jogadores/${playerId}`)
   }
 
   const handleActionClick = () => {
     if (isMine) return
-    
+
     if (isNegotiable) {
       // Para jogadores negociáveis, chama a função de fazer proposta/abrir chat
       onMakeProposal(listing)
@@ -77,8 +77,8 @@ export default function MarketPlayerCard({
       {/* Header com time */}
       <div className="flex items-center gap-2 mb-3">
         {teamLogo ? (
-          <img 
-            src={teamLogo} 
+          <img
+            src={teamLogo}
             alt={teamName}
             className="w-6 h-6 rounded-full object-cover"
           />
@@ -90,7 +90,7 @@ export default function MarketPlayerCard({
           </div>
         )}
         <span className="text-sm text-zinc-300">{teamName}</span>
-        
+
         {/* Badge para negociáveis */}
         {isNegotiable && (
           <Badge className="ml-auto bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs px-2 py-1">
@@ -103,8 +103,8 @@ export default function MarketPlayerCard({
       {/* Player info */}
       <div className="flex items-center gap-3 mb-3 cursor-pointer" onClick={() => navigateToPlayerPage(player.id)}>
         {player.photo_url ? (
-          <img 
-            src={player.photo_url} 
+          <img
+            src={player.photo_url}
             alt={player.name}
             className="w-14 h-14 rounded-full object-cover border-2 border-purple-500"
           />
@@ -154,7 +154,7 @@ export default function MarketPlayerCard({
           </p>
           <div className={cn(
             "text-zinc-300 text-sm rounded-lg p-2",
-            isNegotiable 
+            isNegotiable
               ? "bg-purple-900/20 border border-purple-700/30"
               : "bg-zinc-800/30"
           )}>
@@ -197,7 +197,7 @@ export default function MarketPlayerCard({
             onClick={handleActionClick}
             className={cn(
               "flex-1 text-white flex items-center justify-center gap-2",
-              isNegotiable 
+              isNegotiable
                 ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                 : "bg-green-600 hover:bg-green-700"
             )}

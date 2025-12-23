@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
 import Image from "next/image";
+import { useRouter } from 'next/navigation';
 
 import { ChevronDown } from "lucide-react";
 
@@ -18,6 +19,7 @@ interface Artilheiro {
 }
 
 export default function Artilharia() {
+  const router = useRouter();
   const [artilheiros, setArtilheiros] = useState<Artilheiro[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataAtualizacao, setDataAtualizacao] = useState<string>('');
@@ -348,7 +350,12 @@ export default function Artilharia() {
 
                     {/* Nome e Time */}
                     <div>
-                      <div className="font-bold text-white">{artilheiro.nome}</div>
+                      <div
+                        className="font-bold text-white hover:text-yellow-400 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/dashboard/jogadores/${artilheiro.id}`)}
+                      >
+                        {artilheiro.nome}
+                      </div>
                       <div className="flex items-center gap-2 text-sm text-gray-400">
                         {artilheiro.logo_url ? (
                           <div className="relative w-4 h-4">
