@@ -1314,6 +1314,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDropOnField(e, slot.id)}
                   onTouchStart={(e) => {
+                    hasDraggedRef.current = false; // Reset drag state on new touch
                     const touch = e.touches[0];
                     // Store start position to differentiate tap vs drag
                     (e.target as any).dataset.startX = touch.clientX;
@@ -1606,6 +1607,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                 setShowPlayerModal(true)
               }}
               onTouchStart={(e) => {
+                hasDraggedRef.current = false; // Reset drag state on new touch
                 const touch = e.touches[0];
                 (e.target as any).dataset.startX = touch.clientX;
                 (e.target as any).dataset.startY = touch.clientY;
