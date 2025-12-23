@@ -504,36 +504,48 @@ export default function PlayerProfilePage() {
                                                 } catch (e) { }
 
                                                 return (
-                                                    <div key={match.id} className="flex items-center gap-4 p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl hover:bg-zinc-900 transition-all">
-                                                        {/* Data e Hora */}
-                                                        <div className="flex flex-col items-center min-w-[60px] gap-1">
+                                                    <div key={match.id} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl hover:bg-zinc-900 transition-all">
+                                                        {/* Mobile Header: Date + Badge */}
+                                                        <div className="flex items-center justify-between sm:hidden w-full border-b border-zinc-800/50 pb-2 mb-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <Calendar className="w-3 h-3 text-zinc-500" />
+                                                                <span className="text-sm font-bold text-zinc-300">{dateDisplay}</span>
+                                                                <span className="text-xs text-zinc-500">• {match.time ? match.time.substring(0, 5) : '--:--'}</span>
+                                                            </div>
+                                                            <Badge variant="outline" className="text-[10px] h-5 border-zinc-700 text-zinc-400">
+                                                                {isHome ? 'Casa' : 'Fora'}
+                                                            </Badge>
+                                                        </div>
+
+                                                        {/* Desktop Date Column */}
+                                                        <div className="hidden sm:flex flex-col items-center min-w-[60px] gap-1">
                                                             <span className="text-sm font-bold text-zinc-300">{dateDisplay}</span>
                                                             <span className="text-xs text-zinc-500">{match.time ? match.time.substring(0, 5) : '--:--'}</span>
                                                         </div>
 
-                                                        {/* Informações do Jogo */}
-                                                        <div className="flex-1 flex items-center justify-between gap-4">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-xs text-zinc-500 uppercase font-bold">Rodada {match.round}</span>
-                                                                <div className="flex items-center gap-3 mt-1">
+                                                        {/* Match Info */}
+                                                        <div className="flex-1 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                                            <div className="flex flex-col w-full sm:w-auto text-center sm:text-left">
+                                                                <span className="text-xs text-zinc-500 uppercase font-bold mb-2 sm:mb-1">Rodada {match.round}</span>
+                                                                <div className="flex items-center justify-center sm:justify-start gap-3 sm:gap-3">
                                                                     {/* Time Casa */}
-                                                                    <div className="flex items-center gap-2">
+                                                                    <div className="flex items-center gap-2 justify-end sm:justify-start flex-1 sm:flex-auto">
                                                                         {match.time_casa?.logo_url ? (
                                                                             <img src={match.time_casa.logo_url} className="w-6 h-6 object-contain" title={match.time_casa.name} />
                                                                         ) : (
                                                                             <div className="w-6 h-6 rounded-full bg-zinc-700"></div>
                                                                         )}
-                                                                        <span className={`text-sm font-bold ${match.home_team_id === player.team_id ? 'text-white' : 'text-zinc-400'}`}>
-                                                                            {match.time_casa?.name || 'Time Casa'}
+                                                                        <span className={`text-sm font-bold truncate ${match.home_team_id === player.team_id ? 'text-white' : 'text-zinc-400'}`}>
+                                                                            {match.time_casa?.name || 'Casa'}
                                                                         </span>
                                                                     </div>
 
                                                                     <span className="text-xs text-zinc-600 font-bold">VS</span>
 
                                                                     {/* Time Fora */}
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className={`text-sm font-bold ${match.away_team_id === player.team_id ? 'text-white' : 'text-zinc-400'}`}>
-                                                                            {match.time_fora?.name || 'Time Fora'}
+                                                                    <div className="flex items-center gap-2 justify-start flex-1 sm:flex-auto">
+                                                                        <span className={`text-sm font-bold truncate ${match.away_team_id === player.team_id ? 'text-white' : 'text-zinc-400'}`}>
+                                                                            {match.time_fora?.name || 'Fora'}
                                                                         </span>
                                                                         {match.time_fora?.logo_url ? (
                                                                             <img src={match.time_fora.logo_url} className="w-6 h-6 object-contain" title={match.time_fora.name} />
@@ -544,7 +556,8 @@ export default function PlayerProfilePage() {
                                                                 </div>
                                                             </div>
 
-                                                            <Badge variant="outline" className="text-xs border-zinc-700 text-zinc-400">
+                                                            {/* Desktop Badge */}
+                                                            <Badge variant="outline" className="hidden sm:inline-flex text-xs border-zinc-700 text-zinc-400">
                                                                 {isHome ? 'Em Casa' : 'Fora'}
                                                             </Badge>
                                                         </div>
