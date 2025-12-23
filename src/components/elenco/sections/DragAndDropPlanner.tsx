@@ -1359,7 +1359,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                     transition: dragging.slotId === slot.id ? 'none' : 'all 0.2s ease',
                     width: isHoveringThisSlot && !isMobile ? 'calc(7rem + 6rem)' : (isMobile ? '16%' : (isTablet ? '5rem' : '7rem')), // Responsive % width on mobile
                     height: isMobile ? 'auto' : (isTablet ? '5rem' : '7rem'),
-                    aspectRatio: isMobile ? '1/1' : 'auto'
+                    aspectRatio: isMobile ? '1/1' : 'auto',
+                    touchAction: 'none'
                   }}
                 >
                   {slot.player ? (
@@ -1634,6 +1635,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                   : "border-2 border-dashed border-zinc-600 hover:border-emerald-500 hover:bg-zinc-800/50",
                 isMobile ? "w-10 h-10 min-[375px]:w-12 min-[375px]:h-12 min-[425px]:w-14 min-[425px]:h-14" : (isTablet ? "w-14 h-14" : "w-16 h-16")
               )}
+              style={{ touchAction: 'none' }}
             >
               {slot.player ? (
                 <>
