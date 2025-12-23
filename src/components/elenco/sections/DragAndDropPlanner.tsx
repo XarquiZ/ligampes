@@ -1337,6 +1337,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                         currentX: touch.clientX,
                         currentY: touch.clientY
                       });
+                      hasDraggedRef.current = true; // Mark as dragged to prevent click
                       setHovering({ isHovering: false, slotId: null, showOptions: false });
                     }
                   }}
@@ -1415,8 +1416,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                               <Edit2 className="w-3 h-3 text-blue-400 group-hover/btn:text-blue-300" />
                             </button>
 
-                            {/* Arrastar (Mobile e Desktop agora podem usar este botão) */}
-                            <MoveButton onStartDrag={(e) => handleMouseDown(e, slot.id, true)} />
+
 
                           </div>
                         )}
@@ -1600,7 +1600,8 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
               onDragStart={(e) => handleDragStart(e, slot.id, true)}
               onDragOver={handleDragOver}
               onDrop={(e) => handleDropOnReserve(e, slot.id)}
-              onClick={() => {
+              onClick={(e) => {
+                if (hasDraggedRef.current) return;
                 setSelectedSlot(slot)
                 setShowPlayerModal(true)
               }}
@@ -1626,6 +1627,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                     currentX: touch.clientX,
                     currentY: touch.clientY
                   });
+                  hasDraggedRef.current = true; // Mark as dragged
                 }
               }}
               className={cn(
