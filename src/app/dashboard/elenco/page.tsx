@@ -54,18 +54,18 @@ export default function ElencoPage() {
   const [playerToDismiss, setPlayerToDismiss] = useState<Player | null>(null)
   const [openedPlayers, setOpenedPlayers] = useState<string[]>([])
   const [isTransitioning, setIsTransitioning] = useState(false)
-  
+
   // NOVO ESTADO: Incluir posições secundárias (Padrão: true)
   const [includeSecondaryPositions, setIncludeSecondaryPositions] = useState(true)
-  
+
   const [preSelectedPlayerId, setPreSelectedPlayerId] = useState<string | null>(null)
 
   const getPreSelectedPlayerFromStorage = useCallback(() => {
     if (typeof window === 'undefined') return null
-    
+
     const compareData = sessionStorage.getItem('comparePlayer1')
     if (!compareData) return null
-    
+
     try {
       const parsedData = JSON.parse(compareData)
       return parsedData.comparePlayer?.id || null
@@ -78,7 +78,7 @@ export default function ElencoPage() {
     const section = searchParams.get('section')
     if (section && ['elenco', 'favoritos', 'comparacao', 'planejador'].includes(section)) {
       setActiveSection(section as any)
-      
+
       if (section === 'comparacao') {
         const playerId = getPreSelectedPlayerFromStorage()
         if (playerId) {
@@ -150,7 +150,7 @@ export default function ElencoPage() {
       }
 
       const favoriteIds = favoritesData.map(fav => fav.player_id)
-      
+
       if (favoriteIds.length === 0) {
         setFavoritePlayers([])
         return
@@ -180,7 +180,7 @@ export default function ElencoPage() {
       if (!playersError) {
         const playersWithFavorites = (playersData || []).map(player => {
           const stats = player.player_stats?.[0] || {};
-          
+
           return {
             ...player,
             is_favorite: true,
@@ -251,7 +251,7 @@ export default function ElencoPage() {
         }
 
         const conversationIds = conversations.map(conv => conv.id)
-        
+
         const { count } = await supabase
           .from('private_messages')
           .select('*', { count: 'exact', head: true })
@@ -306,10 +306,10 @@ export default function ElencoPage() {
           )
         `)
         .eq('team_id', teamId)
-      
+
       const mapped = (data || []).map((p: any) => {
         const stats = p.player_stats?.[0] || {}; // Pega o primeiro registro de estatísticas
-        
+
         return {
           ...p,
           club: p.team_id ? (p.team_id === teamId ? (team?.name ?? 'Meu Time') : 'Outro') : 'Sem Time',
@@ -331,14 +331,14 @@ export default function ElencoPage() {
           average_rating: stats.avg_rating || 0
         }
       })
-      
+
       const sortedPlayers = mapped.sort((a, b) => {
         if (b.overall !== a.overall) {
           return b.overall - a.overall
         }
         return a.name.localeCompare(b.name)
       })
-      
+
       setPlayers(sortedPlayers)
       setFilteredPlayers(sortedPlayers)
     } catch (e) {
@@ -349,7 +349,7 @@ export default function ElencoPage() {
           .from('players')
           .select('*')
           .eq('team_id', teamId)
-        
+
         const mapped = (data || []).map((p: any) => ({
           ...p,
           club: p.team_id ? (p.team_id === teamId ? (team?.name ?? 'Meu Time') : 'Outro') : 'Sem Time',
@@ -370,14 +370,14 @@ export default function ElencoPage() {
           total_matches: 0,
           average_rating: 0
         }))
-        
+
         const sortedPlayers = mapped.sort((a, b) => {
           if (b.overall !== a.overall) {
             return b.overall - a.overall
           }
           return a.name.localeCompare(b.name)
         })
-        
+
         setPlayers(sortedPlayers)
         setFilteredPlayers(sortedPlayers)
       } catch (fallbackError) {
@@ -396,19 +396,19 @@ export default function ElencoPage() {
         .from('teams')
         .select('id, name, logo_url')
         .order('name')
-      
+
       setAllTeams(data || [])
     } catch (e) {
       console.error('Erro ao carregar times:', e)
     }
   }, [supabase])
 
-  useEffect(() => { 
+  useEffect(() => {
     loadAllTeams()
     loadAllPlayers()
   }, [loadAllTeams, loadAllPlayers])
 
-  useEffect(() => { 
+  useEffect(() => {
     loadPlayers()
     loadFavoritePlayers()
   }, [loadPlayers, loadFavoritePlayers])
@@ -460,11 +460,11 @@ export default function ElencoPage() {
       if (profileError || !coachProfile) {
         const teamsWithCoaches = [
           'Cruzeiro EC',
-          'Fortaleza EC', 
+          'Fortaleza EC',
           'SC Internacional',
           'Sport Club do Recife'
         ]
-        
+
         if (teamsWithCoaches.includes(playerTeamData.name)) {
           alert(`Erro: O time ${playerTeamData.name} deveria ter um técnico, mas não foi possível encontrá-lo. Contate o administrador.`)
         } else {
@@ -518,7 +518,7 @@ export default function ElencoPage() {
         }
 
         conversationId = newConversation.id
-        
+
         const playerData = {
           id: player.id,
           name: player.name,
@@ -546,7 +546,7 @@ export default function ElencoPage() {
       }
 
       setIsChatOpen(true)
-      
+
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('forceReloadConversations'))
       }, 1000)
@@ -662,9 +662,9 @@ export default function ElencoPage() {
       setDismissModalOpen(false)
       setPlayerToDismiss(null)
       loadPlayers()
-      
+
       alert(`✅ ${playerName} dispensado com sucesso!\nValor da dispensa: R$ ${dismissValue.toLocaleString('pt-BR')}`)
-      
+
     } catch (error: any) {
       console.error('💥 Erro crítico ao dispensar jogador:', error)
       alert(`❌ Erro ao dispensar jogador: ${error.message || 'Erro desconhecido'}`)
@@ -674,12 +674,12 @@ export default function ElencoPage() {
   const handleConfirmTransfer = async (transferData: any) => {
     try {
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      
+
       if (authError || !authUser) {
         alert('Erro: Usuário não autenticado')
         return
       }
-  
+
       const transferPayload: any = {
         player_id: transferData.playerId,
         player_name: transferData.playerName,
@@ -693,7 +693,7 @@ export default function ElencoPage() {
         created_at: new Date().toISOString(),
         transfer_type: transferData.type
       }
-  
+
       if (transferData.type === 'multi_sell') {
         transferPayload.transfer_players = transferData.transferPlayers || []
         transferPayload.player_names = transferData.playerNames || []
@@ -709,14 +709,14 @@ export default function ElencoPage() {
       else if (transferData.type === 'sell') {
         transferPayload.is_exchange = false
       }
-  
+
       console.log('Enviando dados para transferência:', transferPayload)
-  
+
       const { data, error } = await supabase
         .from('player_transfers')
         .insert([transferPayload])
         .select()
-  
+
       if (error) {
         console.error('❌ Erro Supabase detalhado:', error)
         if (error.code === '42501') {
@@ -726,19 +726,19 @@ export default function ElencoPage() {
         }
         return
       }
-  
+
       setTransferModalOpen(false)
       setSelectedPlayer(null)
       loadPlayers()
-      
+
       const message = transferData.type === 'multi_sell'
         ? '✅ Proposta de venda múltipla enviada com sucesso! Aguarde a aprovação do comprador e do administrador.'
         : transferData.type === 'sell'
-        ? '✅ Proposta de transferência enviada com sucesso! Aguarde a aprovação do comprador e do administrador.'
-        : '✅ Proposta de troca enviada com sucesso! Aguarde a aprovação do outro time e do administrador.'
-      
+          ? '✅ Proposta de transferência enviada com sucesso! Aguarde a aprovação do comprador e do administrador.'
+          : '✅ Proposta de troca enviada com sucesso! Aguarde a aprovação do outro time e do administrador.'
+
       alert(message)
-      
+
     } catch (e) {
       console.error('💥 Erro inesperado:', e)
       alert('Erro inesperado ao enviar proposta')
@@ -810,25 +810,25 @@ export default function ElencoPage() {
   useEffect(() => {
     let f = [...playersToShow]
     if (search) f = f.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
-    
+
     if (selectedPositions.length > 0) {
-      f = f.filter(p => 
-        selectedPositions.includes(p.position) || 
+      f = f.filter(p =>
+        selectedPositions.includes(p.position) ||
         (includeSecondaryPositions && p.alternative_positions && p.alternative_positions.some(altPos => selectedPositions.includes(altPos)))
       )
     }
-    
+
     if (selectedPlaystyles.length > 0) {
       f = f.filter(p => p.playstyle && selectedPlaystyles.includes(p.playstyle))
     }
-    
+
     f = f.sort((a, b) => {
       if (b.overall !== a.overall) {
         return b.overall - a.overall
       }
       return a.name.localeCompare(b.name)
     })
-    
+
     setFilteredPlayers(f)
   }, [search, selectedPositions, selectedPlaystyles, playersToShow, includeSecondaryPositions])
 
@@ -877,18 +877,18 @@ export default function ElencoPage() {
               {activeSection !== 'comparacao' && activeSection !== 'planejador' && (
                 <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
                   <div className="relative">
-                    <Input 
-                      placeholder="Procurar..." 
-                      value={search} 
-                      onChange={e => setSearch(e.target.value)} 
-                      className="pl-10 w-48 lg:w-64 h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 text-sm" 
+                    <Input
+                      placeholder="Procurar..."
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      className="pl-10 w-48 lg:w-64 h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 text-sm"
                     />
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
                   </div>
 
                   <div className="relative">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className={cn(
                         "h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 flex items-center gap-1 lg:gap-2 text-xs lg:text-sm",
                         selectedPositions.length > 0 && "border-purple-500 text-purple-400"
@@ -901,15 +901,15 @@ export default function ElencoPage() {
                         <Badge className="bg-purple-600 text-xs h-4 px-1 min-w-4">{selectedPositions.length}</Badge>
                       )}
                     </Button>
-                    
+
                     {positionFilterOpen && (
                       <div className="absolute top-full left-0 mt-2 w-56 lg:w-72 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-3 lg:p-4">
                         <div className="flex justify-between items-center mb-2 lg:mb-3">
                           <h3 className="font-semibold text-sm lg:text-base">Filtrar por Posição</h3>
                           {selectedPositions.length > 0 && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={clearPositionFilters}
                               className="text-xs text-red-400 hover:text-red-300 h-6"
                             >
@@ -920,8 +920,8 @@ export default function ElencoPage() {
 
                         {/* Opção para Incluir Posições Secundárias */}
                         <div className="flex items-center space-x-2 mb-3 p-2 bg-zinc-800/50 rounded-md border border-zinc-700/50">
-                          <Checkbox 
-                            id="include-secondary-elenco" 
+                          <Checkbox
+                            id="include-secondary-elenco"
                             checked={includeSecondaryPositions}
                             onCheckedChange={(checked) => setIncludeSecondaryPositions(!!checked)}
                             className="border-zinc-500 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600 w-4 h-4"
@@ -950,8 +950,8 @@ export default function ElencoPage() {
                   </div>
 
                   <div className="relative">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className={cn(
                         "h-9 lg:h-10 bg-zinc-900/70 border-zinc-700 flex items-center gap-1 lg:gap-2 text-xs lg:text-sm",
                         selectedPlaystyles.length > 0 && "border-purple-500 text-purple-400"
@@ -964,15 +964,15 @@ export default function ElencoPage() {
                         <Badge className="bg-purple-600 text-xs h-4 px-1 min-w-4">{selectedPlaystyles.length}</Badge>
                       )}
                     </Button>
-                    
+
                     {playstyleFilterOpen && (
                       <div className="absolute top-full left-0 mt-2 w-56 lg:w-64 bg-zinc-900 border border-zinc-700 rounded-lg shadow-lg z-10 p-3 lg:p-4">
                         <div className="flex justify-between items-center mb-2 lg:mb-3">
                           <h3 className="font-semibold text-sm lg:text-base">Filtrar por Estilo</h3>
                           {selectedPlaystyles.length > 0 && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={clearPlaystyleFilters}
                               className="text-xs text-red-400 hover:text-red-300 h-6"
                             >
@@ -996,18 +996,18 @@ export default function ElencoPage() {
                   </div>
 
                   <div className="flex bg-zinc-900/70 rounded-lg lg:rounded-xl p-1 border border-zinc-700">
-                    <Button 
-                      variant={viewMode === 'grid' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      onClick={() => setViewMode('grid')} 
+                    <Button
+                      variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('grid')}
                       className={cn('rounded-md lg:rounded-lg text-xs', viewMode === 'grid' && 'bg-purple-600')}
                     >
                       <Grid3X3 className="w-4 h-4 lg:w-5 lg:h-5" />
                     </Button>
-                    <Button 
-                      variant={viewMode === 'list' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      onClick={() => setViewMode('list')} 
+                    <Button
+                      variant={viewMode === 'list' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('list')}
                       className={cn('rounded-md lg:rounded-lg text-xs', viewMode === 'list' && 'bg-purple-600')}
                     >
                       <List className="w-4 h-4 lg:w-5 lg:h-5" />
@@ -1020,7 +1020,7 @@ export default function ElencoPage() {
             <SectionSwitch activeSection={activeSection} onSectionChange={setActiveSection} />
 
             {(positionFilterOpen || playstyleFilterOpen) && (
-              <div 
+              <div
                 className="fixed inset-0 z-0 bg-transparent cursor-default"
                 onClick={(e) => {
                   e.preventDefault()
@@ -1042,8 +1042,8 @@ export default function ElencoPage() {
             )}
 
             {activeSection === 'comparacao' && (
-              <ComparisonSection 
-                players={allPlayers} 
+              <ComparisonSection
+                players={allPlayers}
                 preSelectedPlayerId={preSelectedPlayerId}
               />
             )}
@@ -1062,8 +1062,8 @@ export default function ElencoPage() {
                         {activeSection === 'elenco' ? 'Nenhum jogador no elenco' : 'Nenhum jogador favorito'}
                       </h3>
                       <p className="text-zinc-400 text-sm lg:text-base">
-                        {activeSection === 'elenco' 
-                          ? 'Verifique se seu perfil está associado a um time.' 
+                        {activeSection === 'elenco'
+                          ? 'Verifique se seu perfil está associado a um time.'
                           : 'Adicione jogadores de outros times aos favoritos na página de jogadores.'
                         }
                       </p>
@@ -1081,7 +1081,7 @@ export default function ElencoPage() {
                         tabIndex={0}
                         style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
-                        <PlayerCard 
+                        <PlayerCard
                           player={player}
                           activeSection={activeSection}
                           showProposeButton={activeSection === 'favoritos'}
@@ -1089,8 +1089,8 @@ export default function ElencoPage() {
                           onDismissClick={handleDismissPlayer}
                           onShareClick={handleSharePlayer}
                           onRemoveFavorite={handleRemoveFromFavorites}
-                          onCardClick={activeSection === 'favoritos' 
-                            ? navigateToPlayerInPlayersPage 
+                          onCardClick={activeSection === 'favoritos'
+                            ? navigateToPlayerInPlayersPage
                             : handleGridCardClick}
                         />
                       </div>
@@ -1111,9 +1111,9 @@ export default function ElencoPage() {
                         onDismissClick={handleDismissPlayer}
                         onShareClick={handleSharePlayer}
                         onRemoveFavorite={handleRemoveFromFavorites}
-                        onCardClick={activeSection === 'favoritos' 
-                          ? navigateToPlayerInPlayersPage 
-                          : () => {}}
+                        onCardClick={activeSection === 'favoritos'
+                          ? navigateToPlayerInPlayersPage
+                          : () => { }}
                       />
                     ))}
                   </div>
@@ -1141,13 +1141,13 @@ export default function ElencoPage() {
 
       {user && team && (
         <>
-          <FloatingChatButton 
+          <FloatingChatButton
             currentUser={chatUser}
             currentTeam={chatTeam}
             unreadCount={unreadCount}
             onOpenChat={() => setIsChatOpen(true)}
           />
-          
+
           <ChatPopup
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}

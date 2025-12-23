@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
-import { Trash2, Save, Users, Target, X, Move, Edit2, GripVertical, Eye, AlertTriangle } from 'lucide-react'
+import { Trash2, Save, Users, Target, X, Move, Edit2, GripVertical, Eye, AlertTriangle, Settings2, BarChart2, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PlannerSectionProps, Player, POSITION_MAP, POSITIONS } from '../types'
 import { PlayerSelectionModal } from '../modals/PlayerSelectionModal'
@@ -330,6 +330,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
   const [showRemoveConfirmation, setShowRemoveConfirmation] = useState(false)
   const [slotToRemove, setSlotToRemove] = useState<string | null>(null)
   const [savedFormations, setSavedFormations] = useState<any[]>([])
+  const [isControlsOpen, setIsControlsOpen] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [showLoadDialog, setShowLoadDialog] = useState(false)
@@ -1173,23 +1174,78 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
               • Segure e arraste para mover • Hover para ver opções • Click no jogador para editar posição
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleLoadFormationsClick}
-              className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
-              disabled={!userTeamId}
-            >
-              <Eye className="w-4 h-4 mr-2" />
-              Minhas Formações
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowStats(!showStats)}
-              className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
-            >
-              {showStats ? 'Ocultar' : 'Mostrar'} Estatísticas
-            </Button>
+          <div className="flex-1 w-full sm:w-auto">
+            {/* Mobile Controls Dropdown (< 640px) */}
+            <div className="sm:hidden relative w-full">
+              <Button
+                variant="outline"
+                onClick={() => setIsControlsOpen(!isControlsOpen)}
+                className="w-full justify-between bg-zinc-800/50 border-zinc-700 text-zinc-300"
+              >
+                <span className="flex items-center gap-2">
+                  <Settings2 className="w-4 h-4" />
+                  Opções de Formação
+                </span>
+                <ChevronDown className={cn("w-4 h-4 transition-transform", isControlsOpen && "rotate-180")} />
+              </Button>
+
+              {isControlsOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsControlsOpen(false)} />
+                  <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl overflow-hidden flex flex-col">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        handleLoadFormationsClick()
+                        setIsControlsOpen(false)
+                      }}
+                      disabled={!userTeamId}
+                      className="justify-start rounded-none border-b border-zinc-800 p-4 h-auto"
+                    >
+                      <Eye className="w-4 h-4 mr-3 text-blue-400" />
+                      <div className="flex flex-col items-start">
+                        <span className="font-bold text-white">Minhas Formações</span>
+                        <span className="text-xs text-zinc-400">Carregar formações salvas</span>
+                      </div>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setShowStats(!showStats)
+                        setIsControlsOpen(false)
+                      }}
+                      className="justify-start rounded-none p-4 h-auto"
+                    >
+                      <BarChart2 className="w-4 h-4 mr-3 text-purple-400" />
+                      <div className="flex flex-col items-start">
+                        <span className="font-bold text-white">{showStats ? 'Ocultar' : 'Mostrar'} Estatísticas</span>
+                        <span className="text-xs text-zinc-400">Ver análise do time</span>
+                      </div>
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Desktop Controls (>= 640px) */}
+            <div className="hidden sm:flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleLoadFormationsClick}
+                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                disabled={!userTeamId}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Minhas Formações
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowStats(!showStats)}
+                className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+              >
+                {showStats ? 'Ocultar' : 'Mostrar'} Estatísticas
+              </Button>
+            </div>
           </div>
         </div>
         {!userTeamId && (
@@ -1204,10 +1260,10 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       {/* Campo de Futebol com resumo ao lado */}
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Campo de Futebol - CAMPO COMPRIDO */}
-        <div className="lg:w-2/3 relative bg-gradient-to-b from-emerald-900/20 to-emerald-950/40 rounded-2xl border-2 border-emerald-800 p-2 sm:p-4">
+        <div className="lg:w-2/3 relative bg-gradient-to-b from-emerald-900/20 to-emerald-950/40 rounded-2xl border-2 border-emerald-800 p-8 sm:p-10">
           <div
             ref={fieldRef}
-            className="relative w-full aspect-[4/5] sm:aspect-[4/4] bg-gradient-to-b from-emerald-900/30 to-emerald-950/60 border-2 border-emerald-700 rounded-xl overflow-visible md:overflow-hidden touch-none"
+            className="relative w-full aspect-[2/3] sm:aspect-[4/4] bg-gradient-to-b from-emerald-900/30 to-emerald-950/60 border-2 border-emerald-700 rounded-xl overflow-visible md:overflow-hidden touch-none"
             onDragOver={handleDragOver}
           >
             {/* Gramado com padrão de campo */}
@@ -1257,6 +1313,33 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                   onDragStart={(e) => !dragging.isDragging && handleDragStart(e, slot.id, false)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDropOnField(e, slot.id)}
+                  onTouchStart={(e) => {
+                    const touch = e.touches[0];
+                    // Store start position to differentiate tap vs drag
+                    (e.target as any).dataset.startX = touch.clientX;
+                    (e.target as any).dataset.startY = touch.clientY;
+                    handleMouseDown(e, slot.id);
+                  }}
+                  onTouchMove={(e) => {
+                    const touch = e.touches[0];
+                    const startX = parseFloat((e.target as any).dataset.startX || '0');
+                    const startY = parseFloat((e.target as any).dataset.startY || '0');
+                    const moveX = Math.abs(touch.clientX - startX);
+                    const moveY = Math.abs(touch.clientY - startY);
+
+                    // If moved significantly, it's a drag
+                    if ((moveX > 10 || moveY > 10) && !dragging.isDragging && slot.player) {
+                      setDragging({
+                        isDragging: true,
+                        slotId: slot.id,
+                        startX: touch.clientX,
+                        startY: touch.clientY,
+                        currentX: touch.clientX,
+                        currentY: touch.clientY
+                      });
+                      setHovering({ isHovering: false, slotId: null, showOptions: false });
+                    }
+                  }}
                   onMouseDown={(e) => !isMobile && handleMouseDown(e, slot.id)} // Desktop/Tablet drag start
                   onMouseUp={(e) => {
                     // Ensure checks clean up timeout on release
@@ -1267,15 +1350,16 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                   onMouseLeave={() => !isMobile && handleMouseLeave()}
                   className={cn(
                     "absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center transition-all group",
-                    dragging.slotId === slot.id ? "z-50 cursor-grabbing" : "cursor-pointer",
+                    dragging.slotId === slot.id ? "z-50 cursor-grabbing scale-110" : "cursor-pointer",
                     slot.isOccupied ? "" : "border-2 border-dashed border-white/30"
                   )}
                   style={{
                     left: `${slot.x}%`,
                     top: `${slot.y}%`,
                     transition: dragging.slotId === slot.id ? 'none' : 'all 0.2s ease',
-                    width: isHoveringThisSlot && !isMobile ? 'calc(7rem + 6rem)' : (isMobile ? '3rem' : (isTablet ? '5rem' : '7rem')),
-                    height: isMobile ? '3rem' : (isTablet ? '5rem' : '7rem')
+                    width: isHoveringThisSlot && !isMobile ? 'calc(7rem + 6rem)' : (isMobile ? '16%' : (isTablet ? '5rem' : '7rem')), // Responsive % width on mobile
+                    height: isMobile ? 'auto' : (isTablet ? '5rem' : '7rem'),
+                    aspectRatio: isMobile ? '1/1' : 'auto'
                   }}
                 >
                   {slot.player ? (
@@ -1292,6 +1376,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             )}
                             onMouseEnter={() => !isMobile && handleMouseEnter(slot.id)}
                             onMouseLeave={() => !isMobile && handleMouseLeave()}
+                            onTouchEnd={(e) => e.stopPropagation()} // Prevent closing when tapping inside menu
                           >
                             {/* Remover jogador */}
                             <button
@@ -1341,7 +1426,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                             "player-icon-container rounded-full overflow-hidden border-2 shadow-lg flex flex-col items-center justify-center relative transition-transform",
                             getPositionColor(slot.position),
                             isDraggingThisSlot ? "scale-110 shadow-2xl" : "hover:scale-105",
-                            isMobile ? "w-10 h-10" : (isTablet ? "w-14 h-14" : "w-16 h-16")
+                            isMobile ? "w-10 h-10 min-[375px]:w-12 min-[375px]:h-12 min-[425px]:w-14 min-[425px]:h-14" : (isTablet ? "w-14 h-14" : "w-16 h-16")
                           )}
                         >
                           {slot.player.photo_url ? (
@@ -1387,7 +1472,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                       <div className={cn(
                         "rounded-full flex items-center justify-center border-2 text-xs",
                         getPositionColor(slot.position),
-                        isMobile ? "w-10 h-10" : "w-14 h-14"
+                        isMobile ? "w-10 h-10 min-[375px]:w-12 min-[375px]:h-12 min-[425px]:w-14 min-[425px]:h-14" : "w-14 h-14"
                       )}>
                         <span className="font-bold text-white">{slot.position || '?'}</span>
                       </div>
@@ -1506,7 +1591,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
       {/* Banco de Reservas */}
       <div className="bg-zinc-900/50 rounded-xl border border-zinc-700 p-4">
         <h4 className="font-bold text-white mb-4">Banco de Reservas (Arraste para o campo ou clique para adicionar)</h4>
-        <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-11 gap-3">
+        <div className="grid grid-cols-5 min-[400px]:grid-cols-6 sm:grid-cols-8 md:grid-cols-11 gap-3">
           {reserveSlots.map((slot, index) => (
             <div
               key={slot.id}
@@ -1518,12 +1603,36 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
                 setSelectedSlot(slot)
                 setShowPlayerModal(true)
               }}
+              onTouchStart={(e) => {
+                const touch = e.touches[0];
+                (e.target as any).dataset.startX = touch.clientX;
+                (e.target as any).dataset.startY = touch.clientY;
+                handleMouseDown(e, slot.id, true); // Treat reserve drag as 'move button' action effectively
+              }}
+              onTouchMove={(e) => {
+                const touch = e.touches[0];
+                const startX = parseFloat((e.target as any).dataset.startX || '0');
+                const startY = parseFloat((e.target as any).dataset.startY || '0');
+                const moveX = Math.abs(touch.clientX - startX);
+                const moveY = Math.abs(touch.clientY - startY);
+
+                if ((moveX > 10 || moveY > 10) && !dragging.isDragging && slot.player) {
+                  setDragging({
+                    isDragging: true,
+                    slotId: slot.id,
+                    startX: touch.clientX,
+                    startY: touch.clientY,
+                    currentX: touch.clientX,
+                    currentY: touch.clientY
+                  });
+                }
+              }}
               className={cn(
                 "aspect-square rounded-full flex items-center justify-center transition-all cursor-pointer group relative",
                 slot.player
                   ? "border-2 border-emerald-500 shadow-lg hover:scale-105 hover:shadow-emerald-500/20"
                   : "border-2 border-dashed border-zinc-600 hover:border-emerald-500 hover:bg-zinc-800/50",
-                isMobile ? "w-10 h-10" : (isTablet ? "w-14 h-14" : "w-16 h-16")
+                isMobile ? "w-10 h-10 min-[375px]:w-12 min-[375px]:h-12 min-[425px]:w-14 min-[425px]:h-14" : (isTablet ? "w-14 h-14" : "w-16 h-16")
               )}
             >
               {slot.player ? (
