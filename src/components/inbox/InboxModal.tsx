@@ -100,7 +100,11 @@ export default function InboxModal({
     const handleVoteSubmit = async (announcementId: string) => {
         const optionId = selectedVote[announcementId]
         if (!optionId) return
+
         await onVote(announcementId, optionId)
+
+        // Auto-show results after voting
+        setShowingResults(prev => ({ ...prev, [announcementId]: true }))
     }
 
     // Ordenar: Não lidos primeiro, depois por data

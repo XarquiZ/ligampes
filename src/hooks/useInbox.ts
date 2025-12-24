@@ -78,6 +78,15 @@ export function useInbox(user: any, team: any) {
     }
 
     const markAsRead = async (announcementId: string) => {
+        // Optimistic Update
+        const previousAnnouncements = [...announcements]
+        const previousUnread = unreadCount
+
+        setAnnouncements(prev => prev.map(a =>
+            a.id === announcementId ? { ...a, read: true } : a
+        ))
+        setUnreadCount(prev => Math.max(0, prev - 1))
+
         try {
             const { error } = await supabase
                 .from('announcement_interactions')
@@ -88,18 +97,28 @@ export function useInbox(user: any, team: any) {
 
             if (error) throw error
 
-            // Update local state
-            setAnnouncements(prev => prev.map(a =>
-                a.id === announcementId ? { ...a, read: true } : a
-            ))
-            setUnreadCount(prev => Math.max(0, prev - 1))
-
         } catch (error) {
             console.error('Error marking as read:', error)
+            // Rollback
+            setAnnouncements(previousAnnouncements)
+            setUnreadCount(previousUnread)
         }
     }
 
     const votePoll = async (announcementId: string, optionId: string) => {
+        // Optimistic Update
+        const previousAnnouncements = [...announcements]
+        const previousUnread = unreadCount
+
+        setAnnouncements(prev => prev.map(a =>
+            a.id === announcementId ? { ...a, read: true, voted_option_id: optionId } : a
+        ))
+
+        const wasRead = announcements.find(a => a.id === announcementId)?.read
+        if (!wasRead) {
+            setUnreadCount(prev => Math.max(0, prev - 1))
+        }
+
         try {
             const { error } = await supabase
                 .from('announcement_interactions')
@@ -111,18 +130,11 @@ export function useInbox(user: any, team: any) {
 
             if (error) throw error
 
-            // Update local state
-            setAnnouncements(prev => prev.map(a =>
-                a.id === announcementId ? { ...a, read: true, voted_option_id: optionId } : a
-            ))
-            // Decrease unread count if it wasn't read before
-            const wasRead = announcements.find(a => a.id === announcementId)?.read
-            if (!wasRead) {
-                setUnreadCount(prev => Math.max(0, prev - 1))
-            }
-
         } catch (error) {
             console.error('Error voting:', error)
+            // Rollback
+            setAnnouncements(previousAnnouncements)
+            setUnreadCount(previousUnread)
         }
     }
 
