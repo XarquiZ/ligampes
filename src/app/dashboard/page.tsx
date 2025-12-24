@@ -1839,11 +1839,12 @@ export default function Dashboard() {
 
       {/* Dashboard Auto-Popup Inbox */}
       <InboxModal
-        isOpen={dashboardInboxOpen}
+        isOpen={dashboardInboxOpen || inboxAnnouncements.some(a => a.priority && !a.read)}
         onClose={() => setDashboardInboxOpen(false)}
         announcements={inboxAnnouncements}
         onMarkAsRead={markAsRead}
         onVote={votePoll}
+        preventClose={inboxAnnouncements.some(a => a.priority && !a.read)}
       />
     </div>
   )
