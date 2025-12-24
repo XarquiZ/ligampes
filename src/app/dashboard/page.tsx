@@ -18,7 +18,13 @@ import Image from 'next/image'
 import Link from 'next/link'
 import Sidebar from '@/components/Sidebar'
 import ChatPopup from '@/components/Chatpopup'
+
 import FloatingChatButton from '@/components/FloatingChatButton'
+// Inbox Imports
+import AdminAnnouncementModal from '@/components/inbox/AdminAnnouncementModal'
+import InboxModal from '@/components/inbox/InboxModal'
+import { useInbox } from '@/hooks/useInbox'
+import { PlusCircle } from 'lucide-react'
 
 // Definir tipos para user e team
 interface User {
@@ -324,7 +330,25 @@ export default function Dashboard() {
   const [leagueTable, setLeagueTable] = useState<LeagueTable[]>([])
   const [matchSchedule, setMatchSchedule] = useState<MatchSchedule[]>([])
   const [teamStats, setTeamStats] = useState<TeamStats | null>(null)
+
   const [teamPosition, setTeamPosition] = useState<number | null>(null)
+
+  // Inbox System
+  const [adminModalOpen, setAdminModalOpen] = useState(false)
+  const [dashboardInboxOpen, setDashboardInboxOpen] = useState(false)
+  const { announcements: inboxAnnouncements, unreadCount: inboxUnread, markAsRead, votePoll } = useInbox(user, team) // Reuse logic
+
+
+
+  // Auto-Popup for Priority Messages
+  useEffect(() => {
+    if (inboxAnnouncements.length > 0) {
+      const hasUnreadPriority = inboxAnnouncements.some(a => a.priority && !a.read)
+      if (hasUnreadPriority) {
+        setDashboardInboxOpen(true)
+      }
+    }
+  }, [inboxAnnouncements])
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -1637,6 +1661,18 @@ export default function Dashboard() {
                   </p>
                 )}
               </div>
+
+              {isAdmin && (
+                <div className="w-full md:w-auto mt-4 md:mt-0 md:ml-auto flex justify-center md:justify-end animate-in fade-in slide-in-from-right-4 duration-500">
+                  <Button
+                    onClick={() => setAdminModalOpen(true)}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white gap-2 shadow-lg shadow-purple-500/20 px-6 transition-all hover:scale-105"
+                  >
+                    <PlusCircle size={20} />
+                    Novo Comunicado
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Grid de Tiles */}
@@ -1794,6 +1830,20 @@ export default function Dashboard() {
         isOpen={warningModalOpen}
         onClose={() => setWarningModalOpen(false)}
         type={playerCountWarning.type}
+      />
+
+      <AdminAnnouncementModal
+        isOpen={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+      />
+
+      {/* Dashboard Auto-Popup Inbox */}
+      <InboxModal
+        isOpen={dashboardInboxOpen}
+        onClose={() => setDashboardInboxOpen(false)}
+        announcements={inboxAnnouncements}
+        onMarkAsRead={markAsRead}
+        onVote={votePoll}
       />
     </div>
   )

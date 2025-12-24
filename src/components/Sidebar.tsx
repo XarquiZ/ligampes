@@ -19,8 +19,11 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Trophy,
-  ScrollText
+  ScrollText,
+  Inbox
 } from 'lucide-react'
+import InboxModal from './inbox/InboxModal'
+import { useInbox } from '@/hooks/useInbox'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import Image from 'next/image'
@@ -46,7 +49,14 @@ interface SidebarProps {
   } | null
 }
 
+
 const navigationItems = [
+  {
+    name: 'Inbox',
+    href: '#inbox',
+    icon: Inbox,
+    color: 'text-orange-400'
+  },
   {
     name: 'Dashboard',
     href: '/dashboard',
@@ -102,6 +112,10 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
   const router = useRouter()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState<boolean | null>(null)
+
+  // Inbox State
+  const [isInboxOpen, setIsInboxOpen] = useState(false)
+  const { announcements, unreadCount, markAsRead, votePoll } = useInbox(user, team)
 
   // Efeito para carregar o estado salvo do localStorage
   useEffect(() => {
@@ -329,14 +343,18 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  onClick={() => {
+                  onClick={(e) => {
+                    if (item.name === 'Inbox') {
+                      e.preventDefault()
+                      setIsInboxOpen(true)
+                    }
                     if (window.innerWidth < 1024) {
                       setIsMobileOpen(false)
                       setIsCollapsed(true)
                     }
                   }}
                   className={cn(
-                    "flex items-center rounded-lg transition-all duration-200 group",
+                    "flex items-center rounded-lg transition-all duration-200 group relative",
                     "hover:bg-white/5 hover:text-white",
                     isActive
                       ? 'bg-white/10 text-white shadow-md'
@@ -345,11 +363,18 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
                   )}
                   title={isCollapsed ? item.name : ''}
                 >
-                  <Icon className={cn(
-                    "flex-shrink-0",
-                    isCollapsed ? 'h-5 w-5' : 'h-5 w-5',
-                    item.color
-                  )} />
+                  <div className="relative">
+                    <Icon className={cn(
+                      "flex-shrink-0",
+                      isCollapsed ? 'h-5 w-5' : 'h-5 w-5',
+                      item.color
+                    )} />
+                    {item.name === 'Inbox' && unreadCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
 
                   {!isCollapsed && (
                     <>
@@ -392,6 +417,15 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
           "hidden lg:block transition-all duration-300",
           isCollapsed ? "w-16" : "w-64"
         )}
+      />
+
+      {/* Inbox Modal */}
+      <InboxModal
+        isOpen={isInboxOpen}
+        onClose={() => setIsInboxOpen(false)}
+        announcements={announcements}
+        onMarkAsRead={markAsRead}
+        onVote={votePoll}
       />
     </>
   )
