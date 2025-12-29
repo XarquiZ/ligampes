@@ -793,39 +793,10 @@ export default function PaginaTransferencias() {
       }))
 
       setMarketPlayers(formattedData)
+      setMarketPlayers(formattedData)
     } catch (error) {
       console.error('Erro ao carregar mercado:', error)
-      try {
-        const { data } = await supabase
-          .from('market_listings')
-          .select('*')
-          .eq('is_active', true)
-          .neq('team_id', team.id)
-          .order('created_at', { ascending: false })
-
-        if (data && data.length > 0) {
-          const teamIds = [...new Set(data.map(item => item.team_id))]
-          const { data: teamsData } = await supabase
-            .from('teams')
-            .select('id, name, logo_url')
-            .in('id', teamIds)
-
-          const teamsMap = new Map(
-            teamsData?.map(team => [team.id, team]) || []
-          )
-
-          const formattedData = data.map(item => ({
-            ...item,
-            team_name: teamsMap.get(item.team_id)?.name || 'Time desconhecido',
-            team_logo: teamsMap.get(item.team_id)?.logo_url || null,
-            player: undefined
-          }))
-
-          setMarketPlayers(formattedData)
-        }
-      } catch (fallbackError) {
-        console.error('Erro no fallback:', fallbackError)
-      }
+      setMarketPlayers([])
     } finally {
       setLoadingMarket(false)
     }
