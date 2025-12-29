@@ -9,19 +9,26 @@ export async function generateMetadata({ params }: { params: Promise<{ site: str
     const { site } = await params
     const supabase = await createClient()
 
-    const { data: organization } = await supabase
+    console.log(`[Metadata Debug] Fetching for site: ${site}`)
+
+    const { data: organization, error } = await supabase
         .from('organizations')
         .select('name, description, logo_url')
         .eq('slug', site)
         .single()
 
+    if (error) {
+        // Stringify usage to reveal hidden properties of the error object
+        console.error(`[Metadata Debug] Error fetching organization:`, JSON.stringify(error, null, 2))
+    }
+
     if (organization) {
+        console.log(`[Metadata Debug] Found organization:`, organization.name)
         return {
             title: organization.name,
             description: organization.description || `Campeonato oficial ${organization.name}`,
             icons: {
-                icon: organization.logo_url || "/favicon.ico", // Tenta usar o logo da org, senão fallback
-                // Mantém os outros caso queira, ou simplifica
+                icon: organization.logo_url || "/favicon.ico",
             }
         }
     }

@@ -6,12 +6,18 @@ export async function GET(request: Request) {
   const code = requestUrl.searchParams.get('code')
   const error = requestUrl.searchParams.get('error')
 
+  // Determine the correct origin (handling proxies/vercel dev)
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
+  const protocol = request.headers.get('x-forwarded-proto') || 'http'
+  const origin = `${protocol}://${host}`
+
   console.log('[Callback] Code:', code)
   console.log('[Callback] Error:', error)
+  console.log('[Callback] Detected Origin:', origin)
 
   if (error) {
     console.error('[Callback] Erro do OAuth:', error)
-    return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
+    return NextResponse.redirect(`${origin}/login?error=auth_failed`)
   }
 
   if (code) {
@@ -21,18 +27,17 @@ export async function GET(request: Request) {
 
       if (authError) {
         console.error('[Callback] Erro ao trocar código por sessão:', authError)
-        return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
+        return NextResponse.redirect(`${origin}/login?error=auth_failed`)
       }
 
       console.log('[Callback] Autenticação bem-sucedida')
-      // O Supabase já setou os cookies automaticamente via helpers
-      return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
+      return NextResponse.redirect(`${origin}/dashboard`)
 
     } catch (error) {
       console.error('[Callback] Erro inesperado:', error)
-      return NextResponse.redirect(`${requestUrl.origin}/login?error=auth_failed`)
+      return NextResponse.redirect(`${origin}/login?error=auth_failed`)
     }
   }
 
-  return NextResponse.redirect(`${requestUrl.origin}/login`)
+  return NextResponse.redirect(`${origin}/login`)
 }

@@ -53,11 +53,13 @@ export default function LoginPage() {
     try {
       // Limpa estado anterior
       await supabase.auth.signOut()
-      const siteUrl = getSiteUrl()
+
+      // Use window.location.origin to ensure we redirect back to the current domain
+      const currentOrigin = window.location.origin
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${siteUrl}/api/auth/callback`,
+          redirectTo: `${currentOrigin}/api/auth/callback`,
           // Força o Supabase a usar nossa URL como site_url
           skipBrowserRedirect: false,
           queryParams: {
@@ -66,8 +68,8 @@ export default function LoginPage() {
           }
         },
       })
-      
-      console.log('[Login] Redirect URL configurada:', `${siteUrl}/api/auth/callback`)
+
+      console.log('[Login] Redirect URL configurada:', `${currentOrigin}/api/auth/callback`)
 
       if (error) {
         console.error('[Login] Erro no OAuth:', error)
@@ -104,9 +106,9 @@ export default function LoginPage() {
           <p className="text-zinc-400 text-lg">
             Faça login para gerenciar seu time
           </p>
-          <Button 
-            onClick={handleGoogleLogin} 
-            size="lg" 
+          <Button
+            onClick={handleGoogleLogin}
+            size="lg"
             className="w-full text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
           >
             Entrar com Google

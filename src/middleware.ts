@@ -4,7 +4,21 @@ import type { NextRequest } from 'next/server'
 
 export async function middleware(req: NextRequest) {
   const url = req.nextUrl
-  const hostname = req.headers.get('host') || ''
+  let hostname = req.headers.get('host') || ''
+
+  // Suporte a headers de proxy (Vercel, Nginx, etc)
+  const forwardedHost = req.headers.get('x-forwarded-host')
+  if (forwardedHost && !forwardedHost.includes('localhost:3000')) {
+    hostname = forwardedHost
+  }
+
+  // Para Vercel Dev local, às vezes o host vem como localhost:3000 mesmo com subdomínio no navegador?
+  // Ou usamos o url.host?
+  if (process.env.NODE_ENV === 'development') {
+    // Em dev local, confia no header host do navegador
+    // mas se estiver usando 'vercel dev', o x-forwarded-host pode ser útil
+    if (forwardedHost) hostname = forwardedHost
+  }
 
   // 1. Definições de Domínios
   // Domínios que DEVEM ir para a Landing Page (app/page.tsx)
@@ -58,6 +72,7 @@ export async function middleware(req: NextRequest) {
   await supabase.auth.getUser()
 
   // 3. Lógica de Subdomínio e Rewrites (Multi-Tenant)
+  console.log('[Middleware] Debug Hostname:', hostname)
 
   // Ignorar arquivos estáticos e APIs internas
   if (
@@ -85,14 +100,33 @@ export async function middleware(req: NextRequest) {
   if (LEGACY_DOMAINS[hostname]) {
     currentSite = LEGACY_DOMAINS[hostname]
   } else {
-    // Tenta extrair o subdomínio
-    // Ex: mpes.localhost:3000 -> mpes
-    // Ex: mpes.minhaligavirtual.com -> mpes
-    const subdomain = hostname.split('.')[0]
+    // Lógica para Localhost e Vercel Preview
+    if (hostname.includes('.localhost')) {
+      // Ex: mpes.localhost:3000 -> mpes
+      const parts = hostname.split('.localhost')
+      currentSite = parts[0]
+    } else if (hostname.endsWith('.vercel.app')) {
+      // Ex: mpes.vercel.app -> mpes
+      // Cuidado com: ligampes.vercel.app (já tratado no LEGACY)
+      const parts = hostname.split('.vercel.app')
+      currentSite = parts[0]
+    } else {
+      // Domínios customizados (ex: app.minhaligavirtual.com)
+      const subdomain = hostname.split('.')[0]
+      currentSite = subdomain
+    }
 
-    // Proteção: se o hostname for algo maluco ou IP, assume 'mpes' ou erro?
-    // Vamos assumir o subdomain como slug
-    currentSite = subdomain
+    // Proteção final: Se cair aqui e for um IP ou algo estranho
+    if (!currentSite || currentSite.includes(':') || currentSite.startsWith('[') || currentSite === 'localhost') {
+      // Se não conseguiu extrair um subdomínio válido e não é ROOT, manda para login ou 404
+      // Mas para evitar o erro [::1], vamos forçar 'mpes' se for desenvolvimento local sem subdomínio explicito que escapou
+      if (process.env.NODE_ENV === 'development') {
+        // Fallback seguro apenas para evitar crash local
+        console.warn('[Middleware] Hostname estranho detectado:', hostname, '-> Redirecionando para ROOT')
+        return response
+      }
+      return response // Retorna para a home se não identificar subdomínio
+    }
   }
 
   // 4. Reescrever a URL para rota dinâmica
@@ -116,6 +150,6 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json).*)',
   ],
 }

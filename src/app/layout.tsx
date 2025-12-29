@@ -55,13 +55,12 @@ export default function RootLayout({
         {/* Meta tags específicas para iOS */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="LIGA MPES" />
+        <meta name="apple-mobile-web-app-title" content="LIGA.ON" />
 
         {/* Meta tag para Android */}
         <meta name="theme-color" content="#000000" />
 
-        {/* Link tags manuais (opcional, já coberto pelo metadata) */}
-        <link rel="manifest" href="/manifest.json" />
+
       </head>
       <body className={inter.className + " bg-zinc-950 text-white min-h-screen"}>
         <Providers>
