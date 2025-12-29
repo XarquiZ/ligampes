@@ -21,6 +21,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import React from 'react'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { FeatureShowcase } from '@/components/landing/FeatureShowcase'
 
 export default function LandingPage() {
   return (
@@ -522,8 +523,8 @@ function FeatureShowcase() {
             key={index}
             onClick={() => setActiveFeature(index)}
             className={`text-left p-4 rounded-xl transition-all duration-300 border flex items-center gap-4 group ${activeFeature === index
-                ? "bg-green-500/10 border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
-                : "bg-zinc-950/50 border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700"
+              ? "bg-green-500/10 border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
+              : "bg-zinc-950/50 border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700"
               }`}
           >
             <div className={`p-2 rounded-lg ${activeFeature === index ? "bg-green-500 text-zinc-950" : "bg-zinc-900 text-zinc-500 group-hover:text-zinc-300"}`}>
