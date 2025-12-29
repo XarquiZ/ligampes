@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import JogoCard from "./calendario/JogoCard";
@@ -33,6 +34,7 @@ interface Jogo {
 }
 
 export default function Calendario() {
+  const { organization } = useOrganization();
   const [serie, setSerie] = useState<'A' | 'B'>('A');
   const [rodada, setRodada] = useState<number>(1);
   const [jogos, setJogos] = useState<Jogo[]>([]);
@@ -52,6 +54,7 @@ export default function Calendario() {
           time_fora:away_team_id(id, name, logo_url)
         `)
         .eq('divisao', serie)
+        .eq('organization_id', organization?.id)
         .eq('round', rodada)
         .order('date', { ascending: true })
         .order('time', { ascending: true });
@@ -73,6 +76,7 @@ export default function Calendario() {
           .from('matches')
           .select('round')
           .eq('divisao', serie)
+          .eq('organization_id', organization?.id)
           .order('round', { ascending: true });
 
         if (error) throw error;
@@ -93,13 +97,17 @@ export default function Calendario() {
       }
     };
 
-    loadRodadasDisponiveis();
-  }, [serie, rodada]);
+    if (organization?.id) {
+      loadRodadasDisponiveis();
+    }
+  }, [serie, rodada, organization?.id]);
 
   // Carregar jogos baseado na série e rodada selecionada
   useEffect(() => {
-    loadJogos();
-  }, [serie, rodada]);
+    if (organization?.id) {
+      loadJogos();
+    }
+  }, [serie, rodada, organization?.id]);
 
   // Quando mudar a série, resetar para a primeira rodada disponível
   useEffect(() => {
@@ -182,7 +190,7 @@ export default function Calendario() {
                 data: jogo.date,
                 hora: jogo.time,
                 rodada: jogo.round,
-                serie: jogo.divisao,
+                divisao: jogo.divisao,
                 status: getStatusTraduzido(jogo.status),
                 placar_casa: jogo.home_score,
                 placar_fora: jogo.away_score,

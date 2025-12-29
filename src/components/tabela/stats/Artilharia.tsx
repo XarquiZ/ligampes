@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
 import Image from "next/image";
 import { useRouter } from 'next/navigation';
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 import { ChevronDown } from "lucide-react";
 
@@ -19,6 +20,7 @@ interface Artilheiro {
 }
 
 export default function Artilharia() {
+  const { organization } = useOrganization();
   const router = useRouter();
   const [artilheiros, setArtilheiros] = useState<Artilheiro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +36,8 @@ export default function Artilharia() {
       const { data: timesDivisao, error: timesError } = await supabase
         .from('teams')
         .select('id, name, divisao')
-        .eq('divisao', divisao);
+        .eq('divisao', divisao)
+        .eq('organization_id', organization?.id);
 
       if (timesError) throw timesError;
 
@@ -143,8 +146,10 @@ export default function Artilharia() {
   };
 
   useEffect(() => {
-    fetchArtilheiros(divisaoAtiva);
-  }, [divisaoAtiva]);
+    if (organization?.id) {
+      fetchArtilheiros(divisaoAtiva);
+    }
+  }, [divisaoAtiva, organization?.id]);
 
   const getPositionClasses = (index: number) => {
     switch (index) {

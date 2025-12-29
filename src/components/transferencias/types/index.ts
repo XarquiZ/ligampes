@@ -75,6 +75,7 @@ export interface Transfer {
   transfer_players?: string[]
   player_names?: string[]
   player_values?: number[]
+  money_direction?: 'send' | 'receive'
 }
 
 // Interface para criar anúncio

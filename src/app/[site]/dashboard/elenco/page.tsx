@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState, useCallback, useMemo } from "react"
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { supabase } from "@/lib/supabase"
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
 import FloatingChatButton from '@/components/FloatingChatButton'
 import ChatPopup from '@/components/Chatpopup'
+import { useOrganization } from '@/contexts/OrganizationContext'
 
 // Componentes importados
 import { PlayerCard } from '@/components/elenco/PlayerCard'
@@ -28,6 +29,8 @@ import { Player, Team, POSITIONS, PLAYSTYLES } from '@/components/elenco/types'
 export default function ElencoPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { organization } = useOrganization()
+
   const { user, loading: authLoading } = useAuth()
   const [players, setPlayers] = useState<Player[]>([])
   const [favoritePlayers, setFavoritePlayers] = useState<Player[]>([])
@@ -74,6 +77,9 @@ export default function ElencoPage() {
     }
   }, [])
 
+  // Carregar Organização Atual - Removido pois usamos o Contexto agora
+  // useEffect anterior removido
+
   useEffect(() => {
     const section = searchParams.get('section')
     if (section && ['elenco', 'favoritos', 'comparacao', 'planejador'].includes(section)) {
@@ -109,7 +115,7 @@ export default function ElencoPage() {
 
         if (!profileError) {
           setProfile(profileData)
-          setTeam(profileData?.teams || null)
+          setTeam((profileData?.teams as unknown as Team) || null)
           setTeamId(profileData?.teams?.id || null)
         }
       } catch (error) {
@@ -127,16 +133,19 @@ export default function ElencoPage() {
       const { data } = await supabase
         .from('players')
         .select('*')
+        .eq('organization_id', organization?.id)
         .order('overall', { ascending: false })
 
       setAllPlayers(data || [])
     } catch (error) {
       console.error('Erro ao carregar todos os jogadores:', error)
     }
-  }, [])
+  }, [organization?.id])
 
   const loadFavoritePlayers = useCallback(async () => {
     if (!user) return
+
+    let favoriteIds: string[] = []
 
     try {
       const { data: favoritesData, error: favoritesError } = await supabase
@@ -149,7 +158,7 @@ export default function ElencoPage() {
         return
       }
 
-      const favoriteIds = favoritesData.map(fav => fav.player_id)
+      favoriteIds = favoritesData.map(fav => fav.player_id)
 
       if (favoriteIds.length === 0) {
         setFavoritePlayers([])
@@ -176,6 +185,7 @@ export default function ElencoPage() {
           )
         `)
         .in('id', favoriteIds)
+        .eq('organization_id', organization?.id)
 
       if (!playersError) {
         const playersWithFavorites = (playersData || []).map(player => {
@@ -204,14 +214,15 @@ export default function ElencoPage() {
         const { data: playersData, error: playersError } = await supabase
           .from('players')
           .select(`
-            *,
-            teams (
-              id,
-              name,
-              logo_url
-            )
+        *,
+        teams (
+          id,
+          name,
+          logo_url
+        )
           `)
           .in('id', favoriteIds)
+          .eq('organization_id', organization?.id)
 
         if (!playersError) {
           const playersWithFavorites = (playersData || []).map(player => ({
@@ -233,7 +244,7 @@ export default function ElencoPage() {
         console.error('Erro no fallback de favoritos:', fallbackError)
       }
     }
-  }, [user])
+  }, [user, organization?.id])
 
   useEffect(() => {
     if (!user?.id) return
@@ -243,7 +254,7 @@ export default function ElencoPage() {
         const { data: conversations } = await supabase
           .from('conversations')
           .select('id')
-          .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+          .or(`user1_id.eq.${user.id}, user2_id.eq.${user.id} `)
 
         if (!conversations?.length) {
           setUnreadCount(0)
@@ -295,17 +306,18 @@ export default function ElencoPage() {
       const { data } = await supabase
         .from('players')
         .select(`
-          *,
-          player_stats (
-            gols,
-            assistencias,
-            cartoes_amarelos,
-            cartoes_vermelhos,
-            jogos,
-            avg_rating
-          )
+        *,
+        player_stats(
+          gols,
+          assistencias,
+          cartoes_amarelos,
+          cartoes_vermelhos,
+          jogos,
+          avg_rating
+        )
         `)
         .eq('team_id', teamId)
+        .eq('organization_id', organization?.id)
 
       const mapped = (data || []).map((p: any) => {
         const stats = p.player_stats?.[0] || {}; // Pega o primeiro registro de estatísticas
@@ -349,6 +361,7 @@ export default function ElencoPage() {
           .from('players')
           .select('*')
           .eq('team_id', teamId)
+          .eq('organization_id', organization?.id)
 
         const mapped = (data || []).map((p: any) => ({
           ...p,
@@ -388,30 +401,35 @@ export default function ElencoPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase, teamId, team])
+  }, [supabase, teamId, team, organization?.id])
 
   const loadAllTeams = useCallback(async () => {
     try {
       const { data } = await supabase
         .from('teams')
         .select('id, name, logo_url')
+        .eq('organization_id', organization?.id)
         .order('name')
 
       setAllTeams(data || [])
     } catch (e) {
       console.error('Erro ao carregar times:', e)
     }
-  }, [supabase])
+  }, [supabase, organization?.id])
 
   useEffect(() => {
-    loadAllTeams()
-    loadAllPlayers()
-  }, [loadAllTeams, loadAllPlayers])
+    if (organization?.id) {
+      loadAllTeams()
+      loadAllPlayers()
+    }
+  }, [loadAllTeams, loadAllPlayers, organization?.id])
 
   useEffect(() => {
-    loadPlayers()
-    loadFavoritePlayers()
-  }, [loadPlayers, loadFavoritePlayers])
+    if (organization?.id) {
+      loadPlayers()
+      loadFavoritePlayers()
+    }
+  }, [loadPlayers, loadFavoritePlayers, organization?.id])
 
   const handleSellPlayer = (player: Player) => {
     setSelectedPlayer(player)
@@ -610,7 +628,8 @@ export default function ElencoPage() {
             type: 'credit',
             description: `Dispensa de jogador - ${playerName}`,
             created_at: new Date().toISOString(),
-            player_name: playerName
+            player_name: playerName,
+            organization_id: organization?.id
           }])
       } catch (balanceError) {
         console.warn('⚠️ Aviso: Não foi possível registrar transação de saldo:', balanceError)
@@ -654,7 +673,7 @@ export default function ElencoPage() {
 
         await supabase
           .from('player_transfers')
-          .insert([transferPayload])
+          .insert([{ ...transferPayload, organization_id: organization?.id }])
       } catch (transferError) {
         console.warn('⚠️ Aviso: Erro no registro de transferência:', transferError)
       }
@@ -714,7 +733,7 @@ export default function ElencoPage() {
 
       const { data, error } = await supabase
         .from('player_transfers')
-        .insert([transferPayload])
+        .insert([{ ...transferPayload, organization_id: organization?.id }])
         .select()
 
       if (error) {

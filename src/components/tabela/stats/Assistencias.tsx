@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import Image from "next/image";
 
 import { ChevronDown } from "lucide-react";
@@ -19,6 +20,7 @@ interface Assistente {
 }
 
 export default function Assistencias() {
+  const { organization } = useOrganization();
   const [assistentes, setAssistentes] = useState<Assistente[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataAtualizacao, setDataAtualizacao] = useState<string>('');
@@ -33,7 +35,8 @@ export default function Assistencias() {
       const { data: timesDivisao, error: timesError } = await supabase
         .from('teams')
         .select('id, name, divisao')
-        .eq('divisao', divisao);
+        .eq('divisao', divisao)
+        .eq('organization_id', organization?.id);
 
       if (timesError) throw timesError;
 
@@ -145,8 +148,10 @@ export default function Assistencias() {
   };
 
   useEffect(() => {
-    fetchAssistencias(divisaoAtiva);
-  }, [divisaoAtiva]);
+    if (organization?.id) {
+      fetchAssistencias(divisaoAtiva);
+    }
+  }, [divisaoAtiva, organization?.id]);
 
   if (loading) {
     return (

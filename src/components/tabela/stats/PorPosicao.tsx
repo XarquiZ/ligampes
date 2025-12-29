@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import Image from "next/image";
 
 import { ChevronDown } from "lucide-react";
@@ -42,6 +43,7 @@ const POSITION_NAMES: Record<string, string> = {
 };
 
 export default function PorPosicao() {
+  const { organization } = useOrganization();
   const [jogadores, setJogadores] = useState<JogadorRating[]>([]);
   const [loading, setLoading] = useState(true);
   const [divisaoAtiva, setDivisaoAtiva] = useState<"A" | "B">("A");
@@ -59,7 +61,8 @@ export default function PorPosicao() {
       const { data: timesDivisao, error: timesError } = await supabase
         .from('teams')
         .select('id, name, divisao')
-        .eq('divisao', divisao);
+        .eq('divisao', divisao)
+        .eq('organization_id', organization?.id);
 
       if (timesError) throw timesError;
 
@@ -202,8 +205,10 @@ export default function PorPosicao() {
 
   // Efeito para buscar dados quando a divisão muda
   useEffect(() => {
-    fetchMelhoresPorPosicao(divisaoAtiva);
-  }, [divisaoAtiva]);
+    if (organization?.id) {
+      fetchMelhoresPorPosicao(divisaoAtiva);
+    }
+  }, [divisaoAtiva, organization?.id]);
 
   // Efeito para filtrar quando a posição muda
   useEffect(() => {

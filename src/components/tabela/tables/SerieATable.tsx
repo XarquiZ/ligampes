@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import TeamRow from "./TeamRow";
 import { supabase } from "@/lib/supabase";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 interface Team {
   id: string;
@@ -22,6 +23,7 @@ interface Team {
 }
 
 export default function SerieATable() {
+  const { organization } = useOrganization();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,6 +47,7 @@ export default function SerieATable() {
         .from('teams')
         .select('id, name, logo_url, divisao')
         .eq('divisao', 'A')
+        .eq('organization_id', organization?.id)
         .order('name');
 
       if (teamsError) throw teamsError;

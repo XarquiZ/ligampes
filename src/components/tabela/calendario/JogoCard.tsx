@@ -33,6 +33,7 @@ interface JogoCardProps {
     placar_fora?: number;
     video_url?: string;
     stadium?: string; // Novo campo para o estádio
+    divisao: 'A' | 'B';
   };
 }
 
@@ -43,9 +44,9 @@ export default function JogoCard({ jogo }: JogoCardProps) {
   const { user } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  
+
   const dataFormatada = format(new Date(jogo.data), "dd 'de' MMMM", { locale: ptBR });
-  
+
   // Verificar se o usuário é admin com CACHE
   useEffect(() => {
     if (!user) {
@@ -56,27 +57,34 @@ export default function JogoCard({ jogo }: JogoCardProps) {
     const verifyAdmin = async () => {
       // Se já temos o resultado para este usuário em memória, usamos imediatamente
       if (adminCheckCache.has(user.id)) {
-        const isUserAdmin = await adminCheckCache.get(user.id);
-        setIsAdmin(!!isUserAdmin);
-        return;
+        const cachedPromise = adminCheckCache.get(user.id);
+        if (cachedPromise) {
+          const isUserAdmin = await cachedPromise;
+          setIsAdmin(isUserAdmin);
+          return;
+        }
       }
 
       // Se não, criamos a promessa e salvamos no cache
-      const checkPromise = supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-        .then(({ data, error }) => {
+      const checkPromise = (async (): Promise<boolean> => {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
           if (!error && data) {
             return data.role === 'admin';
           }
           return false;
-        })
-        .catch(() => false);
+        } catch {
+          return false;
+        }
+      })();
 
       adminCheckCache.set(user.id, checkPromise);
-      
+
       const result = await checkPromise;
       setIsAdmin(result);
     };
@@ -224,12 +232,12 @@ export default function JogoCard({ jogo }: JogoCardProps) {
               {/* Usando o estádio do jogo se disponível, caso contrário usa o padrão */}
               {jogo.stadium || "Estádio Virtual Parsec"}
             </div>
-            
+
             {/* Botão de Assistir */}
             {jogo.video_url && (
-              <Button 
-                variant="outline" 
-                size="sm" 
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleWatchGame}
                 className="h-8 gap-2 border-red-900/30 bg-red-950/20 text-red-400 hover:bg-red-900/40 hover:text-red-300 w-full mt-1"
               >
@@ -251,9 +259,9 @@ export default function JogoCard({ jogo }: JogoCardProps) {
             date: jogo.data,
             time: jogo.hora,
             round: jogo.rodada,
-            divisao: 'A',
-            status: jogo.status === 'agendado' ? 'scheduled' : 
-                    jogo.status === 'em_andamento' ? 'in_progress' : 'finished',
+            divisao: jogo.divisao,
+            status: jogo.status === 'agendado' ? 'scheduled' :
+              jogo.status === 'em_andamento' ? 'in_progress' : 'finished',
             home_score: jogo.placar_casa,
             away_score: jogo.placar_fora,
             home_team_id: jogo.time_casa.id,

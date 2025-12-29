@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import FloatingChatButton from '@/components/FloatingChatButton'
 import ChatPopup from '@/components/Chatpopup'
+import { useOrganization } from '@/contexts/OrganizationContext'
 
 // Importando componentes modulares
 import {
@@ -36,7 +37,7 @@ const POSITIONS = [
   { value: 'MLG', label: 'MLG' },
   { value: 'MLE', label: 'MLE' },
   { value: 'MLD', label: 'MLD' },
-  { value: 'MAT', label: 'MAT' }, 
+  { value: 'MAT', label: 'MAT' },
   { value: 'PTE', label: 'PTE' },
   { value: 'PTD', label: 'PTD' },
   { value: 'SA', label: 'SA' },
@@ -56,9 +57,10 @@ const OVERALL_OPTIONS = [
 ]
 
 export default function PaginaTransferencias() {
+  const { organization } = useOrganization()
   const router = useRouter()
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
-  
+
   // Estados para Transferências
   const [transfers, setTransfers] = useState<Transfer[]>([])
   const [allTransfers, setAllTransfers] = useState<Transfer[]>([])
@@ -66,7 +68,7 @@ export default function PaginaTransferencias() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'pending' | 'completed'>('pending')
-  const [exchangePlayersDetails, setExchangePlayersDetails] = useState<{[key: string]: any[]}>({})
+  const [exchangePlayersDetails, setExchangePlayersDetails] = useState<{ [key: string]: any[] }>({})
   const [user, setUser] = useState<UserProfile | null>(null)
   const [profile, setProfile] = useState<any>(null)
   const [team, setTeam] = useState<Team | null>(null)
@@ -108,10 +110,10 @@ export default function PaginaTransferencias() {
   // Carregar dados do usuário e time
   useEffect(() => {
     loadUserData()
-    
+
     const subscription = supabase
       .channel('transferencias')
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'player_transfers' },
         () => {
           if (activeView === 'transferencias') {
@@ -119,7 +121,7 @@ export default function PaginaTransferencias() {
           }
         }
       )
-      .on('postgres_changes', 
+      .on('postgres_changes',
         { event: '*', schema: 'public', table: 'market_listings' },
         () => {
           if (activeView === 'mercado') {
@@ -142,9 +144,10 @@ export default function PaginaTransferencias() {
       try {
         const { data, error } = await supabase
           .from('teams')
-          .select('id, name, logo_url')
+          .select('id, name, logo_url, balance')
+          .eq('organization_id', organization?.id)
           .order('name')
-        
+
         if (error) {
           console.error('Erro ao carregar times:', error)
         } else {
@@ -156,9 +159,11 @@ export default function PaginaTransferencias() {
         setLoadingTeams(false)
       }
     }
-    
-    loadTeams()
-  }, [])
+
+    if (organization?.id) {
+      loadTeams()
+    }
+  }, [organization?.id])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -177,7 +182,7 @@ export default function PaginaTransferencias() {
         }
 
         const conversationIds = conversations.map(conv => conv.id)
-        
+
         const { count } = await supabase
           .from('private_messages')
           .select('*', { count: 'exact', head: true })
@@ -218,7 +223,7 @@ export default function PaginaTransferencias() {
     if (selectedPlayer) {
       const basePrice = selectedPlayer.base_price
       const options = []
-      
+
       for (let i = 0; i < 100; i++) {
         const value = basePrice + (i * 1_000_000)
         options.push({
@@ -226,7 +231,7 @@ export default function PaginaTransferencias() {
           label: `R$ ${value.toLocaleString('pt-BR')}`
         })
       }
-      
+
       setPriceOptions(options)
       setMarketPrice(`R$ ${basePrice.toLocaleString('pt-BR')}`)
     }
@@ -235,18 +240,18 @@ export default function PaginaTransferencias() {
   // Filtrar transferências com base no time selecionado
   useEffect(() => {
     if (allTransfers.length > 0) {
-      let filtered = activeTab === 'pending' 
+      let filtered = activeTab === 'pending'
         ? allTransfers.filter(t => t.status === 'pending')
         : allTransfers.filter(t => t.status === 'approved')
 
       // Aplicar filtro de time apenas na aba "completed"
       if (activeTab === 'completed' && selectedTeamFilter) {
-        filtered = filtered.filter(transfer => 
-          transfer.from_team_id === selectedTeamFilter || 
+        filtered = filtered.filter(transfer =>
+          transfer.from_team_id === selectedTeamFilter ||
           transfer.to_team_id === selectedTeamFilter
         )
       }
-      
+
       setTransfers(filtered)
     }
   }, [activeTab, allTransfers, selectedTeamFilter])
@@ -280,23 +285,23 @@ export default function PaginaTransferencias() {
           case 'recent':
             // Mais recentes primeiro
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          
+
           case 'cheapest':
             // Menor preço primeiro
             return a.price - b.price
-          
+
           case 'expensive':
             // Maior preço primeiro
             return b.price - a.price
-          
+
           case 'highest_overall':
             // Maior Overall primeiro
             return (b.player?.overall || 0) - (a.player?.overall || 0)
-            
+
           case 'lowest_overall':
             // Menor Overall primeiro
             return (a.player?.overall || 0) - (b.player?.overall || 0)
-            
+
           default:
             return 0
         }
@@ -328,7 +333,7 @@ export default function PaginaTransferencias() {
         setProfile(profile)
         setUserTeamId(profile?.team_id || null)
         setIsAdmin(profile?.role === 'admin')
-        
+
         if (profile.teams) {
           setTeam(profile.teams)
         } else {
@@ -375,6 +380,7 @@ export default function PaginaTransferencias() {
           to_team:teams!to_team_id (id, name, logo_url, balance),
           player:players (id, name, photo_url, position)
         `)
+        .eq('organization_id', organization?.id)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -387,8 +393,8 @@ export default function PaginaTransferencias() {
       })) || []
 
       setAllTransfers(safeTransferData)
-      
-      const exchangeDetails: {[key: string]: any[]} = {}
+
+      const exchangeDetails: { [key: string]: any[] } = {}
       if (safeTransferData) {
         for (const transfer of safeTransferData) {
           if (transfer.is_exchange && transfer.exchange_players) {
@@ -397,19 +403,19 @@ export default function PaginaTransferencias() {
         }
       }
       setExchangePlayersDetails(exchangeDetails)
-      
-      let filtered = activeTab === 'pending' 
+
+      let filtered = activeTab === 'pending'
         ? safeTransferData.filter(t => t.status === 'pending')
         : safeTransferData.filter(t => t.status === 'approved')
 
       // Aplicar filtro de time apenas na aba "completed"
       if (activeTab === 'completed' && selectedTeamFilter) {
-        filtered = filtered.filter(transfer => 
-          transfer.from_team_id === selectedTeamFilter || 
+        filtered = filtered.filter(transfer =>
+          transfer.from_team_id === selectedTeamFilter ||
           transfer.to_team_id === selectedTeamFilter
         )
       }
-      
+
       setTransfers(filtered)
     } catch (error) {
       console.error('Erro ao carregar transferências:', error)
@@ -423,14 +429,14 @@ export default function PaginaTransferencias() {
   const checkAndExecuteTransfer = async (transfer: Transfer) => {
     try {
       if (transfer.approved_by_seller && transfer.approved_by_buyer && transfer.approved_by_admin) {
-        
+
         // VERIFICAÇÃO ESPECÍFICA PARA TROCAS COM DINHEIRO
         if (transfer.is_exchange && transfer.exchange_value && transfer.exchange_value > 0) {
           const moneyDirection = transfer.money_direction || 'send'
-          
+
           let teamToCheckId: string
           let teamToCheckName: string
-          
+
           // Identificar qual time precisa mandar dinheiro
           if (moneyDirection === 'send') {
             // Time de origem (quem está dando o jogador) precisa mandar dinheiro
@@ -438,10 +444,10 @@ export default function PaginaTransferencias() {
             teamToCheckName = transfer.from_team?.name || 'Time de origem'
           } else {
             // Time destino (quem está recebendo o jogador) precisa mandar dinheiro
-            teamToCheckId = transfer.to_team_id
+            teamToCheckId = transfer.to_team_id || '' // Garante string, validação ocorre depois
             teamToCheckName = transfer.to_team?.name || 'Time destino'
           }
-          
+
           // Verificar saldo do time que precisa mandar dinheiro
           const { data: teamData } = await supabase
             .from('teams')
@@ -452,7 +458,7 @@ export default function PaginaTransferencias() {
           if (teamData && teamData.balance < transfer.exchange_value) {
             const { error: rejectError } = await supabase
               .from('player_transfers')
-              .update({ 
+              .update({
                 status: 'rejected',
                 approved_by_seller: false,
                 approved_by_buyer: false,
@@ -466,21 +472,21 @@ export default function PaginaTransferencias() {
             return
           }
         }
-        
+
         if (transfer.is_exchange) {
           // Lógica para trocas (mantida)
           const { data: exchangePlayers } = await supabase
             .from('players')
             .select('id, team_id')
             .in('id', transfer.exchange_players || [])
-          
+
           const invalidPlayers = exchangePlayers?.filter(p => p.team_id !== transfer.to_team_id) || []
           if (invalidPlayers.length > 0) {
             alert('❌ Troca rejeita! Alguns jogadores não estão mais disponíveis no time.')
-            
+
             const { error: rejectError } = await supabase
               .from('player_transfers')
-              .update({ 
+              .update({
                 status: 'rejected',
                 approved_by_seller: false,
                 approved_by_buyer: false,
@@ -502,7 +508,7 @@ export default function PaginaTransferencias() {
           if (buyerTeam.balance < transfer.value) {
             const { error: rejectError } = await supabase
               .from('player_transfers')
-              .update({ 
+              .update({
                 status: 'rejected',
                 approved_by_seller: false,
                 approved_by_buyer: false,
@@ -527,10 +533,10 @@ export default function PaginaTransferencias() {
 
         const message = transfer.transfer_type === 'multi_sell'
           ? `✅ Venda múltipla concluída! ${processTransferResult.transferredCount} jogadores foram transferidos.`
-          : transfer.is_exchange 
-          ? '✅ Troca concluída com sucesso! Jogadores foram transferidos.'
-          : '✅ Transferência concluída com sucesso! Jogador foi transferido.'
-        
+          : transfer.is_exchange
+            ? '✅ Troca concluída com sucesso! Jogadores foram transferidos.'
+            : '✅ Transferência concluída com sucesso! Jogador foi transferido.'
+
         alert(message)
         loadData()
       }
@@ -662,16 +668,16 @@ export default function PaginaTransferencias() {
 
       const transferredCount = data?.transferred_count || 1;
 
-      return { 
-        success: true, 
+      return {
+        success: true,
         message: data?.message || 'Transferência concluída com sucesso',
         transferredCount: transferredCount
       }
 
     } catch (error: any) {
       console.error('Erro ao processar transferência completa:', error)
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: error.message || 'Erro desconhecido ao processar transferência'
       }
     }
@@ -706,7 +712,7 @@ export default function PaginaTransferencias() {
       setTransfers(updatedTransfers)
 
       // Verificar se todas as aprovações foram dadas
-      const allApproved = 
+      const allApproved =
         (type === 'seller' || updatedTransfer.approved_by_seller) &&
         (type === 'buyer' || updatedTransfer.approved_by_buyer) &&
         (type === 'admin' || updatedTransfer.approved_by_admin)
@@ -727,7 +733,7 @@ export default function PaginaTransferencias() {
     try {
       const { error } = await supabase
         .from('player_transfers')
-        .update({ 
+        .update({
           status: 'rejected',
           approved_by_seller: false,
           approved_by_buyer: false,
@@ -742,7 +748,7 @@ export default function PaginaTransferencias() {
 
       setTransfers(prev => prev.filter(t => t.id !== transferId))
       setAllTransfers(prev => prev.filter(t => t.id !== transferId))
-      
+
       alert('✅ Transferência cancelada com sucesso!')
     } catch (error) {
       console.error('Erro ao cancelar transferência:', error)
@@ -752,7 +758,7 @@ export default function PaginaTransferencias() {
 
   const loadMarketData = async () => {
     if (!team?.id) return
-    
+
     setLoadingMarket(true)
     try {
       const { data } = await supabase
@@ -775,6 +781,7 @@ export default function PaginaTransferencias() {
           )
         `)
         .eq('is_active', true)
+        .eq('organization_id', organization?.id)
         .neq('team_id', team.id)
         .order('created_at', { ascending: false })
 
@@ -826,7 +833,7 @@ export default function PaginaTransferencias() {
 
   const loadMyPlayers = useCallback(async () => {
     if (!team?.id) return
-    
+
     try {
       const { data: playersData } = await supabase
         .from('players')
@@ -907,7 +914,7 @@ export default function PaginaTransferencias() {
 
     const priceString = priceMatch[1].replace(/\./g, '').replace(',', '.')
     const price = parseFloat(priceString)
-    
+
     if (isNaN(price) || price <= 0) {
       alert('Preço inválido')
       return
@@ -948,12 +955,12 @@ export default function PaginaTransferencias() {
       setMarketDescription('')
       setShowAddForm(false)
       setShowDescriptionModal(false)
-      
-      alert(saleMode === 'fixed_price' 
-        ? '✅ Jogador anunciado com preço fixo no mercado!' 
+
+      alert(saleMode === 'fixed_price'
+        ? '✅ Jogador anunciado com preço fixo no mercado!'
         : '✅ Jogador anunciado para negociação no mercado!'
       )
-      
+
       await Promise.all([
         loadMarketData(),
         loadMyPlayers()
@@ -979,7 +986,7 @@ export default function PaginaTransferencias() {
 
       setMyMarketPlayers(prev => prev.filter(item => item.id !== listingId))
       setMarketPlayers(prev => prev.filter(item => item.id !== listingId))
-      
+
       alert('✅ Jogador removido do mercado com sucesso!')
     } catch (error: any) {
       console.error('Erro ao remover jogador:', error)
@@ -996,7 +1003,7 @@ export default function PaginaTransferencias() {
     try {
       const { error } = await supabase
         .from('market_listings')
-        .update({ 
+        .update({
           description: editDescriptionText.trim(),
           updated_at: new Date().toISOString()
         })
@@ -1004,12 +1011,12 @@ export default function PaginaTransferencias() {
 
       if (error) throw error
 
-      setMyMarketPlayers(prev => prev.map(item => 
-        item.id === listingId 
+      setMyMarketPlayers(prev => prev.map(item =>
+        item.id === listingId
           ? { ...item, description: editDescriptionText.trim() }
           : item
       ))
-      
+
       setEditingDescription(null)
       setEditDescriptionText('')
       alert('✅ Descrição atualizada com sucesso!')
@@ -1035,9 +1042,9 @@ export default function PaginaTransferencias() {
       return
     }
 
-    const isNegotiable = listing.description?.includes('[Aceita Propostas]') || 
-                        listing.description?.toLowerCase().includes('negoci') ||
-                        listing.description?.toLowerCase().includes('proposta')
+    const isNegotiable = listing.description?.includes('[Aceita Propostas]') ||
+      listing.description?.toLowerCase().includes('negoci') ||
+      listing.description?.toLowerCase().includes('proposta')
 
     if (isNegotiable) {
       try {
@@ -1057,8 +1064,8 @@ export default function PaginaTransferencias() {
             detail: {
               userId: sellerProfile.id,
               userName: sellerProfile.coach_name || sellerProfile.email,
-              teamName: sellerProfile.teams.name,
-              teamLogo: sellerProfile.teams.logo_url,
+              teamName: Array.isArray(sellerProfile.teams) ? sellerProfile.teams[0]?.name : (sellerProfile.teams as any)?.name,
+              teamLogo: Array.isArray(sellerProfile.teams) ? sellerProfile.teams[0]?.logo_url : (sellerProfile.teams as any)?.logo_url,
               playerName: listing.player_name,
               playerId: listing.player_id
             }
@@ -1131,7 +1138,7 @@ export default function PaginaTransferencias() {
         .eq('id', listing.id)
 
       alert('✅ Proposta de compra enviada! Aguarde a aprovação do vendedor.')
-      
+
       loadMarketData()
       setActiveView('transferencias')
     } catch (error: any) {
@@ -1195,7 +1202,7 @@ export default function PaginaTransferencias() {
   return (
     <div className="flex min-h-screen bg-zinc-950">
       {/* Sidebar - AGORA CONTROLA TUDO INTERNAMENTE */}
-      <Sidebar 
+      <Sidebar
         user={user!}
         profile={profile}
         team={team}
@@ -1204,14 +1211,14 @@ export default function PaginaTransferencias() {
       <div className="flex-1 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-4 md:p-8">
           {/* REMOVI O MOBILE HEADER - O Sidebar agora controla isso */}
-          
+
           <div className="mx-auto max-w-6xl">
             <h1 className="text-3xl md:text-5xl font-black text-white mb-2 text-center md:text-left">
               {activeView === 'transferencias' ? 'NEGOCIAÇÕES' : 'MERCADO'}
             </h1>
             <p className="text-zinc-400 mb-6 md:mb-8 text-center md:text-left text-sm md:text-base">
-              {activeView === 'transferencias' 
-                ? 'Gerencie todas as transferências' 
+              {activeView === 'transferencias'
+                ? 'Gerencie todas as transferências'
                 : 'Anuncie e compre jogadores'
               }
             </p>
@@ -1229,18 +1236,18 @@ export default function PaginaTransferencias() {
                         <Filter className="w-4 h-4 text-purple-400" />
                         <span className="text-sm text-zinc-300">Filtrar por time:</span>
                       </div>
-                      
+
                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-                        <Select 
-                          value={selectedTeamFilter || "all"} 
+                        <Select
+                          value={selectedTeamFilter || "all"}
                           onValueChange={(value) => setSelectedTeamFilter(value === "all" ? null : value)}
                         >
                           <SelectTrigger className="w-full sm:w-[250px] bg-zinc-800/50 border-zinc-700 hover:bg-zinc-800">
                             <SelectValue placeholder="Selecione um time" />
                           </SelectTrigger>
                           <SelectContent className="bg-zinc-900 border-zinc-700 max-h-60">
-                            <SelectItem 
-                              value="all" 
+                            <SelectItem
+                              value="all"
                               className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
                             >
                               <div className="flex items-center gap-2">
@@ -1259,15 +1266,15 @@ export default function PaginaTransferencias() {
                               </SelectItem>
                             ) : (
                               teams.map((team) => (
-                                <SelectItem 
-                                  key={team.id} 
+                                <SelectItem
+                                  key={team.id}
                                   value={team.id}
                                   className="focus:bg-purple-600 focus:text-white hover:bg-purple-600 hover:text-white transition-colors cursor-pointer text-white"
                                 >
                                   <div className="flex items-center gap-2">
                                     {team.logo_url ? (
-                                      <img 
-                                        src={team.logo_url} 
+                                      <img
+                                        src={team.logo_url}
                                         alt={team.name}
                                         className="w-5 h-5 rounded-full object-cover"
                                       />
@@ -1299,7 +1306,7 @@ export default function PaginaTransferencias() {
                         )}
                       </div>
                     </div>
-                    
+
                     {selectedTeamFilter && (
                       <div className="mt-3 pt-3 border-t border-zinc-700/30">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -1311,8 +1318,8 @@ export default function PaginaTransferencias() {
                                 return (
                                   <>
                                     {selectedTeam.logo_url ? (
-                                      <img 
-                                        src={selectedTeam.logo_url} 
+                                      <img
+                                        src={selectedTeam.logo_url}
                                         alt={selectedTeam.name}
                                         className="w-4 h-4 rounded-full"
                                       />
@@ -1372,9 +1379,9 @@ export default function PaginaTransferencias() {
                         <Filter className="w-4 h-4 text-blue-400" />
                         <span className="text-sm text-zinc-300">Filtrar jogadores disponíveis:</span>
                       </div>
-                      
+
                       <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 w-full lg:w-auto">
-                        
+
                         {/* Filtro de Posições (Multi-select) */}
                         <div className="w-full sm:w-auto">
                           <Select>
@@ -1387,7 +1394,7 @@ export default function PaginaTransferencias() {
                               </div>
                             </SelectTrigger>
                             <SelectContent className="bg-zinc-900 border-zinc-700 max-h-96 w-[calc(100vw-2rem)] sm:w-auto">
-                              <div 
+                              <div
                                 className="flex items-center justify-between px-2 py-2 cursor-pointer hover:bg-blue-600/30 rounded-md"
                                 onClick={toggleAllPositions}
                               >
@@ -1466,13 +1473,13 @@ export default function PaginaTransferencias() {
                         )}
                       </div>
                     </div>
-                    
+
                     {(selectedPositions.length > 0 || selectedSort !== 'recent' || selectedMinOverall !== 'all') && (
                       <div className="mt-3 pt-3 border-t border-zinc-700/30">
                         <div className="flex flex-col gap-2">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="text-xs text-zinc-400">Filtros ativos:</span>
-                            
+
                             {selectedPositions.length > 0 && (
                               <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/30 text-xs">
                                 {selectedPositions.length} Posições
@@ -1493,7 +1500,7 @@ export default function PaginaTransferencias() {
                                 {selectedSort === 'lowest_overall' && 'Pior OVR'}
                               </Badge>
                             )}
-                            
+
                             <span className="text-xs text-zinc-500 ml-auto">
                               ({filteredMarketPlayers.length} de {marketPlayers.length})
                             </span>
@@ -1543,13 +1550,13 @@ export default function PaginaTransferencias() {
 
         {user && team && (
           <>
-            <FloatingChatButton 
+            <FloatingChatButton
               currentUser={chatUser}
               currentTeam={chatTeam}
               unreadCount={unreadCount}
               onOpenChat={() => setIsChatOpen(true)}
             />
-            
+
             <ChatPopup
               isOpen={isChatOpen}
               onClose={() => setIsChatOpen(false)}

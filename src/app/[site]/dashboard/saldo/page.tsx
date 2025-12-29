@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { DollarSign, TrendingUp, TrendingDown, Plus, Minus, Building2, Calendar, User, ArrowUpRight, ArrowDownLeft, Filter, RefreshCw, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
 import FloatingChatButton from '@/components/FloatingChatButton'
+import { useOrganization } from '@/contexts/OrganizationContext'
 import ChatPopup from '@/components/Chatpopup'
 
 interface Team {
@@ -58,10 +59,10 @@ function formatDate(dateString: string) {
 }
 
 // Função para buscar apenas as trocas sem dinheiro
-const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]> => {
+const fetchPureExchanges = async (teamId: string, orgId: string): Promise<BalanceTransaction[]> => {
   try {
     console.log('🔄 Buscando trocas sem dinheiro para o time:', teamId)
-    
+
     const { data: exchangeTransfers, error } = await supabase
       .from('player_transfers')
       .select('*')
@@ -69,6 +70,7 @@ const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]>
       .eq('transfer_type', 'exchange')
       .eq('status', 'approved')
       .eq('exchange_value', 0)
+      .eq('organization_id', orgId)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -83,7 +85,7 @@ const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]>
     exchangeTransfers?.forEach(transfer => {
       const isBuyer = transfer.to_team_id === teamId
       const isSeller = transfer.from_team_id === teamId
-      
+
       if (isSeller) {
         pureExchanges.push({
           id: `${transfer.id}_sell`,
@@ -100,7 +102,7 @@ const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]>
           exchange_only: true
         })
       }
-      
+
       if (isBuyer) {
         pureExchanges.push({
           id: `${transfer.id}_buy`,
@@ -129,6 +131,8 @@ const fetchPureExchanges = async (teamId: string): Promise<BalanceTransaction[]>
 
 export default function PaginaSaldo() {
   const router = useRouter()
+  const { organization } = useOrganization()
+  // const [currentOrg, setCurrentOrg] = useState<any>(null) // Removido
   const { user, loading: authLoading } = useAuth()
   const [team, setTeam] = useState<Team | null>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -150,6 +154,10 @@ export default function PaginaSaldo() {
   const [transactionDescription, setTransactionDescription] = useState('')
   const [transactionType, setTransactionType] = useState<'add' | 'remove'>('add')
   const [processing, setProcessing] = useState(false)
+
+
+  // Carregar Organização Atual - Removido
+  // useEffect removido
 
   // Carrega dados do usuário para o Sidebar
   useEffect(() => {
@@ -195,7 +203,7 @@ export default function PaginaSaldo() {
         }
 
         const conversationIds = conversations.map(conv => conv.id)
-        
+
         const { count } = await supabase
           .from('private_messages')
           .select('*', { count: 'exact', head: true })
@@ -237,10 +245,16 @@ export default function PaginaSaldo() {
     }
   }, [user])
 
+  useEffect(() => {
+    if (user && organization?.id) {
+      loadData()
+    }
+  }, [user, organization?.id])
+
   const loadData = async () => {
     console.log('🔄 Carregando dados...')
     setLoading(true)
-    
+
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       setLoading(false)
@@ -261,6 +275,7 @@ export default function PaginaSaldo() {
           .from('teams')
           .select('id, name, logo_url, balance')
           .eq('id', profile.team_id)
+          .eq('organization_id', organization?.id)
           .single()
 
         if (teamError) throw teamError
@@ -271,23 +286,24 @@ export default function PaginaSaldo() {
           .from('balance_transactions')
           .select('*')
           .eq('team_id', profile.team_id)
+          .eq('organization_id', organization?.id)
           .neq('type', 'bid_pending')
           .order('created_at', { ascending: false })
 
         if (transactionsError) throw transactionsError
 
-        const pureExchanges = await fetchPureExchanges(profile.team_id)
+        const pureExchanges = await fetchPureExchanges(profile.team_id, organization?.id)
 
         const allTransactions = [
           ...(transactionsData || []),
           ...pureExchanges
-        ].sort((a, b) => 
+        ].sort((a, b) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
 
         console.log('📊 Total de transações:', allTransactions.length)
         console.log('🔄 Trocas sem dinheiro:', pureExchanges.length)
-        
+
         setTransactions(allTransactions)
       }
 
@@ -295,6 +311,7 @@ export default function PaginaSaldo() {
         const { data: teamsData, error: teamsError } = await supabase
           .from('teams')
           .select('id, name, logo_url, balance')
+          .eq('organization_id', organization?.id)
           .order('name')
 
         if (teamsError) throw teamsError
@@ -311,11 +328,12 @@ export default function PaginaSaldo() {
   const refreshTeamData = async (teamId: string) => {
     try {
       console.log('🔄 Atualizando dados do time:', teamId)
-      
+
       const { data: teamData, error: teamError } = await supabase
         .from('teams')
         .select('id, name, logo_url, balance')
         .eq('id', teamId)
+        .eq('organization_id', organization?.id)
         .single()
 
       if (teamError) throw teamError
@@ -327,17 +345,18 @@ export default function PaginaSaldo() {
         .from('balance_transactions')
         .select('*')
         .eq('team_id', teamId)
+        .eq('organization_id', organization?.id)
         .neq('type', 'bid_pending')
         .order('created_at', { ascending: false })
 
       if (transactionsError) throw transactionsError
 
-      const pureExchanges = await fetchPureExchanges(teamId)
+      const pureExchanges = await fetchPureExchanges(teamId, organization?.id || '')
 
       const allTransactions = [
         ...(transactionsData || []),
         ...pureExchanges
-      ].sort((a, b) => 
+      ].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )
 
@@ -375,6 +394,7 @@ export default function PaginaSaldo() {
         .from('teams')
         .select('balance, name')
         .eq('id', selectedTeam)
+        .eq('organization_id', organization?.id)
         .single()
 
       if (fetchError) {
@@ -395,10 +415,11 @@ export default function PaginaSaldo() {
 
       const { error: balanceError } = await supabase
         .from('teams')
-        .update({ 
+        .update({
           balance: newBalance
         })
         .eq('id', selectedTeam)
+        .eq('organization_id', organization?.id)
 
       if (balanceError) {
         console.error('❌ Erro ao atualizar saldo:', balanceError)
@@ -414,7 +435,8 @@ export default function PaginaSaldo() {
           amount: amount,
           type: transactionTypeText,
           description: transactionDescription,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          organization_id: organization?.id
         }])
         .select()
 
@@ -442,7 +464,7 @@ export default function PaginaSaldo() {
           if (userProfile.team_id === selectedTeam) {
             console.log('🔄 Atualizando estado do próprio time')
             setTeam(prev => prev ? { ...prev, balance: newBalance } : null)
-            
+
             if (transactionData && transactionData[0]) {
               setTransactions(prev => [transactionData[0], ...prev])
             }
@@ -456,9 +478,9 @@ export default function PaginaSaldo() {
       }
 
       if (isAdmin) {
-        setAllTeams(prev => 
-          prev.map(t => 
-            t.id === selectedTeam 
+        setAllTeams(prev =>
+          prev.map(t =>
+            t.id === selectedTeam
               ? { ...t, balance: newBalance }
               : t
           )
@@ -466,7 +488,7 @@ export default function PaginaSaldo() {
       }
 
       alert(`✅ Saldo ${transactionType === 'add' ? 'adicionado' : 'removido'} com sucesso!`)
-      
+
       setAdminModalOpen(false)
       resetAdminForm()
 
@@ -488,7 +510,7 @@ export default function PaginaSaldo() {
   const formatCurrency = (value: string) => {
     const onlyNumbers = value.replace(/\D/g, '')
     if (onlyNumbers === '') return ''
-    
+
     const number = parseInt(onlyNumbers) / 100
     return number.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
@@ -547,11 +569,11 @@ export default function PaginaSaldo() {
     .filter(t => t.type === 'debit')
     .reduce((sum, t) => sum + t.amount, 0)
 
-  const filteredTransactions = filter === 'all' 
-    ? transactions 
+  const filteredTransactions = filter === 'all'
+    ? transactions
     : filter === 'exchange'
-    ? transactions.filter(t => t.type === 'exchange_trade')
-    : transactions.filter(t => t.type === filter)
+      ? transactions.filter(t => t.type === 'exchange_trade')
+      : transactions.filter(t => t.type === filter)
 
   const chatUser = {
     id: user?.id || '',
@@ -585,7 +607,7 @@ export default function PaginaSaldo() {
   return (
     <div className="flex min-h-screen bg-zinc-950">
       {/* Sidebar - AGORA O COMPONENTE CONTROLADO PELO PRÓPRIO SIDEBAR */}
-      <Sidebar user={user!} profile={profile} team={team} />
+      <Sidebar user={user!} profile={profile} team={team as any} />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 w-full">
@@ -641,8 +663,8 @@ export default function PaginaSaldo() {
                                 <SelectItem key={team.id} value={team.id} className="text-xs lg:text-sm">
                                   <div className="flex items-center gap-2">
                                     {team.logo_url && (
-                                      <img 
-                                        src={team.logo_url} 
+                                      <img
+                                        src={team.logo_url}
                                         alt={team.name}
                                         className="w-4 h-4 lg:w-5 lg:h-5 rounded-full object-contain flex-shrink-0"
                                       />
@@ -669,8 +691,8 @@ export default function PaginaSaldo() {
                               onClick={() => setTransactionType('add')}
                               className={cn(
                                 "flex-1 text-xs lg:text-sm h-8 lg:h-9",
-                                transactionType === 'add' 
-                                  ? "bg-emerald-600 hover:bg-emerald-700" 
+                                transactionType === 'add'
+                                  ? "bg-emerald-600 hover:bg-emerald-700"
                                   : "bg-zinc-800/50 border-zinc-600"
                               )}
                             >
@@ -683,8 +705,8 @@ export default function PaginaSaldo() {
                               onClick={() => setTransactionType('remove')}
                               className={cn(
                                 "flex-1 text-xs lg:text-sm h-8 lg:h-9",
-                                transactionType === 'remove' 
-                                  ? "bg-red-600 hover:bg-red-700" 
+                                transactionType === 'remove'
+                                  ? "bg-red-600 hover:bg-red-700"
                                   : "bg-zinc-800/50 border-zinc-600"
                               )}
                             >
@@ -735,8 +757,8 @@ export default function PaginaSaldo() {
                           disabled={processing}
                           className={cn(
                             "flex-1 text-xs lg:text-sm h-9 lg:h-10",
-                            transactionType === 'add' 
-                              ? "bg-emerald-600 hover:bg-emerald-700" 
+                            transactionType === 'add'
+                              ? "bg-emerald-600 hover:bg-emerald-700"
                               : "bg-red-600 hover:bg-red-700"
                           )}
                         >
@@ -881,7 +903,7 @@ export default function PaginaSaldo() {
                       {filteredTransactions.map((transaction) => {
                         const colors = getTransactionColor(transaction)
                         const IconComponent = colors.iconComponent
-                        
+
                         return (
                           <div
                             key={transaction.id}
@@ -944,8 +966,8 @@ export default function PaginaSaldo() {
                                   </p>
                                 </div>
                               )}
-                              <Badge 
-                                variant="secondary" 
+                              <Badge
+                                variant="secondary"
                                 className={cn("mt-1 text-xs", colors.badge)}
                               >
                                 {getBadgeText(transaction)}
@@ -973,13 +995,13 @@ export default function PaginaSaldo() {
         {/* Chat Components */}
         {user && team && (
           <>
-            <FloatingChatButton 
+            <FloatingChatButton
               currentUser={chatUser}
               currentTeam={chatTeam}
               unreadCount={unreadCount}
               onOpenChat={() => setIsChatOpen(true)}
             />
-            
+
             <ChatPopup
               isOpen={isChatOpen}
               onClose={() => setIsChatOpen(false)}

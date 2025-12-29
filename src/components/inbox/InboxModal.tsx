@@ -107,13 +107,10 @@ export default function InboxModal({
         setShowingResults(prev => ({ ...prev, [announcementId]: true }))
     }
 
-    // Ordenar: Não lidos primeiro, depois por data
+    // Ordenar: Prioridade primeiro, depois puramente por data (mais recente no topo)
     const sortedAnnouncements = [...announcements].sort((a, b) => {
         if (a.priority !== b.priority) return a.priority ? -1 : 1
-        if (a.read === b.read) {
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        }
-        return a.read ? 1 : -1
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
 
     const selectedAnnouncement = announcements.find(a => a.id === selectedId)
@@ -124,7 +121,7 @@ export default function InboxModal({
             if (!open) onClose();
         }}>
             <DialogContent
-                className="max-w-[95vw] md:max-w-6xl h-[90vh] bg-zinc-950 border-zinc-800 text-white flex flex-col p-0 gap-0 overflow-hidden shadow-2xl shadow-purple-900/20"
+                className="w-full h-full md:max-w-6xl md:h-[90vh] bg-zinc-950 border-zinc-800 text-white flex flex-col p-0 gap-0 overflow-hidden shadow-2xl shadow-purple-900/20 rounded-none md:rounded-xl"
                 onInteractOutside={handleInteractOutside}
                 onEscapeKeyDown={handleInteractOutside}
                 showCloseButton={!preventClose}

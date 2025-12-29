@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import {
   Gavel,
@@ -29,6 +30,7 @@ import { WinnerCelebrationModal } from '@/components/leilao/winner-celebration-m
 import { ConsolationModal } from '@/components/leilao/consolation-modal'
 import ChatPopup from '@/components/Chatpopup'
 import FloatingChatButton from '@/components/FloatingChatButton'
+import { useOrganization } from '@/contexts/OrganizationContext'
 
 interface Player {
   id: string
@@ -105,12 +107,22 @@ const formatTimeRemaining = (milliseconds: number) => {
   return `00:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
 }
 
+
+
 export default function PaginaLeilao() {
+  const router = useRouter()
+  const { organization } = useOrganization()
+
+  // const [currentOrg, setCurrentOrg] = useState<any>(null) // Removido
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [team, setTeam] = useState<Team | null>(null)
   const [user, setUser] = useState<any>(null)
+
   const [profile, setProfile] = useState<any>(null)
+
+  // Carregar Organização Atual - Removido
+  // useEffect anterior removido
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [unreadCount, setUnreadCount] = useState(0)
 
@@ -153,14 +165,12 @@ export default function PaginaLeilao() {
     }
   }, [temSaldoReservado])
 
-  // Carregamento inicial
+  // Carregamento inicial corrigido
   useEffect(() => {
-    loadInitialData()
-
-    return () => {
-      // Limpeza será feita no useEffect do WebSocket
+    if (organization?.id) {
+      loadInitialData()
     }
-  }, [])
+  }, [organization?.id])
 
   // ⚡ SUBSCRIPTION DE CHAT (Unread Count)
   useEffect(() => {
@@ -286,7 +296,7 @@ export default function PaginaLeilao() {
   }, [user, team])
 
   // Funções principais
-  const loadInitialData = async () => {
+  async function loadInitialData() {
     setLoading(true)
 
     try {
@@ -329,7 +339,7 @@ export default function PaginaLeilao() {
     }
   }
 
-  const loadAuctions = async () => {
+  async function loadAuctions() {
     try {
       const { data: auctionsData, error } = await supabase
         .from('auctions')
@@ -338,6 +348,8 @@ export default function PaginaLeilao() {
           player:players(*),
           current_bidder_team:teams!auctions_current_bidder_fkey(name, logo_url)
         `)
+
+        .eq('organization_id', organization?.id)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -370,7 +382,7 @@ export default function PaginaLeilao() {
   }
 
   // ⚡ FUNÇÃO QUE ATUALIZA UM LEILÃO ESPECÍFICO
-  const updateSingleAuction = async (auctionId: string) => {
+  async function updateSingleAuction(auctionId: string) {
     try {
       const { data: fullAuction, error } = await supabase
         .from('auctions')
@@ -420,7 +432,7 @@ export default function PaginaLeilao() {
   }
 
   // Função para lidar com leilão finalizado
-  const handleAuctionFinished = async (auctionId: string) => {
+  async function handleAuctionFinished(auctionId: string) {
     try {
       const { data: auction, error } = await supabase
         .from('auctions')
@@ -539,6 +551,7 @@ export default function PaginaLeilao() {
           end_time: new Date(Date.now() + durationMinutes * 60000).toISOString()
         })
         .eq('id', auctionId)
+        .eq('organization_id', organization?.id)
 
       if (error) throw error
 
@@ -606,7 +619,9 @@ export default function PaginaLeilao() {
       const { error: deleteAuctionError } = await supabase
         .from('auctions')
         .delete()
+
         .eq('id', auctionId)
+        .eq('organization_id', organization?.id)
 
       if (deleteAuctionError) throw deleteAuctionError
       console.log('✅ Leilão deletado')

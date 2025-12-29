@@ -2,7 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -285,6 +285,9 @@ function WarningModal({ isOpen, onClose, type }: {
 
 export default function Dashboard() {
   const router = useRouter()
+  const params = useParams()
+  const site = params?.site as string
+  const [currentOrg, setCurrentOrg] = useState<any>(null)
   const { user, loading: authLoading } = useAuth()
   const [team, setTeam] = useState<Team | null>(null)
   const [profile, setProfile] = useState<any>(null)
@@ -332,6 +335,26 @@ export default function Dashboard() {
   const [teamStats, setTeamStats] = useState<TeamStats | null>(null)
 
   const [teamPosition, setTeamPosition] = useState<number | null>(null)
+
+  // Carregar Organização Atual baseada na URL
+  useEffect(() => {
+    if (!site) return
+
+    const loadOrg = async () => {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('slug', site)
+        .single()
+
+      if (data) {
+        setCurrentOrg(data)
+      } else {
+        console.error('Organização não encontrada:', error)
+      }
+    }
+    loadOrg()
+  }, [site])
 
   // Inbox System
   const [adminModalOpen, setAdminModalOpen] = useState(false)
@@ -513,7 +536,7 @@ export default function Dashboard() {
 
   // Carregar dados reais do banco
   useEffect(() => {
-    if (team?.id) {
+    if (team?.id && currentOrg?.id) {
       loadBalanceTransactions()
       loadPlayersStats()
       loadActiveAuctions()
@@ -523,7 +546,7 @@ export default function Dashboard() {
       loadMatchSchedule()
       loadTeamStatistics()
     }
-  }, [team?.id])
+  }, [team?.id, currentOrg?.id])
 
   // Função para carregar transações de saldo REAIS
   const loadBalanceTransactions = async () => {
@@ -532,6 +555,7 @@ export default function Dashboard() {
         .from('balance_transactions')
         .select('*')
         .eq('team_id', team?.id)
+        .eq('organization_id', currentOrg?.id)
         .order('created_at', { ascending: false })
         .limit(5)
 
@@ -559,6 +583,7 @@ export default function Dashboard() {
       const { count: freePlayers, error: freeError } = await supabase
         .from('players')
         .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentOrg?.id)
         .is('team_id', null)
 
       if (freeError) console.error('Erro free players:', freeError)
@@ -567,6 +592,7 @@ export default function Dashboard() {
       const { count: contractedPlayers, error: contractedError } = await supabase
         .from('players')
         .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentOrg?.id)
         .not('team_id', 'is', null)
 
       if (contractedError) console.error('Erro contracted players:', contractedError)
@@ -575,6 +601,7 @@ export default function Dashboard() {
       const { data: ratingData, error: ratingError } = await supabase
         .from('players')
         .select('overall')
+        .eq('organization_id', currentOrg?.id)
 
       const distribution = {
         '75+': 0,
@@ -611,6 +638,7 @@ export default function Dashboard() {
       const { data: auctions, error } = await supabase
         .from('auctions')
         .select('*')
+        .eq('organization_id', currentOrg?.id)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
 
@@ -630,6 +658,7 @@ export default function Dashboard() {
       const { count, error } = await supabase
         .from('player_transfers')
         .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentOrg?.id)
         .eq('status', 'pending')
 
       if (!error) {
@@ -648,6 +677,7 @@ export default function Dashboard() {
       const { count, error } = await supabase
         .from('player_transfers')
         .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentOrg?.id)
         .eq('status', 'approved')
 
       if (!error) {
@@ -681,6 +711,8 @@ export default function Dashboard() {
           )
         `)
         .eq('teams.divisao', divisao)
+        // Precisamos filtrar por organização. Como team_stats é uma view, filtramos pela tabela relacionada
+        .eq('teams.organization_id', currentOrg?.id)
         .order('pontos', { ascending: false })
         .order('saldo', { ascending: false })
         .order('gols_marcados', { ascending: false })
@@ -741,6 +773,7 @@ export default function Dashboard() {
           )
         `)
         .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+        .eq('organization_id', currentOrg?.id)
         .eq('status', 'finished')
         .order('date', { ascending: false })
         .order('time', { ascending: false })
@@ -764,6 +797,7 @@ export default function Dashboard() {
           )
         `)
         .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+        .eq('organization_id', currentOrg?.id)
         .eq('status', 'scheduled')
         .order('date', { ascending: true })
         .order('time', { ascending: true })

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import TeamRow from "./TeamRow";
 import { supabase } from "@/lib/supabase";
+import { useOrganization } from "@/contexts/OrganizationContext";
 
 interface Team {
   id: string;
@@ -22,12 +23,15 @@ interface Team {
 }
 
 export default function SerieBTable() {
+  const { organization } = useOrganization();
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchTeamsWithStats();
-  }, []);
+    if (organization?.id) {
+      fetchTeamsWithStats();
+    }
+  }, [organization?.id]);
 
   const fetchTeamsWithStats = async () => {
     try {
@@ -38,6 +42,7 @@ export default function SerieBTable() {
         .from('teams')
         .select('id, name, logo_url, divisao')
         .eq('divisao', 'B')
+        .eq('organization_id', organization?.id)
         .order('name');
 
       if (teamsError) {

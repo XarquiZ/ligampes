@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +39,7 @@ import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
 import FloatingChatButton from '@/components/FloatingChatButton'
 import ChatPopup from '@/components/Chatpopup'
+import { useOrganization } from '@/contexts/OrganizationContext'
 
 // Importando componentes modulares
 import { PlayerHeader } from '@/components/jogadores/PlayerHeader'
@@ -102,6 +103,8 @@ function formatBasePrice(price: number): string {
 
 export default function ListaJogadores() {
   const router = useRouter()
+  const { organization } = useOrganization()
+
   const { user, loading: authLoading } = useAuth()
   const [jogadores, setJogadores] = useState<Player[]>([])
   const [teams, setTeams] = useState<Team[]>([])
@@ -116,8 +119,12 @@ export default function ListaJogadores() {
 
   // Estados para dados do usuário
   const [team, setTeam] = useState<Team | null>(null)
+
   const [profile, setProfile] = useState<any>(null)
   const [dataLoading, setDataLoading] = useState(true)
+
+  // Carregar Organização Atual - Removido pois usamos o Contexto agora
+  // useEffect anterior removido
 
   // Estados para o chat
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -307,7 +314,7 @@ export default function ListaJogadores() {
 
         if (!profileError) {
           setProfile(profileData)
-          setTeam(profileData?.teams || null)
+          setTeam((profileData?.teams as unknown as Team) || null)
         }
       } catch (error) {
         console.error('Erro ao carregar dados do usuário:', error)
@@ -473,8 +480,8 @@ export default function ListaJogadores() {
     setLoading(true)
     try {
       const [{ data: teamsData }, { data: playersData }] = await Promise.all([
-        supabase.from('teams').select('id, name, logo_url').order('name'),
-        supabase.from('players').select('*').order('overall', { ascending: false }),
+        supabase.from('teams').select('id, name, logo_url').eq('organization_id', organization?.id).order('name'),
+        supabase.from('players').select('*').eq('organization_id', organization?.id).order('overall', { ascending: false }),
       ])
 
       const teamMap = Object.fromEntries((teamsData || []).map(t => [t.id, t]))
@@ -507,9 +514,13 @@ export default function ListaJogadores() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [organization?.id])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    if (organization?.id) {
+      fetchData()
+    }
+  }, [fetchData, organization?.id])
 
   const handleSuccess = useCallback(() => {
     setIsCadastroOpen(false)
@@ -613,7 +624,7 @@ export default function ListaJogadores() {
   return (
     <div className="flex min-h-screen bg-zinc-950">
       {/* Sidebar */}
-      <Sidebar user={user!} profile={profile} team={team} />
+      <Sidebar user={user!} profile={profile} team={team as any} />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 transition-all duration-300 lg:ml-0">

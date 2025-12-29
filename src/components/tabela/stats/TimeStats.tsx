@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import Image from "next/image";
 
 import { ChevronDown } from "lucide-react";
@@ -23,6 +24,7 @@ interface TimeStat {
 }
 
 export default function TimeStats() {
+  const { organization } = useOrganization();
   const [timesDivisaoA, setTimesDivisaoA] = useState<TimeStat[]>([]);
   const [timesDivisaoB, setTimesDivisaoB] = useState<TimeStat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,6 +36,7 @@ export default function TimeStats() {
   // Buscar dados do Supabase
   useEffect(() => {
     const fetchData = async () => {
+      if (!organization?.id) return;
       try {
         setLoading(true);
 
@@ -42,6 +45,7 @@ export default function TimeStats() {
           .from('teams')
           .select('id, name, logo_url, divisao')
           .in('divisao', ['A', 'B'])
+          .eq('organization_id', organization.id)
           .order('name');
 
         if (teamsError) {
@@ -174,8 +178,10 @@ export default function TimeStats() {
       }
     };
 
-    fetchData();
-  }, []);
+    if (organization?.id) {
+      fetchData();
+    }
+  }, [organization?.id]);
 
   const handleSort = (column: keyof TimeStat) => {
     if (sortBy === column) {

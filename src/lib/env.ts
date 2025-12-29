@@ -4,14 +4,8 @@ export function getSiteUrl(): string {
   if (typeof window === 'undefined') {
     return process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
   }
-  
-  // Se está no cliente, detecta automaticamente
-  // Produção
-  if (window.location.hostname === 'ligampes.vercel.app') {
-    return 'https://ligampes.vercel.app'
-  }
-  
-  // Desenvolvimento local
-  return 'http://localhost:3000'
+
+  // Se está no cliente, retorna a origem atual (preserva subdomínio)
+  return window.location.origin
 }
 
