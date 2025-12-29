@@ -10,8 +10,8 @@ const inter = Inter({ subsets: ["latin"] });
 
 // METADADOS COMPLETOS PARA FAVICONS
 export const metadata: Metadata = {
-  title: "LIGA MPES",
-  description: "A liga mais braba do Brasil",
+  title: "LIGA.ON - Crie sua Liga Profissional",
+  description: "A plataforma #1 para gestão de campeonatos de FIFA, PES, NBA 2K e Futebol Society. Leilões, financeiro e estatísticas automáticas.",
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -56,10 +56,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="LIGA MPES" />
-        
+
         {/* Meta tag para Android */}
         <meta name="theme-color" content="#000000" />
-        
+
         {/* Link tags manuais (opcional, já coberto pelo metadata) */}
         <link rel="manifest" href="/manifest.json" />
       </head>
