@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
+import { sendWelcomeEmail } from '@/lib/email'
 
 const schema = z.object({
     leagueName: z.string().min(3, "O nome da liga deve ter pelo menos 3 caracteres"),
@@ -89,7 +90,6 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
     if (userEmail) {
         console.log(`📧 Tentando enviar email para: ${userEmail}`);
         try {
-            const { sendWelcomeEmail } = await import('@/lib/email')
             // Using "Gestor" as fallback name since we might not have full name yet
             const emailResult = await sendWelcomeEmail(userEmail, "Gestor", String(leagueName), String(plan))
             console.log('📧 Resultado do envio:', emailResult);
