@@ -76,11 +76,15 @@ export default function RegisterWizardPage() {
 
 
     // --- Handlers ---
+    // --- Handlers ---
     const handleLogin = async () => {
+        // Set fallback redirect cookie to bypass strict URL whitelisting issues with query params
+        document.cookie = `auth_redirect=/criar; path=/; max-age=300` // 5 minutes
+
         await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/api/auth/callback?next=/criar`,
+                redirectTo: `${window.location.origin}/api/auth/callback`, // Clean URL (must be whitelisted exactly)
                 queryParams: { access_type: 'offline', prompt: 'consent' },
             },
         })
