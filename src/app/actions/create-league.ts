@@ -87,13 +87,17 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
 
     // 3. Send Confirmation Email
     if (userEmail) {
+        console.log(`📧 Tentando enviar email para: ${userEmail}`);
         try {
             const { sendWelcomeEmail } = await import('@/lib/email')
             // Using "Gestor" as fallback name since we might not have full name yet
-            await sendWelcomeEmail(userEmail, "Gestor", String(leagueName), String(plan))
+            const emailResult = await sendWelcomeEmail(userEmail, "Gestor", String(leagueName), String(plan))
+            console.log('📧 Resultado do envio:', emailResult);
         } catch (emailError) {
-            console.error("Erro ao enviar email (Exception):", emailError)
+            console.error("❌ Erro crítico ao enviar email (Exception):", emailError)
         }
+    } else {
+        console.warn('⚠️ Sem email de usuário para enviar confirmação.');
     }
 
     redirect('/acompanhar')

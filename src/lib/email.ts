@@ -12,17 +12,21 @@ export async function sendWelcomeEmail(to: string, userName: string, leagueName:
 
     try {
         const { data, error } = await resend.emails.send({
-            from: 'LIGA.ON <nao-responda@ligaon.com>', // User needs to verify domain or use resend default
+            from: 'LIGA.ON <onboarding@resend.dev>',
             to: [to],
+            // Log for debug
+            // react: WelcomeEmail({ userName, leagueName, plan }) as ReactElement,
+
             subject: 'Bem-vindo ao LIGA.ON: O setup do seu servidor começou ⚙️',
             react: WelcomeEmail({ userName, leagueName, plan }) as ReactElement,
         });
 
         if (error) {
-            console.error('Error sending email:', error);
+            console.error('❌ Resend API Error:', JSON.stringify(error, null, 2));
             return { success: false, error };
         }
 
+        console.log('✅ Email sent successfully:', data);
         return { success: true, data };
     } catch (err) {
         console.error('Exception sending email:', err);
