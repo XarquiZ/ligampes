@@ -40,14 +40,12 @@ export async function GET(request: Request) {
 
   if (code) {
     try {
-      // Determine which cookie jar to use
-      // If authType is platform OR next points to landing area
-      const isPlatform = authType === 'platform' || next.startsWith('/acompanhar') || next.startsWith('/admin') || next.startsWith('/criar')
+      // Use default cookie scope to match client-side configuration
+      const debugCookieStore = await cookies()
+      const allCookies = debugCookieStore.getAll().map(c => c.name).join(', ')
+      console.log('[Callback] Available Cookies:', allCookies)
 
-      const cookieName = isPlatform ? 'sb-platform-auth' : undefined
-      console.log(`[Callback] Using cookie scope: ${cookieName || 'default-tenant'}`)
-
-      const supabase = await createClient(cookieName)
+      const supabase = await createClient()
       const { data: { session }, error: authError } = await supabase.auth.exchangeCodeForSession(code)
 
       if (authError || !session) {

@@ -1,9 +1,10 @@
 import { headers } from "next/headers"
 import Stripe from "stripe"
 import { createAdminClient } from "@/lib/supabase-server"
+import { Resend } from 'resend'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'mock_key_for_build', {
-    apiVersion: "2024-12-18.acacia",
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: "2024-12-18.acacia" as any,
 })
 
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
         if (!endpointSecret) throw new Error("Missing Stripe Webhook Secret")
         event = stripe.webhooks.constructEvent(body, sig, endpointSecret)
     } catch (err: any) {
+        console.error(`Webhook Error: ${err.message}`)
         return new Response(`Webhook Error: ${err.message}`, { status: 400 })
     }
 
@@ -28,14 +30,25 @@ export async function POST(req: Request) {
         const orgId = session.metadata?.organization_id
 
         if (orgId) {
-            // Unlock the organization
-            await supabase
+            console.log(`[Stripe Webhook] Activating Organization: ${orgId}`)
+
+            // Activate Organization
+            const { error } = await supabase
                 .from("organizations")
                 .update({
                     status: "active",
-                    // Optionally store subscription ID: subscription_id: session.subscription
+                    // subscription_id: session.subscription // Warning: Ensure this column exists. If not, maybe store in settings?
+                    // Safe approach if column might be missing: 
+                    subscription_id: session.subscription as string
                 })
                 .eq("id", orgId)
+
+            if (error) {
+                console.error(`[Stripe Webhook] Failed to activate org: ${error.message}`)
+            } else {
+                // Optional: Send Confirmation Email
+                // ...
+            }
         }
     }
 

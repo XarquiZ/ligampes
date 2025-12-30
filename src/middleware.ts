@@ -14,13 +14,6 @@ export async function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname
   const firstSegment = pathname.split('/')[1] || '' // '' for root
 
-  // Define known platform routes that use the Platform Cookie
-  // Note: /login is platform, /mpes/login is tenant (slug 'mpes' is not in this list)
-  const platformRoutes = ['login', 'acompanhar', 'criar', 'admin', 'api', '', 'auth']
-  const isPlatform = platformRoutes.includes(firstSegment)
-
-  const cookieName = isPlatform ? 'sb-platform-auth' : undefined
-
   // Cliente Supabase para gerenciar sessão (RefreshToken)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,7 +37,6 @@ export async function middleware(req: NextRequest) {
           )
         },
       },
-      ...(cookieName ? { cookieOptions: { name: cookieName } } : {}),
     }
   )
 

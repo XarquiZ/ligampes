@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button'
 import { Clock, CheckCircle2, ArrowRight, ExternalLink, LogOut, Mail, Trophy } from 'lucide-react'
 import Link from 'next/link'
 import PlatformSignOutButton from '@/components/PlatformSignOutButton'
+import { PayButton } from '@/components/dashboard/BillingActions'
 
 export default async function TrackerPage() {
-    const supabase = await createClient('sb-platform-auth')
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -64,13 +65,14 @@ export default async function TrackerPage() {
                                         </Button>
                                     )}
 
-                                    {(org.status === 'payment_required' || org.status === 'active') && (
+                                    {org.status === 'payment_required' && (
+                                        <PayButton orgId={org.id} plan={org.chosen_plan || 'mensal'} />
+                                    )}
+
+                                    {org.status === 'active' && (
                                         <Button asChild className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-zinc-950 font-bold">
-                                            {/* Logic to link to the domain. Assuming local dev uses localhost logic or subdomain logic */}
-                                            {/* In Production: https://[slug].meucampeonato.com/admin */}
-                                            {/* Ideally use an environment variable for ROOT_DOMAIN */}
                                             <Link href={`/${org.slug}/admin`}>
-                                                {org.status === 'payment_required' ? 'Pagar e Ativar' : 'Acessar Painel'} <ExternalLink className="ml-2 w-4 h-4" />
+                                                Acessar Painel <ExternalLink className="ml-2 w-4 h-4" />
                                             </Link>
                                         </Button>
                                     )}
