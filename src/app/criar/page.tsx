@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Trophy, Loader2, Check, AlertCircle, Gamepad2, Activity, Dribbble, ArrowLeft } from 'lucide-react'
+import { Trophy, Loader2, Check, AlertCircle, Gamepad2, Activity, Dribbble, ArrowLeft, UserPlus, ServerCog, Rocket } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { toast } from 'sonner'
@@ -147,96 +147,107 @@ export default function RegisterPage() {
             {/* Plan Selection Modal */}
             {showPlanModal && (
                 <div className="absolute inset-0 z-50 bg-zinc-950/90 backdrop-blur-md flex items-start pt-20 justify-center p-4 overflow-y-auto">
-                    <div className="max-w-6xl w-full grid md:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-300">
+                    <div className="max-w-6xl w-full flex flex-col items-center gap-6 animate-in fade-in zoom-in duration-300">
 
-                        {/* Free Plan */}
-                        <Card className="bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-all flex flex-col">
-                            <CardHeader>
-                                <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
-                                    <Trophy className="w-6 h-6 text-zinc-400" />
+                        {/* Back to Home */}
+                        <div className="w-full flex justify-start">
+                            <Link href="/" className="flex items-center text-zinc-400 hover:text-white transition-colors">
+                                <ArrowLeft className="w-5 h-5 mr-2" />
+                                Voltar ao Início
+                            </Link>
+                        </div>
+
+                        <div className="w-full grid md:grid-cols-3 gap-6">
+
+                            {/* Free Plan */}
+                            <Card className="bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-all flex flex-col">
+                                <CardHeader>
+                                    <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
+                                        <Trophy className="w-6 h-6 text-zinc-400" />
+                                    </div>
+                                    <CardTitle className="text-2xl text-white">Starter Grátis</CardTitle>
+                                    <CardDescription>Para quem está começando</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4 flex-1">
+                                    <ul className="space-y-2 text-sm text-zinc-400">
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Até 8 Times</li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> 1 Campeonato Ativo</li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Domínio Próprio (.com.br)</strong></li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Gestão de Jogadores</li>
+                                    </ul>
+                                </CardContent>
+                                <div className="p-6 pt-0 mt-auto">
+                                    <Button
+                                        onClick={() => handleSelectPlan('free')}
+                                        className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-12"
+                                    >
+                                        Começar Grátis
+                                    </Button>
                                 </div>
-                                <CardTitle className="text-2xl text-white">Starter Grátis</CardTitle>
-                                <CardDescription>Para quem está começando</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4 flex-1">
-                                <ul className="space-y-2 text-sm text-zinc-400">
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Até 8 Times</li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> 1 Campeonato Ativo</li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Domínio Próprio (.com.br)</strong></li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Gestão de Jogadores</li>
-                                </ul>
-                            </CardContent>
-                            <div className="p-6 pt-0 mt-auto">
-                                <Button
-                                    onClick={() => handleSelectPlan('free')}
-                                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-12"
-                                >
-                                    Começar Grátis
-                                </Button>
-                            </div>
-                        </Card>
+                            </Card>
 
-                        {/* Mensal Plan */}
-                        <Card className="bg-zinc-900 border-zinc-800 hover:border-green-500/50 transition-all flex flex-col relative overflow-hidden group">
-                            <CardHeader>
-                                <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
-                                    <Trophy className="w-6 h-6 text-zinc-400" />
+                            {/* Mensal Plan */}
+                            <Card className="bg-zinc-900 border-zinc-800 hover:border-green-500/50 transition-all flex flex-col relative overflow-hidden group">
+                                <CardHeader>
+                                    <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
+                                        <Trophy className="w-6 h-6 text-zinc-400" />
+                                    </div>
+                                    <CardTitle className="text-2xl text-white">Mensal</CardTitle>
+                                    <CardDescription>R$ 30,00 / mês</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4 flex-1">
+                                    <ul className="space-y-2 text-sm text-zinc-300">
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Times Ilimitados</strong></li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Campeonatos Ilimitados</strong></li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Domínio Próprio (.com.br)</strong></li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Sem Anúncios</li>
+                                    </ul>
+                                </CardContent>
+                                <div className="p-6 pt-0 mt-auto">
+                                    <Button
+                                        onClick={() => handleSelectPlan('mensal')}
+                                        className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-12"
+                                    >
+                                        Assinar Mensal
+                                    </Button>
                                 </div>
-                                <CardTitle className="text-2xl text-white">Mensal</CardTitle>
-                                <CardDescription>R$ 30,00 / mês</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4 flex-1">
-                                <ul className="space-y-2 text-sm text-zinc-300">
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Times Ilimitados</strong></li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Campeonatos Ilimitados</strong></li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Domínio Próprio (.com.br)</strong></li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Sem Anúncios</li>
-                                </ul>
-                            </CardContent>
-                            <div className="p-6 pt-0 mt-auto">
-                                <Button
-                                    onClick={() => handleSelectPlan('mensal')}
-                                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-12"
-                                >
-                                    Assinar Mensal
-                                </Button>
-                            </div>
-                        </Card>
+                            </Card>
 
-                        {/* Anual Plan */}
-                        <Card className="bg-zinc-900 border-green-500 hover:border-green-400 transition-all flex flex-col relative overflow-hidden group shadow-[0_0_30px_rgba(34,197,94,0.15)]">
-                            <div className="absolute top-0 right-0 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
-                                ECONOMIZE R$ 60
-                            </div>
-                            <CardHeader>
-                                <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center mb-4">
-                                    <Trophy className="w-6 h-6 text-green-500" />
+                            {/* Anual Plan */}
+                            <Card className="bg-zinc-900 border-green-500 hover:border-green-400 transition-all flex flex-col relative overflow-hidden group shadow-[0_0_30px_rgba(34,197,94,0.15)]">
+                                <div className="absolute top-0 right-0 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
+                                    ECONOMIZE R$ 60
                                 </div>
-                                <CardTitle className="text-2xl text-white">Anual</CardTitle>
-                                <CardDescription className="text-green-400">R$ 300,00 / ano</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4 flex-1">
-                                <ul className="space-y-2 text-sm text-zinc-300">
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>2 Meses Grátis</strong></li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Tudo do plano Mensal</li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Domínio Próprio (.com.br)</strong></li>
-                                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Suporte VIP (WhatsApp)</li>
-                                </ul>
-                            </CardContent>
-                            <div className="p-6 pt-0 mt-auto">
-                                <Button
-                                    onClick={() => handleSelectPlan('anual')}
-                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12"
-                                >
-                                    Assinar Anual
-                                </Button>
-                            </div>
-                        </Card>
+                                <CardHeader>
+                                    <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center mb-4">
+                                        <Trophy className="w-6 h-6 text-green-500" />
+                                    </div>
+                                    <CardTitle className="text-2xl text-white">Anual</CardTitle>
+                                    <CardDescription className="text-green-400">R$ 300,00 / ano</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4 flex-1">
+                                    <ul className="space-y-2 text-sm text-zinc-300">
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>2 Meses Grátis</strong></li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Tudo do plano Mensal</li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> <strong>Domínio Próprio (.com.br)</strong></li>
+                                        <li className="flex items-center gap-2"><Check className="w-4 h-4 text-green-500" /> Suporte VIP (WhatsApp)</li>
+                                    </ul>
+                                </CardContent>
+                                <div className="p-6 pt-0 mt-auto">
+                                    <Button
+                                        onClick={() => handleSelectPlan('anual')}
+                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12"
+                                    >
+                                        Assinar Anual
+                                    </Button>
+                                </div>
+                            </Card>
 
-                    </div>
+                        </div>
 
-                    <div className="absolute bottom-8 text-zinc-500 text-sm w-full text-center">
-                        Escolha um plano para prosseguir com o cadastro.
+                        <div className="text-zinc-500 text-sm w-full text-center pb-4">
+                            Escolha um plano para prosseguir com o cadastro.
+                        </div>
                     </div>
                 </div>
             )}
@@ -266,14 +277,58 @@ export default function RegisterPage() {
                     </Link>
                 </div>
 
-                <div className="relative z-10 max-w-lg mb-20">
-                    <div className="flex items-center gap-4 p-4 bg-zinc-950/50 rounded-xl backdrop-blur-sm border border-zinc-800">
-                        <div className="bg-green-500/10 p-3 rounded-full">
-                            <Trophy className="w-6 h-6 text-green-500" />
+                <div className="relative z-10 mt-8 mb-auto">
+                    <h2 className="text-3xl font-bold mb-8 leading-tight">
+                        Do Cadastro ao Kick-off <br />
+                        <span className="text-green-500">em 3 Passos</span>
+                    </h2>
+
+                    <div className="space-y-8">
+                        {/* Passo 1 */}
+                        <div className="flex gap-4">
+                            <div className="flex flex-col items-center">
+                                <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center shrink-0 border border-blue-500/30">
+                                    <UserPlus className="w-5 h-5" />
+                                </div>
+                                <div className="w-px h-full bg-zinc-800 my-2" />
+                            </div>
+                            <div className="pb-8">
+                                <h3 className="font-bold text-white text-lg">1. Reserva (O Cadastro)</h3>
+                                <p className="text-zinc-400 text-sm mt-1 leading-relaxed">
+                                    Você cria sua conta, escolhe o nome da liga e garante seu endereço exclusivo (ex: ligaon.com/sualiga).
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="font-bold text-white">Gestão Profissional</p>
-                            <p className="text-sm text-zinc-400">Automatize tabelas, rankings e estatísticas.</p>
+
+                        {/* Passo 2 */}
+                        <div className="flex gap-4">
+                            <div className="flex flex-col items-center">
+                                <div className="w-10 h-10 rounded-full bg-purple-500/20 text-purple-500 flex items-center justify-center shrink-0 border border-purple-500/30 animate-pulse">
+                                    <ServerCog className="w-5 h-5" />
+                                </div>
+                                <div className="w-px h-full bg-zinc-800 my-2" />
+                            </div>
+                            <div className="pb-8">
+                                <h3 className="font-bold text-white text-lg">2. Configuração Dedicada</h3>
+                                <p className="text-zinc-400 text-sm mt-1 leading-relaxed">
+                                    Nossa equipe sobe sua infraestrutura para garantir performance. Você recebe um e-mail confirmando.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Passo 3 */}
+                        <div className="flex gap-4">
+                            <div className="flex flex-col items-center">
+                                <div className="w-10 h-10 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center shrink-0 border border-green-500/30">
+                                    <Rocket className="w-5 h-5" />
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-white text-lg">3. Liberação e Acesso</h3>
+                                <p className="text-zinc-400 text-sm mt-1 leading-relaxed">
+                                    Em até 24h, você recebe o acesso total para realizar o pagamento e assumir o controle.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -381,6 +436,20 @@ export default function RegisterPage() {
                                 {selectedPlan === 'anual' && "Você terá acesso ilimitado com 2 meses grátis. O pagamento será solicitado após a configuração."}
                             </AlertDescription>
                         </Alert>
+
+
+                        {/* Kick Off Guarantee */}
+                        <div className="bg-zinc-900 border border-green-900/30 rounded-lg p-4 flex gap-3 items-start">
+                            <div className="bg-green-500/10 p-2 rounded-full shrink-0">
+                                <Trophy className="w-5 h-5 text-green-500" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white text-sm">Kick Off Garantido</h4>
+                                <p className="text-zinc-400 text-xs mt-1">
+                                    Nós montamos sua liga primeiro. Você só realiza o pagamento da assinatura depois de ver tudo pronto e aprovado.
+                                </p>
+                            </div>
+                        </div>
 
                         <Button
                             disabled={isPending}
