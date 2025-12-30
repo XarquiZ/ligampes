@@ -392,6 +392,7 @@ export default function Dashboard() {
           .from('profiles')
           .select('*, teams(*)')
           .eq('id', user.id)
+          .eq('organization_id', currentOrg.id)
           .single()
 
         if (profileError) {
@@ -404,6 +405,7 @@ export default function Dashboard() {
             .from('profiles')
             .insert({
               id: user.id,
+              organization_id: currentOrg.id,
               email: user.email!,
               full_name: user.user_metadata?.full_name || user.email,
               coach_name: defaultName,
@@ -577,6 +579,7 @@ export default function Dashboard() {
       const { count: totalPlayers, error: totalError } = await supabase
         .from('players')
         .select('*', { count: 'exact', head: true })
+        .eq('organization_id', currentOrg?.id)
 
       if (totalError) console.error('Erro total players:', totalError)
 
