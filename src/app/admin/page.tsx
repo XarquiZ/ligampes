@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase-server'
+import { createClient, createAdminClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import AdminList from './AdminList'
 
@@ -27,22 +27,19 @@ export default async function AdminDashboardPage() {
     // Does 'organizations' table have 'owner_email'? Probably not.
     // We need to fetch owner details.
 
+    // Simplified logic: Email is now stored directly in the organization table
+    // We only fetch profile name for better display
     const leaguesWithOwners = await Promise.all(
         (pendingLeagues || []).map(async (league) => {
-            const { data: owner } = await supabase.auth.admin.getUserById(league.owner_id)
-            // supabase.auth.admin usually available only in service role client.
-            // standard client can't fetch other users via auth.getUserById unless public profile table exists.
-
-            // Let's try fetching from 'profiles' table first if it exists
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('email, name') // Adjust fields based on schema
+                .select('name')
                 .eq('id', league.owner_id)
                 .single()
 
             return {
                 ...league,
-                owner_email: profile?.email || 'Email desconhecido', // Fallback
+                owner_email: league.owner_email || 'Email não salvo',
                 owner_name: profile?.name || 'Gestor'
             }
         })

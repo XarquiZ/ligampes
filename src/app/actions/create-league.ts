@@ -69,6 +69,7 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
         name: leagueName,
         slug: slug,
         owner_id: userId,
+        owner_email: userEmail,
         plan: plan,
         chosen_plan: plan,
         price_id: priceId,
