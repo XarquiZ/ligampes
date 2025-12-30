@@ -27,8 +27,13 @@ export function CentralLoginClient({ organization }: { organization: Organizatio
         try {
             await supabase.auth.signOut()
             const origin = window.location.origin
-            // REDIRECT LOGIC: Pass 'next' param to target the specific dashboard
-            const redirectTo = `${origin}/api/auth/callback?next=/${organization.slug}/dashboard`
+            // REDIRECT LOGIC: 
+            // 1. Set Cookie as primary context preserver (robust against param stripping)
+            const targetPath = `/${organization.slug}/dashboard`
+            document.cookie = `auth_redirect=${targetPath}; path=/; max-age=300; SameSite=Lax`
+
+            // 2. Also pass 'next' param as backup
+            const redirectTo = `${origin}/api/auth/callback?next=${targetPath}`
 
             console.log("Login targeting:", organization.slug, "Redirect:", redirectTo)
 
