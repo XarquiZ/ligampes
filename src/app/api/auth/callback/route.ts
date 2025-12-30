@@ -8,78 +8,106 @@ export async function GET(request: Request) {
   const error = requestUrl.searchParams.get('error')
   const nextParam = requestUrl.searchParams.get('next')
 
-  // Determine the correct origin (handling proxies/vercel dev)
+  // Determine the correct origin
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host')
   const protocol = request.headers.get('x-forwarded-proto') || 'http'
   const origin = `${protocol}://${host}`
 
-  // Smart Redirect Logic
+  // Default redirect
   let next = nextParam ?? '/dashboard'
 
   console.log('[Callback] Debug - Host:', host)
+  console.log('[Callback] Next Param:', nextParam)
 
-  // Se estiver rodando localmente (localhost ou 127.0.0.1)
+  // --- LOCALHOST SUBDOMAIN LOGIC (Dev Only) ---
   if (host && (host.includes('localhost') || host.includes('127.0.0.1'))) {
-    // Verifica se é subdomínio (ex: mpes.localhost)
-    // Se dividir por ponto der mais que 1 parte (e a primeira parte não for localhost/127), é subdomínio?
-    // Ex: localhost:3000 -> ['localhost:3000'] (1 parte)
-    // Ex: mpes.localhost:3000 -> ['mpes', 'localhost:3000'] (2 partes)
-
-    // Verifica se é um subdomínio (ex: mpes.localhost)
-    // Regex busca: "qualquer coisa exceto ponto" + ".localhost" no início
     const isSubdomain = host.match(/^[^.]+\.localhost/)
-
-    if (!isSubdomain) {
-      console.log('[Callback] Debug - Localhost Raiz detectado -> /acompanhar')
-      next = '/acompanhar'
-    } else {
-      console.log('[Callback] Debug - Subdomínio Localhost detectado -> /dashboard')
+    if (!isSubdomain && !nextParam) {
+      // If no specific destination and on root localhost, go to landing/tracking
+      // CHECK: Should this be /acompanhar or just root? User mentioned root is for management.
+      // Keeping /acompanhar as fallback if no intent is present.
+      // But if nextParam is present (e.g. from league login), we respect it.
+      if (next === '/dashboard') next = '/acompanhar'
     }
   }
 
-  console.log('[Callback] Code:', code)
-  console.log('[Callback] Error:', error)
-  console.log('[Callback] Detected Origin:', origin)
-  console.log('[Callback] Next Redirect:', next)
-
   if (error) {
-    console.error('[Callback] Erro do OAuth:', error)
+    console.error('[Callback] Auth Error:', error)
     return NextResponse.redirect(`${origin}/login?error=auth_failed`)
   }
 
   if (code) {
     try {
       const supabase = await createClient()
-      const { error: authError } = await supabase.auth.exchangeCodeForSession(code)
+      const { data: { session }, error: authError } = await supabase.auth.exchangeCodeForSession(code)
 
-      if (authError) {
-        console.error('[Callback] Erro ao trocar código por sessão:', authError)
+      if (authError || !session) {
+        console.error('[Callback] Session Exchange Error:', authError)
         return NextResponse.redirect(`${origin}/login?error=auth_failed`)
       }
 
-      console.log('[Callback] Autenticação bem-sucedida')
+      console.log('[Callback] Authentication Successful')
+      const user = session.user
 
-      // Verificar Cookie de Redirecionamento (Prioridade sobre Smart Logic)
+      // --- LEAGUE ISOLATION ENFORCEMENT ---
+      // If 'next' points to a specific league dashboard (e.g. /mpes/dashboard), verify membership.
+      const match = next.match(/^\/([^\/]+)\/dashboard/)
+      if (match) {
+        const targetSlug = match[1]
+        console.log(`[Callback] User targeting league: ${targetSlug}`)
+
+        // 1. Resolve Org ID from Slug
+        const { data: org } = await supabase
+          .from('organizations')
+          .select('id')
+          .eq('slug', targetSlug)
+          .single()
+
+        if (org) {
+          // 2. Check Membership
+          // We can check 'user_roles' or 'organization_members' depending on schema.
+          // Usually 'user_roles' links user_id <-> organization_id
+          const { data: member } = await supabase
+            .from('user_roles')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('organization_id', org.id)
+            .single()
+
+          // Check if Owner (in case not in user_roles) - usually owners are added to roles, but safety net
+          const { data: isOwner } = await supabase
+            .from('organizations')
+            .select('id')
+            .eq('id', org.id)
+            .eq('owner_id', user.id)
+            .single()
+
+          if (!member && !isOwner) {
+            console.warn(`[Callback] Access Denied: User ${user.id} is not a member of ${targetSlug}`)
+            // Redirect to unauthorized page or back to login with error
+            // We should sign them out or just show error? 
+            // Better to redirect to a clearer error page.
+            return NextResponse.redirect(`${origin}/${targetSlug}/login?error=unauthorized_member`)
+          }
+        }
+      }
+
+      // Handle custom cookie redirect if present (overrides if still valid, but usually nextParam is safer for OAuth flow)
       const cookieStore = await cookies()
       const cookieRedirect = cookieStore.get('auth_redirect')
-
       if (cookieRedirect?.value) {
-        console.log('[Callback] Override por Cookie detectado:', cookieRedirect.value)
-        next = cookieRedirect.value
+        // Only use cookie if we didn't have a specific `next` param intent
+        if (!nextParam) {
+          next = cookieRedirect.value
+        }
+        cookieStore.delete('auth_redirect')
       }
 
-      const response = NextResponse.redirect(`${origin}${next}`)
-
-      // Limpar o cookie após usar
-      if (cookieRedirect) {
-        response.cookies.delete('auth_redirect')
-      }
-
-      return response
+      return NextResponse.redirect(`${origin}${next}`)
 
     } catch (error) {
-      console.error('[Callback] Erro inesperado:', error)
-      return NextResponse.redirect(`${origin}/login?error=auth_failed`)
+      console.error('[Callback] Unexpected Error:', error)
+      return NextResponse.redirect(`${origin}/login?error=server_error`)
     }
   }
 
