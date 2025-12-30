@@ -16,18 +16,35 @@ export default function CentralLoginPage() {
     const router = useRouter()
 
 
+    const [loading, setLoading] = useState(true)
+
+    // Check for existing session
+    useState(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session) {
+                router.replace('/acompanhar')
+            } else {
+                setLoading(false)
+            }
+        }
+        checkSession()
+    })
+
     const handleGoogleLogin = async () => {
         try {
             // Força logout antes de tentar novo login para limpar sessões antigas
             await supabase.auth.signOut()
 
             const origin = window.location.origin
-            console.log("Redirecting to:", `${origin}/api/auth/callback?next=/acompanhar`)
+            // Explicitly set next param for landing page flow
+            const next = '/acompanhar'
+            console.log("Redirecting to:", `${origin}/api/auth/callback?next=${next}`)
 
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${origin}/api/auth/callback`,
+                    redirectTo: `${origin}/api/auth/callback?next=${next}`,
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
@@ -39,6 +56,14 @@ export default function CentralLoginPage() {
             console.error(error)
             toast.error('Erro ao conectar com Google')
         }
+    }
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
+            </div>
+        )
     }
 
     return (

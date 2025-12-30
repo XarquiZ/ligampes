@@ -28,11 +28,13 @@ export function CentralLoginClient({ organization }: { organization: Organizatio
             await supabase.auth.signOut()
             const origin = window.location.origin
             // REDIRECT LOGIC: 
-            // 1. Set Cookie as primary context preserver (robust against param stripping)
+            // 1. Set Cookie as primary context preserver
             const targetPath = `/${organization.slug}/dashboard`
             document.cookie = `auth_redirect=${targetPath}; path=/; max-age=300; SameSite=Lax`
 
             // 2. Also pass 'next' param as backup
+            // Explicitly construct the full URL with the next parameter
+            const nextParam = encodeURIComponent(targetPath)
             const redirectTo = `${origin}/api/auth/callback?next=${targetPath}`
 
             console.log("Login targeting:", organization.slug, "Redirect:", redirectTo)
@@ -40,7 +42,7 @@ export function CentralLoginClient({ organization }: { organization: Organizatio
             const { error: authError } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo,
+                    redirectTo: redirectTo,
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',

@@ -171,9 +171,12 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut()
-      router.push(`/${site}/login`)
+      // Hard redirect to ensure clean state and avoid middleware/cache issues
+      window.location.href = `/${site}/login`
     } catch (error) {
       console.error('Erro no logout:', error)
+      // Fallback
+      router.push(`/${site}/login`)
     }
   }
 
