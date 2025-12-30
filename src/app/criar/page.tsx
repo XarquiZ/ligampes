@@ -157,10 +157,13 @@ export default function RegisterPage() {
                             </Link>
                         </div>
 
-                        <div className="w-full grid md:grid-cols-3 gap-6">
+                        <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-6 w-[calc(100vw-3rem)] -mx-6 px-6 md:w-full md:grid md:grid-cols-3 md:mx-0 md:px-0 md:pb-0 scrollbar-hide">
 
                             {/* Free Plan */}
-                            <Card className="bg-zinc-900 border-zinc-800 hover:border-zinc-700 transition-all flex flex-col">
+                            <Card className={cn(
+                                "min-w-[85vw] md:min-w-0 snap-center flex flex-col transition-all cursor-pointer relative",
+                                selectedPlan === 'free' ? "bg-zinc-800/80 border-green-500 ring-1 ring-green-500" : "bg-zinc-900 border-zinc-800 hover:border-zinc-700"
+                            )}>
                                 <CardHeader>
                                     <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
                                         <Trophy className="w-6 h-6 text-zinc-400" />
@@ -179,15 +182,21 @@ export default function RegisterPage() {
                                 <div className="p-6 pt-0 mt-auto">
                                     <Button
                                         onClick={() => handleSelectPlan('free')}
-                                        className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-12"
+                                        className={cn(
+                                            "w-full font-bold h-12",
+                                            selectedPlan === 'free' ? "bg-green-600 hover:bg-green-700 text-white" : "bg-zinc-800 hover:bg-zinc-700 text-white"
+                                        )}
                                     >
-                                        Começar Grátis
+                                        {selectedPlan === 'free' ? 'Selecionado' : 'Começar Grátis'}
                                     </Button>
                                 </div>
                             </Card>
 
                             {/* Mensal Plan */}
-                            <Card className="bg-zinc-900 border-zinc-800 hover:border-green-500/50 transition-all flex flex-col relative overflow-hidden group">
+                            <Card className={cn(
+                                "min-w-[85vw] md:min-w-0 snap-center flex flex-col transition-all cursor-pointer relative overflow-hidden group",
+                                selectedPlan === 'mensal' ? "bg-zinc-800/80 border-green-500 ring-1 ring-green-500" : "bg-zinc-900 border-zinc-800 hover:border-green-500/50"
+                            )}>
                                 <CardHeader>
                                     <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mb-4">
                                         <Trophy className="w-6 h-6 text-zinc-400" />
@@ -206,15 +215,21 @@ export default function RegisterPage() {
                                 <div className="p-6 pt-0 mt-auto">
                                     <Button
                                         onClick={() => handleSelectPlan('mensal')}
-                                        className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold h-12"
+                                        className={cn(
+                                            "w-full font-bold h-12",
+                                            selectedPlan === 'mensal' ? "bg-green-600 hover:bg-green-700 text-white" : "bg-zinc-800 hover:bg-zinc-700 text-white"
+                                        )}
                                     >
-                                        Assinar Mensal
+                                        {selectedPlan === 'mensal' ? 'Selecionado' : 'Assinar Mensal'}
                                     </Button>
                                 </div>
                             </Card>
 
                             {/* Anual Plan */}
-                            <Card className="bg-zinc-900 border-green-500 hover:border-green-400 transition-all flex flex-col relative overflow-hidden group shadow-[0_0_30px_rgba(34,197,94,0.15)]">
+                            <Card className={cn(
+                                "min-w-[85vw] md:min-w-0 snap-center flex flex-col transition-all cursor-pointer relative overflow-hidden group shadow-[0_0_30px_rgba(34,197,94,0.15)]",
+                                selectedPlan === 'anual' ? "bg-zinc-800/80 border-green-500 ring-1 ring-green-500 transform scale-[1.02]" : "bg-zinc-900 border-green-500 hover:border-green-400"
+                            )}>
                                 <div className="absolute top-0 right-0 bg-green-500 text-black text-xs font-bold px-3 py-1 rounded-bl-lg">
                                     ECONOMIZE R$ 60
                                 </div>
@@ -236,9 +251,12 @@ export default function RegisterPage() {
                                 <div className="p-6 pt-0 mt-auto">
                                     <Button
                                         onClick={() => handleSelectPlan('anual')}
-                                        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-12"
+                                        className={cn(
+                                            "w-full font-bold h-12",
+                                            selectedPlan === 'anual' ? "bg-green-600 hover:bg-green-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
+                                        )}
                                     >
-                                        Assinar Anual
+                                        {selectedPlan === 'anual' ? 'Selecionado' : 'Assinar Anual'}
                                     </Button>
                                 </div>
                             </Card>

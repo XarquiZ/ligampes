@@ -25,11 +25,11 @@ export function PricingFAQ() {
                     <p className="text-zinc-400">Comece grátis, pague apenas quando estiver pronto.</p>
                 </div>
 
-                {/* Cards - Information Only */}
-                <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto mb-24">
+                {/* Cards - Scrollable on Mobile, Grid on Desktop */}
+                <div className="flex overflow-x-auto snap-x snap-mandatory pb-8 lg:pb-0 lg:overflow-visible gap-6 lg:gap-8 lg:grid lg:grid-cols-3 max-w-6xl mx-auto mb-24 -mx-6 px-6 lg:mx-auto lg:px-0 scrollbar-hide">
 
                     {/* Starter Grátis */}
-                    <Card className="bg-zinc-900 border-zinc-800 relative flex flex-col">
+                    <Card className="min-w-[85vw] md:min-w-[350px] snap-center bg-zinc-900 border-zinc-800 relative flex flex-col h-full">
                         <CardHeader>
                             <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mb-4">
                                 <Trophy className="w-5 h-5 text-zinc-400" />
@@ -48,7 +48,7 @@ export function PricingFAQ() {
                     </Card>
 
                     {/* Mensal */}
-                    <Card className="bg-zinc-900 border-zinc-800 relative flex flex-col">
+                    <Card className="min-w-[85vw] md:min-w-[350px] snap-center bg-zinc-900 border-zinc-800 relative flex flex-col h-full">
                         <CardHeader>
                             <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center mb-4">
                                 <Trophy className="w-5 h-5 text-zinc-400" />
@@ -67,7 +67,7 @@ export function PricingFAQ() {
                     </Card>
 
                     {/* Anual */}
-                    <Card className="bg-zinc-900 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)] relative overflow-hidden transform md:-translate-y-4 flex flex-col">
+                    <Card className="min-w-[85vw] md:min-w-[350px] snap-center bg-zinc-900 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.1)] relative overflow-hidden transform lg:-translate-y-4 flex flex-col h-full">
                         <div className="absolute top-0 right-0 p-0">
                             <Badge className="bg-green-500 hover:bg-green-600 text-zinc-950 font-bold rounded-bl-xl rounded-tr-none px-4 py-1">ECONOMIZE R$ 60</Badge>
                         </div>
