@@ -417,6 +417,17 @@ export default function Dashboard() {
           if (createError) {
             console.error('[Dashboard] Erro ao criar profile:', createError)
           } else {
+            // SUCESSO: Criar vínculo na organization_members (se ainda não existir)
+            const { error: memberError } = await supabase
+              .from('organization_members')
+              .insert({
+                organization_id: currentOrg.id,
+                user_id: user.id,
+                role: isAdmin ? 'admin' : 'member'
+              })
+
+            if (memberError) console.warn('[Dashboard] Aviso ao vincular membro:', memberError)
+
             setProfile(newProfile)
             setTeam(newProfile?.teams || null)
             setNewCoachName(newProfile?.coach_name || defaultName)
