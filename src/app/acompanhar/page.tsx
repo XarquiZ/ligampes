@@ -69,19 +69,23 @@ export default async function TrackerPage() {
                                         <PayButton orgId={org.id} plan={org.chosen_plan || 'mensal'} />
                                     )}
 
+                                    {/* Button: Ver Projeto (Active OR Trial < 48h) */}
+                                    {(org.status === 'active' || (org.status === 'payment_required' && (new Date().getTime() - new Date(org.created_at).getTime()) < 172800000)) && (
+                                        <Button asChild variant="outline" className="w-full md:w-auto border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+                                            <Link href={`/${org.slug}/login`} target="_blank">
+                                                Ver Projeto
+                                                {org.status !== 'active' && <span className="ml-2 text-[10px] bg-yellow-500/10 text-yellow-500 px-1.5 py-0.5 rounded border border-yellow-500/20">TESTE 48H</span>}
+                                                <ExternalLink className="ml-2 w-3 h-3" />
+                                            </Link>
+                                        </Button>
+                                    )}
+
                                     {org.status === 'active' && (
-                                        <>
-                                            <Button asChild variant="outline" className="w-full md:w-auto border-zinc-700 text-zinc-300 hover:bg-zinc-800">
-                                                <Link href={`/${org.slug}/login`} target="_blank">
-                                                    Ver Projeto <ExternalLink className="ml-2 w-3 h-3" />
-                                                </Link>
-                                            </Button>
-                                            <Button asChild className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-zinc-950 font-bold">
-                                                <Link href={`/${org.slug}/dashboard`}>
-                                                    Acessar Painel
-                                                </Link>
-                                            </Button>
-                                        </>
+                                        <Button asChild className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-zinc-950 font-bold">
+                                            <Link href={`/${org.slug}/dashboard`}>
+                                                Acessar Painel
+                                            </Link>
+                                        </Button>
                                     )}
                                 </div>
                             </div>
