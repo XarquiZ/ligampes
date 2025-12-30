@@ -72,7 +72,7 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
         plan: plan,
         chosen_plan: plan,
         price_id: priceId,
-        status: plan === 'free' ? 'pending_setup' : 'payment_required',
+        status: 'pending_setup',
         settings: {
             max_teams: 8,
             game_type: gameType
