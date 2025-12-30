@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import WelcomeEmail from '@/components/emails/WelcomeEmail';
 import { ReactElement } from 'react';
+import { render } from '@react-email/components';
 
 export async function sendWelcomeEmail(to: string, userName: string, leagueName: string, plan: string) {
     if (!process.env.RESEND_API_KEY) {
@@ -11,11 +12,13 @@ export async function sendWelcomeEmail(to: string, userName: string, leagueName:
     const resend = new Resend(process.env.RESEND_API_KEY);
 
     try {
+        const emailHtml = await render(WelcomeEmail({ userName, leagueName, plan }) as ReactElement);
+
         const { data, error } = await resend.emails.send({
             from: 'LIGA.ON <nao-responda@ligaon.com.br>',
             to: [to],
             subject: 'Bem-vindo ao LIGA.ON: O setup do seu servidor começou ⚙️',
-            react: WelcomeEmail({ userName, leagueName, plan }) as ReactElement,
+            html: emailHtml,
         });
 
         if (error) {
