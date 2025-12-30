@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const origin = `${protocol}://${host}`
 
   // Default redirect
-  let next = nextParam ?? '/dashboard'
+  let next = nextParam ?? '/acompanhar'
 
   console.log('[Callback] Debug - Host:', host)
   console.log('[Callback] Next Param:', nextParam)
