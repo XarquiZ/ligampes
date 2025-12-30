@@ -3,15 +3,24 @@ import Stripe from "stripe"
 import { createAdminClient } from "@/lib/supabase-server"
 import { Resend } from 'resend'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-    apiVersion: "2024-12-18.acacia" as any,
-})
+// Remove top-level initialization to prevent build failures when env vars are missing
+// const stripe = new Stripe(...) 
 
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET
 
 export async function POST(req: Request) {
     const body = await req.text()
     const sig = (await headers()).get("stripe-signature") as string
+
+    // Initialize Stripe lazily inside the handler
+    if (!process.env.STRIPE_SECRET_KEY) {
+        console.error("Missing STRIPE_SECRET_KEY")
+        return new Response("Server Configuration Error: Missing Stripe Key", { status: 500 })
+    }
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: "2024-12-18.acacia" as any,
+    })
 
     let event: Stripe.Event
 
