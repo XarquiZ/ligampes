@@ -24,7 +24,22 @@ import { Badge } from '@/components/ui/badge'
 import { FeatureShowcase } from '@/components/landing/FeatureShowcase'
 import { ComparisonSection } from '@/components/landing/ComparisonSection'
 
+import { useRouter, useSearchParams } from 'next/navigation'
+
 export default function LandingPage() {
+  const router = useRouter()
+  // Safety net for Supabase misconfiguration (redirecting to root instead of callback)
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const code = params.get('code')
+      if (code) {
+        console.log('[Landing] Auth code detected, redirecting to callback...')
+        window.location.href = `/api/auth/callback${window.location.search}`
+      }
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-zinc-950 text-white selection:bg-green-500/30 font-sans scroll-smooth pt-20">
 
