@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function createClient() {
+export async function createClient(cookieName?: string) {
     const cookieStore = await cookies()
 
     return createServerClient(
@@ -24,6 +24,7 @@ export async function createClient() {
                     }
                 },
             },
+            ...(cookieName ? { cookieOptions: { name: cookieName } } : {}),
         }
     )
 }

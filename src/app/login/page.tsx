@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { supabasePlatform } from '@/lib/supabase-platform'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -17,13 +17,15 @@ export default function CentralLoginPage() {
 
 
     const [loading, setLoading] = useState(true)
+    const [currentUser, setCurrentUser] = useState<any>(null)
 
     // Check for existing session
     useState(() => {
         const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession()
+            const { data: { session } } = await supabasePlatform.auth.getSession()
             if (session) {
-                router.replace('/acompanhar')
+                setCurrentUser(session.user)
+                setLoading(false)
             } else {
                 setLoading(false)
             }
@@ -34,17 +36,18 @@ export default function CentralLoginPage() {
     const handleGoogleLogin = async () => {
         try {
             // Força logout antes de tentar novo login para limpar sessões antigas
-            await supabase.auth.signOut()
+            await supabasePlatform.auth.signOut()
 
             const origin = window.location.origin
             // Explicitly set next param for landing page flow
             const next = '/acompanhar'
-            console.log("Redirecting to:", `${origin}/api/auth/callback?next=${next}`)
+            const authType = 'platform'
+            console.log("Redirecting to:", `${origin}/api/auth/callback?next=${next}&auth_type=${authType}`)
 
-            const { error } = await supabase.auth.signInWithOAuth({
+            const { error } = await supabasePlatform.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${origin}/api/auth/callback?next=${next}`,
+                    redirectTo: `${origin}/api/auth/callback?next=${next}&auth_type=${authType}`,
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
@@ -62,6 +65,46 @@ export default function CentralLoginPage() {
         return (
             <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-green-500 animate-spin" />
+            </div>
+        )
+    }
+
+    if (currentUser) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4 relative">
+                <Link
+                    href="/"
+                    className="absolute top-6 left-6 p-2 bg-zinc-900/50 hover:bg-zinc-800 rounded-full transition-colors backdrop-blur-sm"
+                >
+                    <ArrowLeft className="w-6 h-6 text-white" />
+                </Link>
+
+                <div className="mb-8 text-center flex flex-col items-center">
+                    <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                        <Trophy className="w-8 h-8 text-green-500" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-white mb-2">Bem-vindo de volta!</h1>
+                    <p className="text-zinc-400">Você já está conectado como <span className="text-white font-medium">{currentUser.email}</span></p>
+                </div>
+
+                <div className="w-full max-w-sm space-y-3">
+                    <Button
+                        onClick={() => router.push('/acompanhar')}
+                        className="w-full h-12 text-lg font-bold bg-green-500 hover:bg-green-600 text-black"
+                    >
+                        Continuar para Painel
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={async () => {
+                            await supabasePlatform.auth.signOut()
+                            setCurrentUser(null)
+                        }}
+                        className="w-full h-12 border-zinc-700 hover:bg-zinc-800 text-zinc-300"
+                    >
+                        Trocar de Conta
+                    </Button>
+                </div>
             </div>
         )
     }

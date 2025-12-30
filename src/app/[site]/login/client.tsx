@@ -16,8 +16,21 @@ interface Organization {
 }
 
 export function CentralLoginClient({ organization }: { organization: Organization }) {
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [currentUser, setCurrentUser] = useState<any>(null)
+    const router = useRouter()
+
+    useState(() => {
+        const checkSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session) {
+                setCurrentUser(session.user)
+            }
+            setLoading(false)
+        }
+        checkSession()
+    })
 
     const handleGoogleLogin = async () => {
         setLoading(true)
@@ -77,29 +90,62 @@ export function CentralLoginClient({ organization }: { organization: Organizatio
             >
                 <ArrowLeft className="w-6 h-6 text-white" />
             </Link>
-            <Card className="w-full max-w-md p-10 border-white/10 bg-zinc-900/50 backdrop-blur-xl">
-                <div className="text-center space-y-6">
-                    <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent uppercase">
-                        {organization.name}
-                    </h1>
-                    {error && (
-                        <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
-                            <p className="text-red-300 text-sm">{error}</p>
+
+            {currentUser ? (
+                <Card className="w-full max-w-md p-10 border-white/10 bg-zinc-900/50 backdrop-blur-xl">
+                    <div className="text-center space-y-6">
+                        <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent uppercase">
+                            {organization.name}
+                        </h1>
+                        <p className="text-zinc-400 text-lg">
+                            Você já está logado como <span className="text-white font-medium">{currentUser.email}</span>
+                        </p>
+                        <div className="space-y-3 pt-4">
+                            <Button
+                                onClick={() => router.push(`/${organization.slug}/dashboard`)}
+                                size="lg"
+                                className="w-full text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0"
+                            >
+                                Entrar na Liga
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={async () => {
+                                    await supabase.auth.signOut()
+                                    setCurrentUser(null)
+                                }}
+                                className="w-full border-white/20 hover:bg-white/10 text-zinc-300"
+                            >
+                                Usar outra conta
+                            </Button>
                         </div>
-                    )}
-                    <p className="text-zinc-400 text-lg">
-                        Faça login para gerenciar seu time
-                    </p>
-                    <Button
-                        onClick={handleGoogleLogin}
-                        disabled={loading}
-                        size="lg"
-                        className="w-full text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0"
-                    >
-                        Entrar com Google
-                    </Button>
-                </div>
-            </Card>
+                    </div>
+                </Card>
+            ) : (
+                <Card className="w-full max-w-md p-10 border-white/10 bg-zinc-900/50 backdrop-blur-xl">
+                    <div className="text-center space-y-6">
+                        <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent uppercase">
+                            {organization.name}
+                        </h1>
+                        {error && (
+                            <div className="p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+                                <p className="text-red-300 text-sm">{error}</p>
+                            </div>
+                        )}
+                        <p className="text-zinc-400 text-lg">
+                            Faça login para gerenciar seu time
+                        </p>
+                        <Button
+                            onClick={handleGoogleLogin}
+                            disabled={loading}
+                            size="lg"
+                            className="w-full text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white border-0"
+                        >
+                            Entrar com Google
+                        </Button>
+                    </div>
+                </Card>
+            )}
         </div>
     )
 }

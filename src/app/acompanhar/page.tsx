@@ -4,10 +4,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Clock, CheckCircle2, ArrowRight, ExternalLink, LogOut, Mail, Trophy } from 'lucide-react'
 import Link from 'next/link'
-import SignOutButton from '@/components/SignOutButton' // Assuming we have or will create a sign out logic, or inline it.
+import PlatformSignOutButton from '@/components/PlatformSignOutButton'
 
 export default async function TrackerPage() {
-    const supabase = await createClient()
+    const supabase = await createClient('sb-platform-auth')
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -31,7 +31,7 @@ export default async function TrackerPage() {
                         <h1 className="text-2xl font-bold">Minhas Ligas</h1>
                         <p className="text-zinc-400">Acompanhe o status e acesse seus campeonatos.</p>
                     </div>
-                    <SignOutButton />
+                    <PlatformSignOutButton />
                 </div>
 
                 {/* List */}
