@@ -441,13 +441,15 @@ export default function ElencoPage() {
     setDismissModalOpen(true)
   }
 
+  const params = useParams()
+
   const navigateToPlayerInPlayersPage = (player: Player) => {
     sessionStorage.setItem('selectedPlayer', JSON.stringify({
       id: player.id,
       name: player.name,
       shouldExpand: true
     }))
-    router.push(`/dashboard/jogadores#player-${player.id}`)
+    router.push(`/${params.site}/dashboard/jogadores#player-${player.id}`)
   }
 
   const handleProposeToCoach = async (player: Player) => {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from '@/lib/supabase';
 import Image from "next/image";
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useOrganization } from "@/contexts/OrganizationContext";
 
 import { ChevronDown } from "lucide-react";
@@ -22,6 +22,7 @@ interface Artilheiro {
 export default function Artilharia() {
   const { organization } = useOrganization();
   const router = useRouter();
+  const params = useParams();
   const [artilheiros, setArtilheiros] = useState<Artilheiro[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataAtualizacao, setDataAtualizacao] = useState<string>('');
@@ -357,7 +358,7 @@ export default function Artilharia() {
                     <div>
                       <div
                         className="font-bold text-white hover:text-yellow-400 cursor-pointer transition-colors"
-                        onClick={() => router.push(`/dashboard/jogadores/${artilheiro.id}`)}
+                        onClick={() => router.push(`/${params.site}/dashboard/jogadores/${artilheiro.id}`)}
                       >
                         {artilheiro.nome}
                       </div>

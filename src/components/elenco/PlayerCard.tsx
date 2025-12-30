@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { PlayerCardProps } from './types'
 import { Target, Footprints, Square, Pencil, DollarSign, X, MessageCircle, Trash2 } from 'lucide-react'
 import { StatItem } from './StatItem'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 
 // Função para formatar o preço
 const formatPrice = (price: number): string => {
@@ -47,6 +47,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   }
 
   const router = useRouter()
+  const params = useParams()
 
   const handleCardClick = () => {
     onCardClick(player)
@@ -112,7 +113,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           className="font-bold text-base lg:text-lg text-center leading-tight line-clamp-2 hover:text-purple-400 cursor-pointer transition-colors"
           onClick={(e) => {
             e.stopPropagation()
-            router.push(`/dashboard/jogadores/${player.id}`)
+            router.push(`/${params.site}/dashboard/jogadores/${player.id}`)
           }}
         >
           {player.name}

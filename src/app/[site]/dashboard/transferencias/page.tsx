@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import FloatingChatButton from '@/components/FloatingChatButton'
@@ -59,6 +59,7 @@ const OVERALL_OPTIONS = [
 export default function PaginaTransferencias() {
   const { organization } = useOrganization()
   const router = useRouter()
+  const params = useParams()
   const [activeView, setActiveView] = useState<'transferencias' | 'mercado'>('transferencias')
 
   // Estados para Transferências
@@ -317,7 +318,13 @@ export default function PaginaTransferencias() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        router.push('/login')
+        // Se temos o site nos params (o que deve acontecer), usamos ele.
+        // Se não, fallback para /login global (embora idealmente não deva acontecer aqui)
+        if (typeof params?.site === 'string') {
+          router.push(`/${params.site}/login`)
+        } else {
+          router.push('/login')
+        }
         return
       }
 

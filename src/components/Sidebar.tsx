@@ -1,9 +1,9 @@
 // src/components/Sidebar.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useParams } from 'next/navigation'
 import {
   DollarSign,
   Shirt,
@@ -49,73 +49,79 @@ interface SidebarProps {
   } | null
 }
 
-
-const navigationItems = [
-  {
-    name: 'Inbox',
-    href: '#inbox',
-    icon: Inbox,
-    color: 'text-orange-400'
-  },
-  {
-    name: 'Dashboard',
-    href: '/dashboard',
-    icon: Home,
-    color: 'text-blue-400'
-  },
-  {
-    name: 'Saldo',
-    href: '/dashboard/saldo',
-    icon: DollarSign,
-    color: 'text-green-400'
-  },
-  {
-    name: 'Meu Elenco',
-    href: '/dashboard/elenco',
-    icon: Shirt,
-    color: 'text-blue-400'
-  },
-  {
-    name: 'Jogadores',
-    href: '/dashboard/jogadores',
-    icon: Users,
-    color: 'text-pink-400'
-  },
-  {
-    name: 'Transferências',
-    href: '/dashboard/transferencias',
-    icon: ArrowLeftRight,
-    color: 'text-purple-400'
-  },
-  {
-    name: 'Leilão',
-    href: '/dashboard/leilao',
-    icon: Calendar,
-    color: 'text-red-400'
-  },
-  {
-    name: 'Tabela',
-    href: '/dashboard/tabela',
-    icon: Trophy,
-    color: 'text-yellow-400'
-  },
-  {
-    name: 'Informações',
-    href: '/dashboard/informacoes',
-    icon: ScrollText,
-    color: 'text-indigo-400'
-  },
-]
-
 export default function Sidebar({ user, profile, team }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const params = useParams()
+  const site = params?.site as string // Get the dynamic site param
+
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState<boolean | null>(null)
 
   // Inbox State
   const [isInboxOpen, setIsInboxOpen] = useState(false)
   const { announcements, unreadCount, markAsRead, votePoll } = useInbox(user, team)
+
+  // Dynamic Navigation Items based on site
+  const navigationItems = useMemo(() => {
+    const baseUrl = `/${site}/dashboard`
+    return [
+      {
+        name: 'Inbox',
+        href: '#inbox', // Special case
+        icon: Inbox,
+        color: 'text-orange-400'
+      },
+      {
+        name: 'Dashboard',
+        href: baseUrl,
+        icon: Home,
+        color: 'text-blue-400'
+      },
+      {
+        name: 'Saldo',
+        href: `${baseUrl}/saldo`,
+        icon: DollarSign,
+        color: 'text-green-400'
+      },
+      {
+        name: 'Meu Elenco',
+        href: `${baseUrl}/elenco`,
+        icon: Shirt,
+        color: 'text-blue-400'
+      },
+      {
+        name: 'Jogadores',
+        href: `${baseUrl}/jogadores`,
+        icon: Users,
+        color: 'text-pink-400'
+      },
+      {
+        name: 'Transferências',
+        href: `${baseUrl}/transferencias`,
+        icon: ArrowLeftRight,
+        color: 'text-purple-400'
+      },
+      {
+        name: 'Leilão',
+        href: `${baseUrl}/leilao`,
+        icon: Calendar,
+        color: 'text-red-400'
+      },
+      {
+        name: 'Tabela',
+        href: `${baseUrl}/tabela`,
+        icon: Trophy,
+        color: 'text-yellow-400'
+      },
+      {
+        name: 'Informações',
+        href: `${baseUrl}/informacoes`,
+        icon: ScrollText,
+        color: 'text-indigo-400'
+      },
+    ]
+  }, [site])
 
   // Efeito para carregar o estado salvo do localStorage
   useEffect(() => {
@@ -165,6 +171,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
   const handleSignOut = async () => {
     try {
       await supabase.auth.signOut()
+      router.push(`/${site}/login`)
     } catch (error) {
       console.error('Erro no logout:', error)
     }
@@ -187,7 +194,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
   }
 
   const handleLogoClick = () => {
-    router.push('/dashboard')
+    router.push(`/${site}/dashboard`)
     if (window.innerWidth < 1024) {
       setIsMobileOpen(false)
     }
@@ -341,7 +348,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
 
               return (
                 <Link
-                  key={item.name}
+                  key={item.name + item.href}
                   href={item.href}
                   onClick={(e) => {
                     if (item.name === 'Inbox') {

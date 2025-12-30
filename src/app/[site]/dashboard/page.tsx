@@ -164,10 +164,11 @@ function MatchResult({ match }: { match: MatchSchedule }) {
 }
 
 // Componente Modal para avisos
-function WarningModal({ isOpen, onClose, type }: {
+function WarningModal({ isOpen, onClose, type, site }: {
   isOpen: boolean;
   onClose: () => void;
   type: 'below' | 'above' | null;
+  site: string;
 }) {
   if (!isOpen || !type) return null;
 
@@ -270,7 +271,7 @@ function WarningModal({ isOpen, onClose, type }: {
               >
                 Entendi
               </Button>
-              <Link href="/dashboard/elenco" onClick={onClose} className="flex-1">
+              <Link href={`/${site}/dashboard/elenco`} onClick={onClose} className="flex-1">
                 <Button className="w-full bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white">
                   Ver Elenco
                 </Button>
@@ -778,7 +779,7 @@ export default function Dashboard() {
         .order('date', { ascending: false })
         .order('time', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       // Buscar os próximos 2 jogos agendados
       const { data: nextScheduledMatches, error: scheduledError } = await supabase
@@ -1145,7 +1146,7 @@ export default function Dashboard() {
       color: 'green',
       value: formatBalance(team?.balance || 0),
       subtitle: 'disponível para gastar',
-      link: '/dashboard/saldo',
+      link: `/${site}/dashboard/saldo`,
       buttonText: 'Ver saldo',
       preview: 'saldo'
     },
@@ -1155,7 +1156,7 @@ export default function Dashboard() {
       color: 'blue',
       value: getPlayerCountValue(),
       subtitle: 'jogadores no elenco',
-      link: '/dashboard/elenco',
+      link: `/${site}/dashboard/elenco`,
       buttonText: 'Ver elenco',
       preview: 'elenco'
     },
@@ -1165,7 +1166,7 @@ export default function Dashboard() {
       color: 'pink',
       value: 'Pool',
       subtitle: 'todos os atletas',
-      link: '/dashboard/jogadores',
+      link: `/${site}/dashboard/jogadores`,
       buttonText: 'Ver jogadores',
       preview: 'jogadores'
     },
@@ -1175,7 +1176,7 @@ export default function Dashboard() {
       color: 'purple',
       value: 'Mercado',
       subtitle: 'negociações ativas',
-      link: '/dashboard/transferencias',
+      link: `/${site}/dashboard/transferencias`,
       buttonText: 'Ver mercado',
       preview: 'transferencias'
     },
@@ -1185,7 +1186,7 @@ export default function Dashboard() {
       color: 'red',
       value: activeAuctions.length > 0 ? 'AO VIVO' : 'EM BREVE',
       subtitle: activeAuctions.length > 0 ? 'leilão ativo' : 'próximo evento',
-      link: '/dashboard/leilao',
+      link: `/${site}/dashboard/leilao`,
       buttonText: 'Ver leilão',
       preview: 'leilao'
     },
@@ -1195,7 +1196,7 @@ export default function Dashboard() {
       color: 'yellow',
       value: teamPosition ? `${teamPosition}º` : 'N/A',
       subtitle: 'classificação atual',
-      link: '/dashboard/tabela',
+      link: `/${site}/dashboard/tabela`,
       buttonText: 'Ver classificação',
       preview: 'tabela'
     },
@@ -1205,7 +1206,7 @@ export default function Dashboard() {
       color: 'indigo',
       value: 'Avisos',
       subtitle: 'regulamento oficial',
-      link: '/dashboard/informacoes',
+      link: `/${site}/dashboard/informacoes`,
       buttonText: 'Ler regras',
       preview: 'regras'
     },
@@ -1864,6 +1865,7 @@ export default function Dashboard() {
         isOpen={warningModalOpen}
         onClose={() => setWarningModalOpen(false)}
         type={playerCountWarning.type}
+        site={site}
       />
 
       <AdminAnnouncementModal

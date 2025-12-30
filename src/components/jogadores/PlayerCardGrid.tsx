@@ -1,5 +1,5 @@
 import { Pencil, Target, Footprints, Square } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { StatItem } from '../elenco/StatItem'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,10 +39,11 @@ export function PlayerCardGrid({
   }
 
   const router = useRouter()
+  const params = useParams()
 
   const handleNameClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/dashboard/jogadores/${player.id}`)
+    router.push(`/${params.site}/dashboard/jogadores/${player.id}`)
   }
 
   return (

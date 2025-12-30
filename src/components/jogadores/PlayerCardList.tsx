@@ -8,7 +8,7 @@ import { PlayerAttributes } from './PlayerAttributes'
 import { PlayerSkills } from './PlayerSkills'
 import { PlayerInspirational } from './PlayerInspirational'
 import { Player } from '@/components/jogadores/types'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import React from 'react'
 
 interface PlayerCardListProps {
@@ -37,6 +37,7 @@ export function PlayerCardList({
   renderClubLogo
 }: PlayerCardListProps) {
   const router = useRouter()
+  const params = useParams()
   const isFavorite = favoritePlayers.includes(player.id)
 
   const handleCompareClick = (e: React.MouseEvent) => {
@@ -63,12 +64,12 @@ export function PlayerCardList({
     sessionStorage.setItem('comparePlayer1', JSON.stringify(compareData))
 
     // Redirecionar para a página de elenco na seção de comparação
-    router.push('/dashboard/elenco?section=comparacao')
+    router.push(`/${params.site}/dashboard/elenco?section=comparacao`)
   }
 
   const handleNameClick = (e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/dashboard/jogadores/${player.id}`)
+    router.push(`/${params.site}/dashboard/jogadores/${player.id}`)
   }
 
   // Handler para lidar com clicks no card

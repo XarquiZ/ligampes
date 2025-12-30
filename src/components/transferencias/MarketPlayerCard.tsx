@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Edit, Trash2, ShoppingCart, Info, ExternalLink, MessageCircle, Handshake } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { MarketPlayer } from './types'
 import EditDescriptionForm from './EditDescriptionForm'
 
@@ -36,6 +36,7 @@ export default function MarketPlayerCard({
   onCancelEdit
 }: MarketPlayerCardProps) {
   const router = useRouter()
+  const params = useParams()
 
   const player = listing.player || {
     id: listing.player_id,
@@ -57,7 +58,7 @@ export default function MarketPlayerCard({
     listing.description?.toLowerCase().includes('aceito')
 
   const navigateToPlayerPage = (playerId: string) => {
-    router.push(`/dashboard/jogadores/${playerId}`)
+    router.push(`/${params.site}/dashboard/jogadores/${playerId}`)
   }
 
   const handleActionClick = () => {
