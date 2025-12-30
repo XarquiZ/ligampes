@@ -22,23 +22,27 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { FeatureShowcase } from '@/components/landing/FeatureShowcase'
+import { ComparisonSection } from '@/components/landing/ComparisonSection'
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-white selection:bg-green-500/30 font-sans scroll-smooth">
+    <div className="min-h-screen bg-zinc-950 text-white selection:bg-green-500/30 font-sans scroll-smooth pt-20">
 
       {/* --- HEADER --- */}
-      <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur-md fixed top-0 w-full z-50">
         <div className="container mx-auto px-6 h-20 flex items-center justify-between">
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="bg-gradient-to-tr from-green-500 to-emerald-600 p-2 rounded-lg group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-green-500/20">
-              <Trophy className="w-6 h-6 text-zinc-950 fill-current" />
+            <div className="relative w-40 h-12">
+              <Image
+                src="/LOGO.png"
+                alt="Liga.On Logo"
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
-            <span className="text-2xl font-black tracking-tighter text-white">
-              LIGA<span className="text-green-500">.ON</span>
-            </span>
           </Link>
 
           {/* Nav Desktop */}
@@ -50,8 +54,11 @@ export default function LandingPage() {
 
           {/* Actions */}
           <div className="flex items-center gap-4">
-            <Button className="font-bold bg-green-500 hover:bg-green-600 text-zinc-950 shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] transition-all duration-300">
-              Criar Liga Grátis
+            <Button asChild variant="ghost" className="text-zinc-400 hover:text-white hover:bg-zinc-800">
+              <Link href="/login">Acompanhar Solicitação</Link>
+            </Button>
+            <Button asChild className="font-bold bg-green-500 hover:bg-green-600 text-zinc-950 shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] transition-all duration-300">
+              <Link href="/criar">Criar Liga Grátis</Link>
             </Button>
           </div>
         </div>
@@ -76,7 +83,7 @@ export default function LandingPage() {
 
           {/* Heading */}
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.1] animate-in fade-in slide-in-from-bottom-8 duration-700">
-            leve seu campeonato<br />
+            Leve seu campeonato<br />
             para o <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">Próximo Nível</span>.
           </h1>
 
@@ -87,8 +94,8 @@ export default function LandingPage() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center gap-4 mb-20 animate-in fade-in slide-in-from-bottom-16 duration-1000 w-full sm:w-auto">
-            <Button size="lg" className="w-full sm:w-auto h-14 px-8 text-lg font-bold bg-green-500 hover:bg-green-600 text-zinc-950 shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_30px_rgba(34,197,94,0.6)] transition-all">
-              Começar Agora <Rocket className="ml-2 w-5 h-5" />
+            <Button asChild size="lg" className="w-full sm:w-auto h-14 px-8 text-lg font-bold bg-green-500 hover:bg-green-600 text-zinc-950 shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_30px_rgba(34,197,94,0.6)] transition-all">
+              <Link href="/criar">Começar Agora <Rocket className="ml-2 w-5 h-5" /></Link>
             </Button>
             <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg border-zinc-800 bg-zinc-950/50 hover:bg-zinc-900 text-zinc-300 hover:text-white backdrop-blur-sm">
               <PlayCircle className="mr-2 w-5 h-5 text-purple-500" /> Ver Exemplo ao Vivo
@@ -183,6 +190,9 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* --- COMPARISON SECTION (NEW) --- */}
+      <ComparisonSection />
+
       {/* --- GAMES SECTION --- */}
       <section id="games" className="py-24 bg-zinc-900/30 border-t border-zinc-800">
         <div className="container mx-auto px-6">
@@ -195,7 +205,7 @@ export default function LandingPage() {
 
             {/* PES / FIFA */}
             <Card className="bg-zinc-950 border-zinc-800 overflow-hidden hover:border-green-500/50 transition-all group">
-              <div className="h-48 relative flex items-center justify-center overflow-hidden">
+              <div className="h-64 relative flex items-center justify-center overflow-hidden">
                 <Image
                   src="https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=800&auto=format&fit=crop"
                   alt="Futebol Virtual"
@@ -225,7 +235,7 @@ export default function LandingPage() {
 
             {/* NBA / BASQUETE */}
             <Card className="bg-zinc-950 border-zinc-800 overflow-hidden hover:border-orange-500/50 transition-all group">
-              <div className="h-48 relative flex items-center justify-center overflow-hidden">
+              <div className="h-64 relative flex items-center justify-center overflow-hidden">
                 <Image
                   src="https://images.unsplash.com/photo-1546519638-68e109498ffc?q=80&w=800&auto=format&fit=crop"
                   alt="Basquete"
@@ -255,7 +265,7 @@ export default function LandingPage() {
 
             {/* REAL SPORTS */}
             <Card className="bg-zinc-950 border-zinc-800 overflow-hidden hover:border-blue-500/50 transition-all group">
-              <div className="h-48 relative flex items-center justify-center overflow-hidden">
+              <div className="h-64 relative flex items-center justify-center overflow-hidden">
                 <Image
                   src="https://images.unsplash.com/photo-1551958219-acbc608c6377?q=80&w=800&auto=format&fit=crop"
                   alt="Futebol Society"
@@ -418,12 +428,14 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-8 mb-12">
             <div className="col-span-1 md:col-span-2">
               <Link href="/" className="flex items-center gap-2 justify-center md:justify-start mb-4">
-                <div className="bg-gradient-to-tr from-green-500 to-emerald-600 p-1.5 rounded-lg">
-                  <Trophy className="w-4 h-4 text-zinc-950 fill-current" />
+                <div className="relative w-32 h-10">
+                  <Image
+                    src="/LOGO.png"
+                    alt="Liga.On Logo"
+                    fill
+                    className="object-contain"
+                  />
                 </div>
-                <span className="text-xl font-black tracking-tighter text-white">
-                  LIGA<span className="text-green-500">.ON</span>
-                </span>
               </Link>
               <p className="text-zinc-500 text-sm max-w-xs mx-auto md:mx-0">
                 A plataforma definitiva para gestão de campeonatos virtuais e reais. Feito com 💚 para a comunidade.

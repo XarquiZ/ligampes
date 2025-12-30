@@ -8,7 +8,16 @@ import {
     Users,
     Table,
     BarChart3,
+    Maximize2,
+    X
 } from 'lucide-react'
+import {
+    Dialog,
+    DialogContent,
+    DialogTrigger,
+    DialogClose,
+    DialogTitle
+} from "@/components/ui/dialog"
 
 export function FeatureShowcase() {
     const [activeFeature, setActiveFeature] = React.useState(0)
@@ -74,8 +83,8 @@ export function FeatureShowcase() {
                         key={index}
                         onClick={() => setActiveFeature(index)}
                         className={`text-left p-4 rounded-xl transition-all duration-300 border flex items-center gap-4 group ${activeFeature === index
-                                ? "bg-green-500/10 border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
-                                : "bg-zinc-950/50 border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700"
+                            ? "bg-green-500/10 border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
+                            : "bg-zinc-950/50 border-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-700"
                             }`}
                     >
                         <div className={`p-2 rounded-lg ${activeFeature === index ? "bg-green-500 text-zinc-950" : "bg-zinc-900 text-zinc-500 group-hover:text-zinc-300"}`}>
@@ -117,6 +126,34 @@ export function FeatureShowcase() {
                         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/20 via-transparent to-transparent" />
                     </div>
                 ))}
+
+                {/* Botão de Expandir (Lightbox) */}
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <button
+                            className="absolute top-4 right-4 z-20 p-2 rounded-full bg-black/50 hover:bg-black/80 text-white backdrop-blur-sm transition-all opacity-0 group-hover/image:opacity-100 border border-white/10 hover:scale-110"
+                            title="Expandir Imagem"
+                        >
+                            <Maximize2 className="w-5 h-5" />
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-[95vw] h-[95vh] sm:max-w-[95vw] sm:h-[95vh] p-0 bg-transparent border-none shadow-none flex items-center justify-center outline-none">
+                        <DialogTitle className="sr-only">{features[activeFeature].title}</DialogTitle>
+                        <div className="relative w-full h-full flex items-center justify-center p-2">
+                            <DialogClose className="absolute -top-12 right-0 z-50 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all">
+                                <X className="w-6 h-6" />
+                            </DialogClose>
+                            <Image
+                                src={features[activeFeature].image}
+                                alt={features[activeFeature].title}
+                                fill
+                                className="object-contain"
+                                quality={100}
+                                priority
+                            />
+                        </div>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Loading/Progress Bar */}
                 <div className="absolute bottom-0 left-0 h-1 bg-green-500 transition-all duration-4000 ease-linear"

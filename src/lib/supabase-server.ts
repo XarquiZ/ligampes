@@ -27,3 +27,18 @@ export async function createClient() {
         }
     )
 }
+
+export async function createAdminClient() {
+    // Note: This client has admin privileges (bypasses RLS). Use with caution.
+    const { createClient } = await import('@supabase/supabase-js')
+    return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false,
+            },
+        }
+    )
+}
