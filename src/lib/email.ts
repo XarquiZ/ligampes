@@ -12,7 +12,7 @@ export async function sendWelcomeEmail(to: string, userName: string, leagueName:
 
     try {
         const { data, error } = await resend.emails.send({
-            from: 'LIGA.ON <onboarding@resend.dev>',
+            from: 'LIGA.ON <nao-responda@ligaon.com.br>',
             to: [to],
             // Log for debug
             // react: WelcomeEmail({ userName, leagueName, plan }) as ReactElement,
