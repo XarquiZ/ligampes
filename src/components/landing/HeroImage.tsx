@@ -1,10 +1,13 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion, useScroll, useTransform, useMotionTemplate, useMotionValue, useSpring } from 'framer-motion'
 import Image from 'next/image'
+import { ImageModal } from '@/components/ui/ImageModal'
+import { Maximize2 } from 'lucide-react'
 
 export function HeroImage() {
+    const [isOpen, setIsOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
 
     // Mouse tilt effect
@@ -43,6 +46,7 @@ export function HeroImage() {
                     x.set(0)
                     y.set(0)
                 }}
+                onClick={() => setIsOpen(true)}
                 className="relative w-full max-w-6xl mx-auto rounded-xl shadow-2xl shadow-emerald-500/20 border border-zinc-800 bg-zinc-900 overflow-hidden group cursor-pointer"
             >
                 <div className="relative aspect-video">
@@ -56,8 +60,20 @@ export function HeroImage() {
 
                     {/* Reflection / Gloss Effect */}
                     <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+
+                    {/* Zoom Hint */}
+                    <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-md p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white border border-white/10">
+                        <Maximize2 className="w-5 h-5" />
+                    </div>
                 </div>
             </motion.div>
+
+            <ImageModal
+                isOpen={isOpen}
+                onClose={() => setIsOpen(false)}
+                src="/screens/dashboard.png"
+                alt="Liga.On Dashboard Interface"
+            />
         </div>
     )
 }

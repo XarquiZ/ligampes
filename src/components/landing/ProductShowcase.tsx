@@ -1,9 +1,10 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import Image from 'next/image'
-import { Trophy, Users, Banknote, Gavel } from 'lucide-react'
+import { Trophy, Users, Banknote, Gavel, Maximize2 } from 'lucide-react'
+import { ImageModal } from '@/components/ui/ImageModal'
 
 const features = [
     {
@@ -41,6 +42,7 @@ const features = [
 ]
 
 export function ProductShowcase() {
+    const [selectedImage, setSelectedImage] = useState<{ src: string, alt: string } | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
     const { scrollYProgress } = useScroll({
         target: containerRef,
@@ -56,22 +58,29 @@ export function ProductShowcase() {
                     <div className="relative w-full h-full max-w-lg">
                         {features.map((feature, index) => {
                             // Creating fade in/out ranges for text
-                            // Range size per item is 1 / 4 = 0.25
-                            // Item 0: 0.0 - 0.2
-                            // Item 1: 0.25 - 0.45
-                            const start = index * 0.25
-                            const end = start + 0.25
-                            const mid = start + 0.125
+                            // Boundaries: 0, 0.25, 0.50, 0.75, 1.0
+
+                            const rangeStart = index * 0.25
+                            const rangeEnd = rangeStart + 0.25
+
+                            // Cross-fade transitions (overlap by 0.1)
+                            // Fade In: starts 0.1 before rangeStart, fully visible at rangeStart + 0.05
+                            // Fade Out: starts at rangeEnd - 0.05, fully invisible at rangeEnd + 0.1
+
+                            const fadeInStart = rangeStart - 0.1
+                            const fadeInEnd = rangeStart + 0.05
+                            const fadeOutStart = rangeEnd - 0.05
+                            const fadeOutEnd = rangeEnd + 0.1
 
                             // eslint-disable-next-line react-hooks/rules-of-hooks
                             const opacity = useTransform(scrollYProgress,
-                                [start, start + 0.05, end - 0.05, end],
+                                [fadeInStart, fadeInEnd, fadeOutStart, fadeOutEnd],
                                 [0, 1, 1, 0]
                             )
 
                             // eslint-disable-next-line react-hooks/rules-of-hooks
                             const y = useTransform(scrollYProgress,
-                                [start, mid, end],
+                                [rangeStart, rangeStart + 0.125, rangeEnd],
                                 [50, 0, -50]
                             )
 
@@ -96,22 +105,33 @@ export function ProductShowcase() {
 
                 {/* Right Column - Images */}
                 <div className="w-full lg:w-1/2 h-full flex items-center justify-center p-6 lg:p-12 bg-zinc-900/50">
-                    <div className="relative w-full aspect-video max-w-2xl rounded-xl border border-zinc-800 shadow-2xl overflow-hidden bg-zinc-900">
+                    <div className="relative w-full aspect-video max-w-2xl rounded-xl border border-zinc-800 shadow-2xl overflow-hidden bg-zinc-900 group">
                         {features.map((feature, index) => {
-                            const start = index * 0.25
-                            const end = start + 0.25
+                            const rangeStart = index * 0.25
+                            const rangeEnd = rangeStart + 0.25
+
+                            const fadeInStart = rangeStart - 0.1
+                            const fadeInEnd = rangeStart + 0.05
+                            const fadeOutStart = rangeEnd - 0.05
+                            const fadeOutEnd = rangeEnd + 0.1
 
                             // eslint-disable-next-line react-hooks/rules-of-hooks
                             const opacity = useTransform(scrollYProgress,
-                                [start, start + 0.01, end - 0.01, end],
+                                [fadeInStart, fadeInEnd, fadeOutStart, fadeOutEnd],
                                 [0, 1, 1, 0]
+                            )
+
+                            // eslint-disable-next-line react-hooks/rules-of-hooks
+                            const pointerEvents = useTransform(scrollYProgress,
+                                (v) => (v >= fadeInStart && v <= fadeOutEnd) ? 'auto' : 'none'
                             )
 
                             return (
                                 <motion.div
                                     key={index}
-                                    style={{ opacity }}
-                                    className="absolute inset-0"
+                                    style={{ opacity, pointerEvents }}
+                                    className="absolute inset-0 cursor-zoom-in"
+                                    onClick={() => setSelectedImage({ src: feature.image, alt: feature.title })}
                                 >
                                     <Image
                                         src={feature.image}
@@ -122,10 +142,24 @@ export function ProductShowcase() {
                                 </motion.div>
                             )
                         })}
+
+                        {/* Zoom Hint (Always visible on hover of container) */}
+                        <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white border border-white/10 pointer-events-none z-10">
+                            <Maximize2 className="w-5 h-5" />
+                        </div>
                     </div>
                 </div>
 
+                {/* Mobile Only Placeholder (Hidden for now as sticky handles it reasonably well or we rely on the sticky layout stacking) */}
+
             </div>
+
+            <ImageModal
+                isOpen={!!selectedImage}
+                onClose={() => setSelectedImage(null)}
+                src={selectedImage?.src || ''}
+                alt={selectedImage?.alt || ''}
+            />
         </section>
     )
 }
