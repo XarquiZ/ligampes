@@ -20,13 +20,13 @@ export interface Announcement {
     voted_option_id?: string
 }
 
-export function useInbox(user: any, team: any) {
+export function useInbox(user: any, team: any, organizationId?: string) {
     const [announcements, setAnnouncements] = useState<Announcement[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
     const [loading, setLoading] = useState(true)
 
     const fetchAnnouncements = async () => {
-        if (!user) return
+        if (!user || !organizationId) return
 
         try {
             setLoading(true)
@@ -38,6 +38,7 @@ export function useInbox(user: any, team: any) {
           *,
           poll_options (id, label)
         `)
+                .eq('organization_id', organizationId)
                 .order('created_at', { ascending: false })
 
             const { data: allAnnouncements, error: annError } = await query
@@ -154,7 +155,7 @@ export function useInbox(user: any, team: any) {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [user?.id, team?.id])
+    }, [user?.id, team?.id, organizationId])
 
     return {
         announcements,

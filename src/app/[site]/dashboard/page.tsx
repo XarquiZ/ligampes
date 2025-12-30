@@ -12,7 +12,7 @@ import {
   DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight,
   Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown,
   Building2, Target, Footprints, Clock, AlertTriangle, X,
-  Trophy, BarChart2, CalendarDays, ScrollText
+  Trophy, BarChart2, CalendarDays, ScrollText, Shield
 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -360,7 +360,7 @@ export default function Dashboard() {
   // Inbox System
   const [adminModalOpen, setAdminModalOpen] = useState(false)
   const [dashboardInboxOpen, setDashboardInboxOpen] = useState(false)
-  const { announcements: inboxAnnouncements, unreadCount: inboxUnread, markAsRead, votePoll } = useInbox(user, team) // Reuse logic
+  const { announcements: inboxAnnouncements, unreadCount: inboxUnread, markAsRead, votePoll } = useInbox(user, team, currentOrg?.id) // Reuse logic
 
 
 
@@ -383,7 +383,7 @@ export default function Dashboard() {
 
   // Carrega dados profile/team
   useEffect(() => {
-    if (authLoading || !user) return
+    if (authLoading || !user || !currentOrg) return
 
     const loadUserData = async () => {
       try {
@@ -415,7 +415,7 @@ export default function Dashboard() {
             .single()
 
           if (createError) {
-            console.error('[Dashboard] Erro ao criar profile:', createError)
+            console.error('[Dashboard] Erro ao criar profile:', JSON.stringify(createError, null, 2))
           } else {
             // SUCESSO: Criar vínculo na organization_members (se ainda não existir)
             const { error: memberError } = await supabase
@@ -492,7 +492,7 @@ export default function Dashboard() {
     }
 
     loadUserData()
-  }, [authLoading, user])
+  }, [authLoading, user, currentOrg])
 
   // ⚡ SUBSCRIPTION DE CHAT (Unread Count)
   useEffect(() => {
@@ -1153,7 +1153,7 @@ export default function Dashboard() {
     return `${playerCount}/28`
   }
 
-  const tiles = [
+  const allTiles = [
     {
       title: 'SALDO',
       icon: DollarSign,
@@ -1224,7 +1224,23 @@ export default function Dashboard() {
       buttonText: 'Ler regras',
       preview: 'regras'
     },
+    ...(isAdmin ? [{
+      title: 'GERENCIAR TIMES',
+      icon: Shield,
+      color: 'emerald',
+      value: 'Admin',
+      subtitle: 'adicionar/editar times',
+      link: `/${site}/dashboard/times`,
+      buttonText: 'Acessar',
+      preview: 'times'
+    }] : [])
   ]
+
+  // Filter tiles based on Game Type
+  // Se for NBA, mostra apenas: Elenco, Jogadores, Times (Admin), Tabela
+  const tiles = (currentOrg?.settings?.game_type === 'nba' || currentOrg?.settings?.game_type === 'NBA')
+    ? allTiles.filter(t => ['elenco', 'jogadores', 'times', 'tabela'].includes(t.preview))
+    : allTiles
 
   // Função para renderizar o preview baseado no tile
   const renderPreview = (tileTitle: string) => {
@@ -1592,6 +1608,21 @@ export default function Dashboard() {
                   Respeito e Fair Play obrigatórios
                 </li>
               </ul>
+            </div>
+          </div>
+        )
+
+      case 'GERENCIAR TIMES':
+        return (
+          <div className="space-y-3">
+            <div className="p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-4 h-4 text-emerald-400" />
+                <span className="text-emerald-400 font-semibold text-sm">Painel Administrativo</span>
+              </div>
+              <p className="text-xs text-zinc-300">
+                Acesso restrito para gerenciamento de clubes. Adicione novos times, configure escudos e divisões.
+              </p>
             </div>
           </div>
         )
