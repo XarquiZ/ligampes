@@ -86,21 +86,27 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
         }
     }
 
+    let emailResult = null;
+
     // 3. Send Confirmation Email
     if (userEmail) {
         console.log(`📧 Tentando enviar email para: ${userEmail}`);
         try {
             // Using "Gestor" as fallback name since we might not have full name yet
-            const emailResult = await sendWelcomeEmail(userEmail, "Gestor", String(leagueName), String(plan))
+            emailResult = await sendWelcomeEmail(userEmail, "Gestor", String(leagueName), String(plan))
             console.log('📧 Resultado do envio:', emailResult);
         } catch (emailError) {
             console.error("❌ Erro crítico ao enviar email (Exception):", emailError)
+            emailResult = { success: false, error: String(emailError) }
         }
     } else {
         console.warn('⚠️ Sem email de usuário para enviar confirmação.');
     }
 
-    redirect('/acompanhar')
+    // redirect('/acompanhar')
+    return {
+        message: `[DEBUG] Liga Criada! Email: ${emailResult?.success ? 'ENVIADO' : 'FALHOU'} | ${JSON.stringify(emailResult)}`
+    }
 }
 
 
