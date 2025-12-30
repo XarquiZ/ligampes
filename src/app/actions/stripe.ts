@@ -4,8 +4,8 @@ import { redirect } from "next/navigation"
 import Stripe from "stripe"
 import { createClient } from "@/lib/supabase-server"
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-    apiVersion: "2024-12-18.acacia", // Use latest or appropriate version
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'mock_key_for_build', {
+    apiVersion: "2025-12-15.clover" as any, // Cast to any to avoid type conflicts if types update mismatch
 })
 
 export async function createCheckoutSession(orgId: string, plan: string) {
