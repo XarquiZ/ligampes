@@ -104,10 +104,7 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
         console.warn('⚠️ Sem email de usuário para enviar confirmação.');
     }
 
-    // redirect('/acompanhar')
-    return {
-        message: `[DEBUG] Liga Criada! Email: ${emailResult?.success ? 'ENVIADO' : 'FALHOU'} | ${JSON.stringify(emailResult)}`
-    }
+    redirect('/acompanhar')
 }
 
 

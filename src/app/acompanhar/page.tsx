@@ -70,11 +70,18 @@ export default async function TrackerPage() {
                                     )}
 
                                     {org.status === 'active' && (
-                                        <Button asChild className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-zinc-950 font-bold">
-                                            <Link href={`/${org.slug}/admin`}>
-                                                Acessar Painel <ExternalLink className="ml-2 w-4 h-4" />
-                                            </Link>
-                                        </Button>
+                                        <>
+                                            <Button asChild variant="outline" className="w-full md:w-auto border-zinc-700 text-zinc-300 hover:bg-zinc-800">
+                                                <Link href={`/${org.slug}/login`} target="_blank">
+                                                    Ver Projeto <ExternalLink className="ml-2 w-3 h-3" />
+                                                </Link>
+                                            </Button>
+                                            <Button asChild className="w-full md:w-auto bg-green-500 hover:bg-green-600 text-zinc-950 font-bold">
+                                                <Link href={`/${org.slug}/dashboard`}>
+                                                    Acessar Painel
+                                                </Link>
+                                            </Button>
+                                        </>
                                     )}
                                 </div>
                             </div>
