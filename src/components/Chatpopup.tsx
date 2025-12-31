@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { X, Send, MessageCircle, Search, User, Crown, Paperclip, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface User {
   id: string;
@@ -72,6 +73,7 @@ export default function ChatPopup({
   onUnreadCountChange
 }: ChatPopupProps) {
   const params = useParams();
+  const { organization } = useOrganization();
   const [activeTab, setActiveTab] = useState<TabType>('conversations');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [coaches, setCoaches] = useState<User[]>([]);
@@ -207,7 +209,7 @@ export default function ChatPopup({
     };
 
     loadData();
-  }, [isOpen, currentUser.id]);
+  }, [isOpen, currentUser.id, organization?.id]);
 
   // Carregar conversas do usuário
   const loadConversations = async () => {
@@ -250,7 +252,8 @@ export default function ChatPopup({
             logo_url
           )
         `)
-        .in('id', uniqueUserIds);
+        .in('id', uniqueUserIds)
+        .eq('organization_id', organization?.id);
 
       if (profilesError) {
         console.error('❌ Erro ao carregar perfis:', profilesError);
@@ -315,27 +318,37 @@ export default function ChatPopup({
         };
       });
 
-      // 5. Ordenar
-      const sortedConversations = sortConversations(formattedConversations);
+    });
 
-      // 6. Aplicar ao state
-      setConversations(sortedConversations);
+    // Filtrar conversas válidas (onde o outro usuário pertence à organização)
+    const validConversations = formattedConversations.filter(conv => {
+      const isUser1Me = conv.user1_id === currentUser.id;
+      const otherUserId = isUser1Me ? conv.user2_id : conv.user1_id;
+      // Verifica se o profile do outro usuário foi encontrado na busca filtrada por org
+      return profilesData.some(p => p.id === otherUserId);
+    });
 
-      // 7. Calcular e notificar o total de mensagens não lidas
-      const totalUnread = calculateTotalUnread(sortedConversations);
-      notifyUnreadCountChange(totalUnread);
+    // 5. Ordenar
+    const sortedConversations = sortConversations(validConversations);
 
-    } catch (error) {
-      console.error('❌ Erro ao processar conversas:', error);
-    }
-  };
+    // 6. Aplicar ao state
+    setConversations(sortedConversations);
 
-  // Carregar todos os treinadores com informações do time
-  const loadCoaches = async () => {
-    try {
-      const { data: coachesData, error } = await supabase
-        .from('profiles')
-        .select(`
+    // 7. Calcular e notificar o total de mensagens não lidas
+    const totalUnread = calculateTotalUnread(sortedConversations);
+    notifyUnreadCountChange(totalUnread);
+
+  } catch (error) {
+    console.error('❌ Erro ao processar conversas:', error);
+  }
+};
+
+// Carregar todos os treinadores com informações do time
+const loadCoaches = async () => {
+  try {
+    const { data: coachesData, error } = await supabase
+      .from('profiles')
+      .select(`
           id, 
           coach_name, 
           email, 
@@ -347,979 +360,981 @@ export default function ChatPopup({
             logo_url
           )
         `)
-        .neq('id', currentUser.id)
-        .order('coach_name');
+      .neq('id', currentUser.id)
+      .eq('organization_id', organization?.id)
+      .order('coach_name');
 
-      if (error) {
-        console.error('Erro ao carregar treinadores:', error);
-        return;
-      }
-
-      const formattedCoaches: User[] = coachesData.map(coach => ({
-        id: coach.id,
-        name: coach.coach_name || coach.email || 'Treinador',
-        email: coach.email,
-        role: coach.role,
-        team_name: coach.teams?.name || undefined,
-        team_logo: coach.teams?.logo_url || undefined
-      }));
-
-      setCoaches(formattedCoaches);
-    } catch (error) {
-      console.error('Erro ao processar treinadores:', error);
-    }
-  };
-
-  // Carregar mensagens de uma conversa
-  const loadMessages = async (conversationId: string) => {
-    try {
-      const { data: messagesData, error } = await supabase
-        .from('private_messages')
-        .select('*')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Erro ao carregar mensagens:', error);
-        return;
-      }
-
-      const formattedMessages: Message[] = messagesData.map(msg => {
-        let messageData: Message = {
-          id: msg.id,
-          text: msg.message,
-          sender: msg.sender_id === currentUser.id ? 'user' : 'other',
-          timestamp: new Date(msg.created_at),
-          senderId: msg.sender_id,
-          conversationId: msg.conversation_id,
-          type: 'text'
-        };
-
-        if (msg.player_data) {
-          messageData = {
-            ...messageData,
-            type: 'player',
-            playerData: msg.player_data,
-            text: `Jogador: ${msg.player_data.name}`
-          };
-        }
-
-        return messageData;
-      });
-
-      setMessages(formattedMessages);
-
-    } catch (error) {
-      console.error('Erro ao processar mensagens:', error);
-    }
-  };
-
-  // Carregar times disponíveis para seleção de jogadores
-  const loadAvailableTeams = async () => {
-    if (!selectedConversation) return;
-
-    const teams: Team[] = [];
-
-    if (currentTeam.id) {
-      teams.push(currentTeam);
-    }
-
-    const otherUser = getOtherUser(selectedConversation);
-
-    const { data: otherUserTeam } = await supabase
-      .from('profiles')
-      .select('teams(id, name, logo_url)')
-      .eq('id', otherUser.id)
-      .single();
-
-    if (otherUserTeam?.teams) {
-      teams.push({
-        id: otherUserTeam.teams.id,
-        name: otherUserTeam.teams.name,
-        logo_url: otherUserTeam.teams.logo_url
-      });
-    }
-
-    setAvailableTeams(teams);
-    if (teams.length > 0) {
-      setSelectedTeam(teams[0].id);
-    }
-  };
-
-  // Carregar jogadores do time selecionado
-  const loadPlayers = async (teamId: string) => {
-    try {
-      const { data: playersData, error } = await supabase
-        .from('players')
-        .select('id, name, overall, position, photo_url, team_id, teams!inner(id, name, logo_url)')
-        .eq('team_id', teamId)
-        .order('overall', { ascending: false });
-
-      if (error) {
-        console.error('Erro ao carregar jogadores:', error);
-        return;
-      }
-
-      const formattedPlayers: PlayerData[] = playersData.map(player => ({
-        id: player.id,
-        name: player.name,
-        overall: player.overall,
-        position: player.position,
-        photo_url: player.photo_url,
-        team_id: player.team_id,
-        team_name: player.teams.name,
-        team_logo: player.teams.logo_url
-      }));
-
-      setPlayers(formattedPlayers);
-    } catch (error) {
-      console.error('Erro ao processar jogadores:', error);
-    }
-  };
-
-  // Abrir seletor de jogadores
-  const openPlayerSelector = async () => {
-    if (!selectedConversation) return;
-
-    setShowPlayerSelector(true);
-    await loadAvailableTeams();
-  };
-
-  // Selecionar time e carregar jogadores
-  useEffect(() => {
-    if (selectedTeam && showPlayerSelector) {
-      loadPlayers(selectedTeam);
-    }
-  }, [selectedTeam, showPlayerSelector]);
-
-  // Filtrar jogadores pela busca
-  const filteredPlayers = players.filter(player =>
-    player.name.toLowerCase().includes(playerSearch.toLowerCase())
-  );
-
-  // Compartilhar jogador
-  const sharePlayer = async () => {
-    if (!selectedPlayer || !selectedConversation) return;
-
-    // 0. Optimistic Update (UI Imediata)
-    const tempId = `temp-${Date.now()}`;
-    const timestamp = new Date();
-
-    // Cria mensagem temporária
-    const tempMessage: Message = {
-      id: tempId,
-      text: `Jogador: ${selectedPlayer.name}`,
-      sender: 'user',
-      timestamp: timestamp,
-      senderId: currentUser.id,
-      conversationId: selectedConversation.id,
-      type: 'player',
-      playerData: selectedPlayer
-    };
-
-    // Atualiza UI instantaneamente
-    setMessages(prev => [...prev, tempMessage]);
-
-    // Fecha modais e limpa estados
-    setShowPlayerSelector(false);
-    setSelectedPlayer(null);
-    setPlayerSearch('');
-
-    // Scroll para o fim
-    scrollToBottom();
-
-    try {
-      console.log(`🎮 Compartilhando jogador: ${selectedPlayer.name}`);
-
-      // 1. Atualizar conversa
-      const updateTimestamp = timestamp.toISOString();
-
-      const updateSuccess = await updateConversation(
-        selectedConversation.id,
-        `Compartilhou: ${selectedPlayer.name}`,
-        updateTimestamp
-      );
-
-      if (!updateSuccess) {
-        console.error('❌ Falha ao atualizar conversa');
-        // Rollback opcional: setMessages(prev => prev.filter(m => m.id !== tempId));
-        return;
-      }
-
-      // 2. Enviar mensagem
-      const { error: messageError } = await supabase
-        .from('private_messages')
-        .insert({
-          conversation_id: selectedConversation.id,
-          sender_id: currentUser.id,
-          message: `Jogador: ${selectedPlayer.name}`,
-          player_data: selectedPlayer,
-          created_at: updateTimestamp
-        });
-
-      if (messageError) {
-        console.error('❌ Erro ao enviar jogador:', messageError);
-        // Rollback opcional
-        return;
-      }
-
-      // 3. Recarregar (Opcional, pois o realtime já deve tratar)
-      // await loadConversations();
-      // await loadMessages(selectedConversation.id); // Comentado para evitar flash
-
-      console.log('✅ Jogador compartilhado com sucesso');
-
-    } catch (error) {
-      console.error('❌ Erro ao processar compartilhamento:', error);
-      // Remove mensagem otimista em caso de erro crítico
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-    }
-  };
-
-  // Iniciar nova conversa
-  const startNewConversation = async (coach: User) => {
-    // Verificar se já existe conversa
-    const existingConversation = conversations.find(conv =>
-      (conv.user1.id === coach.id && conv.user2.id === currentUser.id) ||
-      (conv.user2.id === coach.id && conv.user1.id === currentUser.id)
-    );
-
-    if (existingConversation) {
-      setSelectedConversation(existingConversation);
-      await loadMessages(existingConversation.id);
-      setActiveTab('conversations');
+    if (error) {
+      console.error('Erro ao carregar treinadores:', error);
       return;
     }
 
-    try {
-      const { data: newConversation, error } = await supabase
-        .from('conversations')
-        .insert({
-          user1_id: currentUser.id,
-          user2_id: coach.id,
-          last_message: 'Conversa iniciada'
-        })
-        .select()
-        .single();
+    const formattedCoaches: User[] = coachesData.map(coach => ({
+      id: coach.id,
+      name: coach.coach_name || coach.email || 'Treinador',
+      email: coach.email,
+      role: coach.role,
+      team_name: coach.teams?.name || undefined,
+      team_logo: coach.teams?.logo_url || undefined
+    }));
 
-      if (error) {
-        console.error('Erro ao criar conversa:', error);
-        return;
-      }
+    setCoaches(formattedCoaches);
+  } catch (error) {
+    console.error('Erro ao processar treinadores:', error);
+  }
+};
 
-      const formattedConversation: Conversation = {
-        id: newConversation.id,
-        user1_id: newConversation.user1_id,
-        user2_id: newConversation.user2_id,
-        user1: {
-          id: currentUser.id,
-          name: currentUser.name,
-          email: currentUser.email,
-          role: currentUser.role,
-          team_name: currentTeam.name,
-          team_logo: currentTeam.logo_url
-        },
-        user2: {
-          id: coach.id,
-          name: coach.name,
-          email: coach.email,
-          role: coach.role,
-          team_name: coach.team_name,
-          team_logo: coach.team_logo
-        },
-        last_message: newConversation.last_message,
-        last_message_at: newConversation.last_message_at,
-        unread_count: 0
+// Carregar mensagens de uma conversa
+const loadMessages = async (conversationId: string) => {
+  try {
+    const { data: messagesData, error } = await supabase
+      .from('private_messages')
+      .select('*')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Erro ao carregar mensagens:', error);
+      return;
+    }
+
+    const formattedMessages: Message[] = messagesData.map(msg => {
+      let messageData: Message = {
+        id: msg.id,
+        text: msg.message,
+        sender: msg.sender_id === currentUser.id ? 'user' : 'other',
+        timestamp: new Date(msg.created_at),
+        senderId: msg.sender_id,
+        conversationId: msg.conversation_id,
+        type: 'text'
       };
 
-      setSelectedConversation(formattedConversation);
-      setMessages([]);
-      setActiveTab('conversations');
-
-      await loadConversations();
-
-    } catch (error) {
-      console.error('Erro ao processar nova conversa:', error);
-    }
-  };
-
-  // Enviar mensagem
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!newMessage.trim() || !selectedConversation) return;
-
-    const messageText = newMessage.trim();
-
-    // 0. Optimistic Update (UI Imediata)
-    const tempId = `temp-${Date.now()}`;
-    const timestamp = new Date(); // Data atual para exibição imediata
-
-    const tempMessage: Message = {
-      id: tempId,
-      text: messageText,
-      sender: 'user',
-      timestamp: timestamp,
-      senderId: currentUser.id,
-      conversationId: selectedConversation.id,
-      type: 'text'
-    };
-
-    // Atualiza estado local imediatamente
-    setMessages(prev => [...prev, tempMessage]);
-    setNewMessage(''); // Limpa input
-    scrollToBottom();
-
-    try {
-      console.log('✉️ Enviando mensagem...');
-
-      // 1. Atualizar conversa
-      const updateTimestamp = timestamp.toISOString();
-
-      const updateSuccess = await updateConversation(
-        selectedConversation.id,
-        messageText,
-        updateTimestamp
-      );
-
-      if (!updateSuccess) {
-        console.error('❌ Falha ao atualizar conversa');
-        // Rollback silencioso ou visual se necessário
-        return;
+      if (msg.player_data) {
+        messageData = {
+          ...messageData,
+          type: 'player',
+          playerData: msg.player_data,
+          text: `Jogador: ${msg.player_data.name}`
+        };
       }
 
-      // 2. Enviar mensagem
-      const { error: messageError } = await supabase
-        .from('private_messages')
-        .insert({
-          conversation_id: selectedConversation.id,
-          sender_id: currentUser.id,
-          message: messageText,
-          created_at: updateTimestamp
-        });
+      return messageData;
+    });
 
-      if (messageError) {
-        console.error('❌ Erro ao enviar mensagem:', messageError);
-        // Rollback: em caso de erro, poderíamos remover a mensagem ou mostrar erro
-        // setMessages(prev => prev.filter(m => m.id !== tempId));
-        return;
-      }
+    setMessages(formattedMessages);
 
-      // 3. Não precisamos recarregar tudo imediatamente pois o realtime cuidará disso
-      // Mas podemos atualizar a lista de conversas em background para garantir ordenação
-      loadConversations();
+  } catch (error) {
+    console.error('Erro ao processar mensagens:', error);
+  }
+};
 
-      // NOTA: Não chamamos loadMessages() aqui para evitar que a mensagem "pisque"
-      // O realtime event irá disparar, e lá podemos decidir se recarregamos ou não
+// Carregar times disponíveis para seleção de jogadores
+const loadAvailableTeams = async () => {
+  if (!selectedConversation) return;
 
-      console.log('✅ Mensagem enviada com sucesso');
+  const teams: Team[] = [];
 
-    } catch (error) {
-      console.error('💥 Erro ao processar envio:', error);
-      // Rollback em erro crítico
-      setMessages(prev => prev.filter(m => m.id !== tempId));
-      setNewMessage(messageText); // Devolve o texto para o input
-    }
-  };
+  if (currentTeam.id) {
+    teams.push(currentTeam);
+  }
 
-  // Função para navegar para o jogador
-  const navigateToPlayer = (playerId: string) => {
-    onClose();
+  const otherUser = getOtherUser(selectedConversation);
 
-    setTimeout(() => {
-      const slug = params?.site as string;
-      const baseUrl = slug ? `/${slug}` : '';
-      const playerUrl = `${baseUrl}/dashboard/jogadores#player-${playerId}`;
+  const { data: otherUserTeam } = await supabase
+    .from('profiles')
+    .select('teams(id, name, logo_url)')
+    .eq('id', otherUser.id)
+    .eq('organization_id', organization?.id)
+    .single();
 
-      window.location.href = playerUrl;
-    }, 300);
-  };
+  if (otherUserTeam?.teams) {
+    teams.push({
+      id: otherUserTeam.teams.id,
+      name: otherUserTeam.teams.name,
+      logo_url: otherUserTeam.teams.logo_url
+    });
+  }
 
-  // Função handleSelectConversation
-  const handleSelectConversation = async (conversation: Conversation) => {
-    if (isProcessingConversation && lastProcessedConversation === conversation.id) {
-      console.log('⏳ Já processando esta conversa, ignorando...');
+  setAvailableTeams(teams);
+  if (teams.length > 0) {
+    setSelectedTeam(teams[0].id);
+  }
+};
+
+// Carregar jogadores do time selecionado
+const loadPlayers = async (teamId: string) => {
+  try {
+    const { data: playersData, error } = await supabase
+      .from('players')
+      .select('id, name, overall, position, photo_url, team_id, teams!inner(id, name, logo_url)')
+      .eq('team_id', teamId)
+      .order('overall', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao carregar jogadores:', error);
       return;
     }
 
-    console.log('🎯 Selecionando conversa:', conversation.id);
+    const formattedPlayers: PlayerData[] = playersData.map(player => ({
+      id: player.id,
+      name: player.name,
+      overall: player.overall,
+      position: player.position,
+      photo_url: player.photo_url,
+      team_id: player.team_id,
+      team_name: player.teams.name,
+      team_logo: player.teams.logo_url
+    }));
 
-    setIsProcessingConversation(true);
-    setLastProcessedConversation(conversation.id);
+    setPlayers(formattedPlayers);
+  } catch (error) {
+    console.error('Erro ao processar jogadores:', error);
+  }
+};
 
-    try {
-      setSelectedConversation(conversation);
-      await loadMessages(conversation.id);
+// Abrir seletor de jogadores
+const openPlayerSelector = async () => {
+  if (!selectedConversation) return;
 
-      if (conversation.unread_count && conversation.unread_count > 0) {
-        console.log('🔴 Marcando mensagens como lidas...');
+  setShowPlayerSelector(true);
+  await loadAvailableTeams();
+};
 
-        const success = await markMessagesAsRead(conversation.id);
+// Selecionar time e carregar jogadores
+useEffect(() => {
+  if (selectedTeam && showPlayerSelector) {
+    loadPlayers(selectedTeam);
+  }
+}, [selectedTeam, showPlayerSelector]);
 
-        if (success) {
-          const updatedConversations = conversations.map(conv =>
-            conv.id === conversation.id
-              ? { ...conv, unread_count: 0 }
-              : conv
-          );
+// Filtrar jogadores pela busca
+const filteredPlayers = players.filter(player =>
+  player.name.toLowerCase().includes(playerSearch.toLowerCase())
+);
 
-          const sortedUpdatedConversations = sortConversations(updatedConversations);
-          setConversations(sortedUpdatedConversations);
+// Compartilhar jogador
+const sharePlayer = async () => {
+  if (!selectedPlayer || !selectedConversation) return;
 
-          const totalUnread = calculateTotalUnread(sortedUpdatedConversations);
-          notifyUnreadCountChange(totalUnread);
-        }
-      }
+  // 0. Optimistic Update (UI Imediata)
+  const tempId = `temp-${Date.now()}`;
+  const timestamp = new Date();
 
-    } catch (error) {
-      console.error('💥 Erro ao selecionar conversa:', error);
-    } finally {
-      setIsProcessingConversation(false);
-      setTimeout(() => {
-        setLastProcessedConversation(null);
-      }, 500);
+  // Cria mensagem temporária
+  const tempMessage: Message = {
+    id: tempId,
+    text: `Jogador: ${selectedPlayer.name}`,
+    sender: 'user',
+    timestamp: timestamp,
+    senderId: currentUser.id,
+    conversationId: selectedConversation.id,
+    type: 'player',
+    playerData: selectedPlayer
+  };
+
+  // Atualiza UI instantaneamente
+  setMessages(prev => [...prev, tempMessage]);
+
+  // Fecha modais e limpa estados
+  setShowPlayerSelector(false);
+  setSelectedPlayer(null);
+  setPlayerSearch('');
+
+  // Scroll para o fim
+  scrollToBottom();
+
+  try {
+    console.log(`🎮 Compartilhando jogador: ${selectedPlayer.name}`);
+
+    // 1. Atualizar conversa
+    const updateTimestamp = timestamp.toISOString();
+
+    const updateSuccess = await updateConversation(
+      selectedConversation.id,
+      `Compartilhou: ${selectedPlayer.name}`,
+      updateTimestamp
+    );
+
+    if (!updateSuccess) {
+      console.error('❌ Falha ao atualizar conversa');
+      // Rollback opcional: setMessages(prev => prev.filter(m => m.id !== tempId));
+      return;
     }
-  };
 
-  // Listener para atualizações em tempo real
-  useEffect(() => {
-    if (!isOpen || !currentUser.id) return;
+    // 2. Enviar mensagem
+    const { error: messageError } = await supabase
+      .from('private_messages')
+      .insert({
+        conversation_id: selectedConversation.id,
+        sender_id: currentUser.id,
+        message: `Jogador: ${selectedPlayer.name}`,
+        player_data: selectedPlayer,
+        created_at: updateTimestamp
+      });
 
-    const subscription = supabase
-      .channel('private_messages_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'private_messages'
-        },
-        async (payload) => {
-          console.log('🔄 Nova mensagem detectada:', payload.new.id);
+    if (messageError) {
+      console.error('❌ Erro ao enviar jogador:', messageError);
+      // Rollback opcional
+      return;
+    }
 
-          await loadConversations();
+    // 3. Recarregar (Opcional, pois o realtime já deve tratar)
+    // await loadConversations();
+    // await loadMessages(selectedConversation.id); // Comentado para evitar flash
 
-          if (selectedConversation?.id === payload.new.conversation_id) {
-            await loadMessages(selectedConversation.id);
+    console.log('✅ Jogador compartilhado com sucesso');
 
-            if (payload.new.sender_id !== currentUser.id) {
-              await markMessagesAsRead(selectedConversation.id);
-            }
-          }
-        }
-      )
-      .subscribe();
+  } catch (error) {
+    console.error('❌ Erro ao processar compartilhamento:', error);
+    // Remove mensagem otimista em caso de erro crítico
+    setMessages(prev => prev.filter(m => m.id !== tempId));
+  }
+};
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [isOpen, currentUser.id, selectedConversation]);
-
-  // Listener para focar em conversa específica quando receber evento
-  useEffect(() => {
-    const handleFocusConversation = async (event: CustomEvent) => {
-      const { conversationId } = event.detail;
-      console.log('🎯 Evento focusConversation recebido:', conversationId);
-
-      await loadConversations();
-
-      const conversation = conversations.find(conv => conv.id === conversationId);
-      if (conversation) {
-        handleSelectConversation(conversation);
-        setActiveTab('conversations');
-      }
-    };
-
-    window.addEventListener('focusConversation', handleFocusConversation as EventListener);
-
-    return () => {
-      window.removeEventListener('focusConversation', handleFocusConversation as EventListener);
-    };
-  }, [conversations]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getOtherUser = (conversation: Conversation) => {
-    return conversation.user1.id === currentUser.id ? conversation.user2 : conversation.user1;
-  };
-
-  const filteredCoaches = coaches.filter(coach =>
-    coach.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    coach.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    coach.team_name?.toLowerCase().includes(searchTerm.toLowerCase())
+// Iniciar nova conversa
+const startNewConversation = async (coach: User) => {
+  // Verificar se já existe conversa
+  const existingConversation = conversations.find(conv =>
+    (conv.user1.id === coach.id && conv.user2.id === currentUser.id) ||
+    (conv.user2.id === coach.id && conv.user1.id === currentUser.id)
   );
 
-  // Função para navegar entre abas mesmo com conversa aberta
-  const handleTabClick = (tab: TabType) => {
-    setActiveTab(tab);
-    if (tab === 'coaches') {
-      setSelectedConversation(null);
+  if (existingConversation) {
+    setSelectedConversation(existingConversation);
+    await loadMessages(existingConversation.id);
+    setActiveTab('conversations');
+    return;
+  }
+
+  try {
+    const { data: newConversation, error } = await supabase
+      .from('conversations')
+      .insert({
+        user1_id: currentUser.id,
+        user2_id: coach.id,
+        last_message: 'Conversa iniciada'
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao criar conversa:', error);
+      return;
+    }
+
+    const formattedConversation: Conversation = {
+      id: newConversation.id,
+      user1_id: newConversation.user1_id,
+      user2_id: newConversation.user2_id,
+      user1: {
+        id: currentUser.id,
+        name: currentUser.name,
+        email: currentUser.email,
+        role: currentUser.role,
+        team_name: currentTeam.name,
+        team_logo: currentTeam.logo_url
+      },
+      user2: {
+        id: coach.id,
+        name: coach.name,
+        email: coach.email,
+        role: coach.role,
+        team_name: coach.team_name,
+        team_logo: coach.team_logo
+      },
+      last_message: newConversation.last_message,
+      last_message_at: newConversation.last_message_at,
+      unread_count: 0
+    };
+
+    setSelectedConversation(formattedConversation);
+    setMessages([]);
+    setActiveTab('conversations');
+
+    await loadConversations();
+
+  } catch (error) {
+    console.error('Erro ao processar nova conversa:', error);
+  }
+};
+
+// Enviar mensagem
+const handleSendMessage = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (!newMessage.trim() || !selectedConversation) return;
+
+  const messageText = newMessage.trim();
+
+  // 0. Optimistic Update (UI Imediata)
+  const tempId = `temp-${Date.now()}`;
+  const timestamp = new Date(); // Data atual para exibição imediata
+
+  const tempMessage: Message = {
+    id: tempId,
+    text: messageText,
+    sender: 'user',
+    timestamp: timestamp,
+    senderId: currentUser.id,
+    conversationId: selectedConversation.id,
+    type: 'text'
+  };
+
+  // Atualiza estado local imediatamente
+  setMessages(prev => [...prev, tempMessage]);
+  setNewMessage(''); // Limpa input
+  scrollToBottom();
+
+  try {
+    console.log('✉️ Enviando mensagem...');
+
+    // 1. Atualizar conversa
+    const updateTimestamp = timestamp.toISOString();
+
+    const updateSuccess = await updateConversation(
+      selectedConversation.id,
+      messageText,
+      updateTimestamp
+    );
+
+    if (!updateSuccess) {
+      console.error('❌ Falha ao atualizar conversa');
+      // Rollback silencioso ou visual se necessário
+      return;
+    }
+
+    // 2. Enviar mensagem
+    const { error: messageError } = await supabase
+      .from('private_messages')
+      .insert({
+        conversation_id: selectedConversation.id,
+        sender_id: currentUser.id,
+        message: messageText,
+        created_at: updateTimestamp
+      });
+
+    if (messageError) {
+      console.error('❌ Erro ao enviar mensagem:', messageError);
+      // Rollback: em caso de erro, poderíamos remover a mensagem ou mostrar erro
+      // setMessages(prev => prev.filter(m => m.id !== tempId));
+      return;
+    }
+
+    // 3. Não precisamos recarregar tudo imediatamente pois o realtime cuidará disso
+    // Mas podemos atualizar a lista de conversas em background para garantir ordenação
+    loadConversations();
+
+    // NOTA: Não chamamos loadMessages() aqui para evitar que a mensagem "pisque"
+    // O realtime event irá disparar, e lá podemos decidir se recarregamos ou não
+
+    console.log('✅ Mensagem enviada com sucesso');
+
+  } catch (error) {
+    console.error('💥 Erro ao processar envio:', error);
+    // Rollback em erro crítico
+    setMessages(prev => prev.filter(m => m.id !== tempId));
+    setNewMessage(messageText); // Devolve o texto para o input
+  }
+};
+
+// Função para navegar para o jogador
+const navigateToPlayer = (playerId: string) => {
+  onClose();
+
+  setTimeout(() => {
+    const slug = params?.site as string;
+    const baseUrl = slug ? `/${slug}` : '';
+    const playerUrl = `${baseUrl}/dashboard/jogadores#player-${playerId}`;
+
+    window.location.href = playerUrl;
+  }, 300);
+};
+
+// Função handleSelectConversation
+const handleSelectConversation = async (conversation: Conversation) => {
+  if (isProcessingConversation && lastProcessedConversation === conversation.id) {
+    console.log('⏳ Já processando esta conversa, ignorando...');
+    return;
+  }
+
+  console.log('🎯 Selecionando conversa:', conversation.id);
+
+  setIsProcessingConversation(true);
+  setLastProcessedConversation(conversation.id);
+
+  try {
+    setSelectedConversation(conversation);
+    await loadMessages(conversation.id);
+
+    if (conversation.unread_count && conversation.unread_count > 0) {
+      console.log('🔴 Marcando mensagens como lidas...');
+
+      const success = await markMessagesAsRead(conversation.id);
+
+      if (success) {
+        const updatedConversations = conversations.map(conv =>
+          conv.id === conversation.id
+            ? { ...conv, unread_count: 0 }
+            : conv
+        );
+
+        const sortedUpdatedConversations = sortConversations(updatedConversations);
+        setConversations(sortedUpdatedConversations);
+
+        const totalUnread = calculateTotalUnread(sortedUpdatedConversations);
+        notifyUnreadCountChange(totalUnread);
+      }
+    }
+
+  } catch (error) {
+    console.error('💥 Erro ao selecionar conversa:', error);
+  } finally {
+    setIsProcessingConversation(false);
+    setTimeout(() => {
+      setLastProcessedConversation(null);
+    }, 500);
+  }
+};
+
+// Listener para atualizações em tempo real
+useEffect(() => {
+  if (!isOpen || !currentUser.id) return;
+
+  const subscription = supabase
+    .channel('private_messages_changes')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'private_messages'
+      },
+      async (payload) => {
+        console.log('🔄 Nova mensagem detectada:', payload.new.id);
+
+        await loadConversations();
+
+        if (selectedConversation?.id === payload.new.conversation_id) {
+          await loadMessages(selectedConversation.id);
+
+          if (payload.new.sender_id !== currentUser.id) {
+            await markMessagesAsRead(selectedConversation.id);
+          }
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}, [isOpen, currentUser.id, selectedConversation]);
+
+// Listener para focar em conversa específica quando receber evento
+useEffect(() => {
+  const handleFocusConversation = async (event: CustomEvent) => {
+    const { conversationId } = event.detail;
+    console.log('🎯 Evento focusConversation recebido:', conversationId);
+
+    await loadConversations();
+
+    const conversation = conversations.find(conv => conv.id === conversationId);
+    if (conversation) {
+      handleSelectConversation(conversation);
+      setActiveTab('conversations');
     }
   };
 
-  // Função para renderizar conversas ordenadas
-  const renderConversations = () => {
-    const sortedConversations = sortConversations(conversations);
+  window.addEventListener('focusConversation', handleFocusConversation as EventListener);
 
-    if (sortedConversations.length === 0) {
-      return (
-        <div className="text-center text-gray-500 py-6">
-          <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">
-            <MessageCircle size={16} className="text-gray-600" />
-          </div>
-          <p className="font-medium text-xs">Nenhuma conversa iniciada</p>
-          <p className="text-[10px] mt-1">Vá para "Treinadores" para começar</p>
+  return () => {
+    window.removeEventListener('focusConversation', handleFocusConversation as EventListener);
+  };
+}, [conversations]);
+
+const scrollToBottom = () => {
+  messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+};
+
+useEffect(() => {
+  scrollToBottom();
+}, [messages]);
+
+const formatTime = (date: Date) => {
+  return date.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
+const getOtherUser = (conversation: Conversation) => {
+  return conversation.user1.id === currentUser.id ? conversation.user2 : conversation.user1;
+};
+
+const filteredCoaches = coaches.filter(coach =>
+  coach.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  coach.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  coach.team_name?.toLowerCase().includes(searchTerm.toLowerCase())
+);
+
+// Função para navegar entre abas mesmo com conversa aberta
+const handleTabClick = (tab: TabType) => {
+  setActiveTab(tab);
+  if (tab === 'coaches') {
+    setSelectedConversation(null);
+  }
+};
+
+// Função para renderizar conversas ordenadas
+const renderConversations = () => {
+  const sortedConversations = sortConversations(conversations);
+
+  if (sortedConversations.length === 0) {
+    return (
+      <div className="text-center text-gray-500 py-6">
+        <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">
+          <MessageCircle size={16} className="text-gray-600" />
         </div>
-      );
-    }
+        <p className="font-medium text-xs">Nenhuma conversa iniciada</p>
+        <p className="text-[10px] mt-1">Vá para "Treinadores" para começar</p>
+      </div>
+    );
+  }
 
-    return sortedConversations.map((conversation) => {
-      const otherUser = getOtherUser(conversation);
-      return (
-        <button
-          key={`${conversation.id}-${conversation.last_message_at}`}
-          onClick={() => handleSelectConversation(conversation)}
-          className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group relative"
-        >
-          <div className="flex items-center justify-between">
+  return sortedConversations.map((conversation) => {
+    const otherUser = getOtherUser(conversation);
+    return (
+      <button
+        key={`${conversation.id}-${conversation.last_message_at}`}
+        onClick={() => handleSelectConversation(conversation)}
+        className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group relative"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+              {otherUser.team_logo ? (
+                <img
+                  src={otherUser.team_logo}
+                  alt={otherUser.team_name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                  <User size={12} className="text-white" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-white text-xs flex items-center gap-1 truncate">
+                {otherUser.name}
+                {otherUser.role === 'admin' && (
+                  <Crown size={10} className="text-yellow-500 flex-shrink-0" />
+                )}
+              </p>
+              <p className="text-purple-400 text-xs font-medium truncate">
+                {otherUser.team_name}
+              </p>
+              <p className="text-gray-400 text-[10px] mt-0.5 truncate">
+                {conversation.last_message || 'Nenhuma mensagem'}
+              </p>
+              <p className="text-gray-500 text-[9px]">
+                {conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleString('pt-BR') : ''}
+              </p>
+            </div>
+          </div>
+
+          {/* Indicador de mensagens não lidas */}
+          {conversation.unread_count && conversation.unread_count > 0 && (
+            <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
+              <span className="bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-bold shadow-lg">
+                {conversation.unread_count}
+              </span>
+              <span className="bg-red-500/20 text-red-300 text-[8px] px-1 rounded">
+                NOVA
+              </span>
+            </div>
+          )}
+        </div>
+      </button>
+    );
+  });
+};
+
+if (!isOpen) return null;
+
+return (
+  <div className="fixed bottom-4 right-4 w-[320px] h-[450px] bg-zinc-900 rounded-xl shadow-2xl border border-white/10 flex flex-col z-50 backdrop-blur-xl">
+    {/* Header */}
+    <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-t-xl flex justify-between items-center">
+      <div className="flex-1 min-w-0">
+        <h3 className="font-black text-sm truncate">CHAT</h3>
+        <p className="text-purple-200 text-xs font-medium truncate">
+          {selectedConversation ? `Conversando com ${getOtherUser(selectedConversation).name}` : `${currentTeam.name}`}
+        </p>
+      </div>
+      <button
+        onClick={onClose}
+        className="text-white hover:text-purple-200 transition-colors p-1 rounded-full hover:bg-white/10 flex-shrink-0 ml-2"
+        aria-label="Fechar chat"
+      >
+        <X size={16} />
+      </button>
+    </div>
+
+    {/* Tabs - Sempre visíveis */}
+    <div className="flex border-b border-white/10 bg-zinc-800/50">
+      <button
+        onClick={() => handleTabClick('conversations')}
+        className={`flex-1 py-2 px-3 text-xs font-bold transition-all ${activeTab === 'conversations'
+          ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-400 border-b-2 border-purple-400'
+          : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+      >
+        CONVERSAS
+      </button>
+      <button
+        onClick={() => handleTabClick('coaches')}
+        className={`flex-1 py-2 px-3 text-xs font-bold transition-all ${activeTab === 'coaches'
+          ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-400 border-b-2 border-purple-400'
+          : 'text-gray-400 hover:text-white hover:bg-white/5'
+          }`}
+      >
+        TREINADORES
+      </button>
+    </div>
+
+    {/* Content */}
+    <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-zinc-900 to-zinc-800">
+      {selectedConversation && activeTab === 'conversations' ? (
+        // Área de mensagens (quando em conversas E com conversa selecionada)
+        <>
+          {/* Header da conversa */}
+          <div className="p-2 border-b border-white/10 bg-zinc-800/50 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
-                {otherUser.team_logo ? (
+              <button
+                onClick={() => setSelectedConversation(null)}
+                className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-all flex-shrink-0"
+              >
+                ←
+              </button>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {getOtherUser(selectedConversation).team_logo ? (
                   <img
-                    src={otherUser.team_logo}
-                    alt={otherUser.team_name}
-                    className="w-full h-full object-cover"
+                    src={getOtherUser(selectedConversation).team_logo}
+                    alt={getOtherUser(selectedConversation).team_name}
+                    className="w-6 h-6 rounded-full object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                  <div className="w-6 h-6 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
                     <User size={12} className="text-white" />
                   </div>
                 )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-white text-xs flex items-center gap-1 truncate">
-                  {otherUser.name}
-                  {otherUser.role === 'admin' && (
-                    <Crown size={10} className="text-yellow-500 flex-shrink-0" />
-                  )}
-                </p>
-                <p className="text-purple-400 text-xs font-medium truncate">
-                  {otherUser.team_name}
-                </p>
-                <p className="text-gray-400 text-[10px] mt-0.5 truncate">
-                  {conversation.last_message || 'Nenhuma mensagem'}
-                </p>
-                <p className="text-gray-500 text-[9px]">
-                  {conversation.last_message_at ? new Date(conversation.last_message_at).toLocaleString('pt-BR') : ''}
-                </p>
-              </div>
-            </div>
-
-            {/* Indicador de mensagens não lidas */}
-            {conversation.unread_count && conversation.unread_count > 0 && (
-              <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-1">
-                <span className="bg-red-500 text-white rounded-full w-4 h-4 text-[10px] flex items-center justify-center font-bold shadow-lg">
-                  {conversation.unread_count}
-                </span>
-                <span className="bg-red-500/20 text-red-300 text-[8px] px-1 rounded">
-                  NOVA
-                </span>
-              </div>
-            )}
-          </div>
-        </button>
-      );
-    });
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed bottom-4 right-4 w-[320px] h-[450px] bg-zinc-900 rounded-xl shadow-2xl border border-white/10 flex flex-col z-50 backdrop-blur-xl">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-3 rounded-t-xl flex justify-between items-center">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-black text-sm truncate">CHAT</h3>
-          <p className="text-purple-200 text-xs font-medium truncate">
-            {selectedConversation ? `Conversando com ${getOtherUser(selectedConversation).name}` : `${currentTeam.name}`}
-          </p>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-white hover:text-purple-200 transition-colors p-1 rounded-full hover:bg-white/10 flex-shrink-0 ml-2"
-          aria-label="Fechar chat"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      {/* Tabs - Sempre visíveis */}
-      <div className="flex border-b border-white/10 bg-zinc-800/50">
-        <button
-          onClick={() => handleTabClick('conversations')}
-          className={`flex-1 py-2 px-3 text-xs font-bold transition-all ${activeTab === 'conversations'
-            ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-400 border-b-2 border-purple-400'
-            : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }`}
-        >
-          CONVERSAS
-        </button>
-        <button
-          onClick={() => handleTabClick('coaches')}
-          className={`flex-1 py-2 px-3 text-xs font-bold transition-all ${activeTab === 'coaches'
-            ? 'bg-gradient-to-r from-purple-600/20 to-pink-600/20 text-purple-400 border-b-2 border-purple-400'
-            : 'text-gray-400 hover:text-white hover:bg-white/5'
-            }`}
-        >
-          TREINADORES
-        </button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 flex flex-col min-h-0 bg-gradient-to-br from-zinc-900 to-zinc-800">
-        {selectedConversation && activeTab === 'conversations' ? (
-          // Área de mensagens (quando em conversas E com conversa selecionada)
-          <>
-            {/* Header da conversa */}
-            <div className="p-2 border-b border-white/10 bg-zinc-800/50 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <button
-                  onClick={() => setSelectedConversation(null)}
-                  className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-all flex-shrink-0"
-                >
-                  ←
-                </button>
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  {getOtherUser(selectedConversation).team_logo ? (
-                    <img
-                      src={getOtherUser(selectedConversation).team_logo}
-                      alt={getOtherUser(selectedConversation).team_name}
-                      className="w-6 h-6 rounded-full object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-6 h-6 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <User size={12} className="text-white" />
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <span className="font-bold text-white text-xs flex items-center gap-1 truncate">
-                      {getOtherUser(selectedConversation).name}
-                      {getOtherUser(selectedConversation).role === 'admin' && (
-                        <Crown size={10} className="text-yellow-500 flex-shrink-0" />
-                      )}
-                    </span>
-                    {getOtherUser(selectedConversation).team_name && (
-                      <span className="text-purple-400 text-xs truncate block">
-                        {getOtherUser(selectedConversation).team_name}
-                      </span>
+                <div className="min-w-0 flex-1">
+                  <span className="font-bold text-white text-xs flex items-center gap-1 truncate">
+                    {getOtherUser(selectedConversation).name}
+                    {getOtherUser(selectedConversation).role === 'admin' && (
+                      <Crown size={10} className="text-yellow-500 flex-shrink-0" />
                     )}
-                  </div>
+                  </span>
+                  {getOtherUser(selectedConversation).team_name && (
+                    <span className="text-purple-400 text-xs truncate block">
+                      {getOtherUser(selectedConversation).team_name}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Mensagens */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gradient-to-b from-zinc-900 to-zinc-800">
-              {messages.length === 0 ? (
-                <div className="text-center text-gray-500 text-xs py-6">
-                  <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <MessageCircle size={16} className="text-gray-600" />
-                  </div>
-                  <p className="font-medium">Nenhuma mensagem ainda</p>
-                  <p className="text-xs mt-1">Inicie a conversa!</p>
+          {/* Mensagens */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-2 bg-gradient-to-b from-zinc-900 to-zinc-800">
+            {messages.length === 0 ? (
+              <div className="text-center text-gray-500 text-xs py-6">
+                <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <MessageCircle size={16} className="text-gray-600" />
                 </div>
-              ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'
-                      }`}
-                  >
-                    {message.type === 'player' && message.playerData ? (
-                      // Mensagem de jogador compartilhado - AGORA CLICÁVEL
-                      <div
-                        className="max-w-[85%] rounded-lg p-3 backdrop-blur-xl bg-white/10 border border-white/10 cursor-pointer hover:bg-white/20 transition-all group relative"
-                        onClick={() => navigateToPlayer(message.playerData!.id)}
-                      >
-                        <div className="flex items-center gap-3">
-                          {message.playerData.photo_url ? (
-                            <img
-                              src={message.playerData.photo_url}
-                              alt={message.playerData.name}
-                              className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400 transition-all"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform">
-                              <span className="text-white text-xs font-bold">{message.playerData.position}</span>
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-white text-sm truncate group-hover:text-purple-300 transition-colors">
-                              {message.playerData.name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-0.5 rounded">
-                                OVR {message.playerData.overall}
-                              </span>
-                              <span className="text-purple-400 text-xs">{message.playerData.position}</span>
-                            </div>
-                            {message.playerData.team_name && (
-                              <p className="text-gray-400 text-xs mt-1 truncate">{message.playerData.team_name}</p>
-                            )}
+                <p className="font-medium">Nenhuma mensagem ainda</p>
+                <p className="text-xs mt-1">Inicie a conversa!</p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'
+                    }`}
+                >
+                  {message.type === 'player' && message.playerData ? (
+                    // Mensagem de jogador compartilhado - AGORA CLICÁVEL
+                    <div
+                      className="max-w-[85%] rounded-lg p-3 backdrop-blur-xl bg-white/10 border border-white/10 cursor-pointer hover:bg-white/20 transition-all group relative"
+                      onClick={() => navigateToPlayer(message.playerData!.id)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {message.playerData.photo_url ? (
+                          <img
+                            src={message.playerData.photo_url}
+                            alt={message.playerData.name}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-purple-500/50 group-hover:border-purple-400 transition-all"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform">
+                            <span className="text-white text-xs font-bold">{message.playerData.position}</span>
                           </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-white text-sm truncate group-hover:text-purple-300 transition-colors">
+                            {message.playerData.name}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="bg-yellow-500 text-black text-xs font-bold px-2 py-0.5 rounded">
+                              OVR {message.playerData.overall}
+                            </span>
+                            <span className="text-purple-400 text-xs">{message.playerData.position}</span>
+                          </div>
+                          {message.playerData.team_name && (
+                            <p className="text-gray-400 text-xs mt-1 truncate">{message.playerData.team_name}</p>
+                          )}
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-2 text-right">
-                          {formatTime(message.timestamp)}
-                        </p>
-                        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 to-pink-600/0 group-hover:from-purple-600/10 group-hover:to-pink-600/10 rounded-lg transition-all" />
                       </div>
-                    ) : (
-                      // Mensagem de texto normal
-                      <div
-                        className={`max-w-[85%] rounded-lg p-2 backdrop-blur-xl ${message.sender === 'user'
-                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-br-none shadow-lg'
-                          : 'bg-white/10 text-white rounded-bl-none border border-white/10'
+                      <p className="text-[10px] text-gray-400 mt-2 text-right">
+                        {formatTime(message.timestamp)}
+                      </p>
+                      <div className="absolute inset-0 bg-gradient-to-r from-purple-600/0 to-pink-600/0 group-hover:from-purple-600/10 group-hover:to-pink-600/10 rounded-lg transition-all" />
+                    </div>
+                  ) : (
+                    // Mensagem de texto normal
+                    <div
+                      className={`max-w-[85%] rounded-lg p-2 backdrop-blur-xl ${message.sender === 'user'
+                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-br-none shadow-lg'
+                        : 'bg-white/10 text-white rounded-bl-none border border-white/10'
+                        }`}
+                    >
+                      <p className="text-xs font-medium break-words">{message.text}</p>
+                      <p
+                        className={`text-[10px] mt-1 font-medium ${message.sender === 'user'
+                          ? 'text-purple-200'
+                          : 'text-gray-400'
                           }`}
                       >
-                        <p className="text-xs font-medium break-words">{message.text}</p>
-                        <p
-                          className={`text-[10px] mt-1 font-medium ${message.sender === 'user'
-                            ? 'text-purple-200'
-                            : 'text-gray-400'
-                            }`}
-                        >
-                          {formatTime(message.timestamp)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input de mensagem */}
-            <form
-              onSubmit={handleSendMessage}
-              className="p-2 border-t border-white/10 bg-zinc-800/50 shrink-0"
-            >
-              <div className="flex space-x-2">
-                <button
-                  type="button"
-                  onClick={openPlayerSelector}
-                  className="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-lg transition-all duration-300 flex-shrink-0"
-                  title="Compartilhar jogador"
-                >
-                  <Paperclip size={14} />
-                </button>
-
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Digite sua mensagem..."
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-transparent placeholder-gray-400 backdrop-blur-xl"
-                />
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white p-1 rounded-lg transition-all duration-300 shadow-lg disabled:shadow-none flex-shrink-0"
-                >
-                  <Send size={14} />
-                </button>
-              </div>
-            </form>
-          </>
-        ) : (
-          // Lista de conversas ou treinadores (quando NÃO está em uma conversa OU está na aba de treinadores)
-          <>
-            {activeTab === 'coaches' && (
-              <div className="p-2 border-b border-white/10 bg-zinc-800/50 shrink-0">
-                <div className="relative">
-                  <Search size={12} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Buscar treinadores..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg pl-7 pr-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-transparent placeholder-gray-400 backdrop-blur-xl"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-20">
-                  <div className="text-gray-500 text-xs font-medium">Carregando...</div>
-                </div>
-              ) : activeTab === 'conversations' ? (
-                renderConversations()
-              ) : (
-                filteredCoaches.length === 0 ? (
-                  <div className="text-center text-gray-500 py-6">
-                    <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">
-                      <User size={16} className="text-gray-600" />
+                        {formatTime(message.timestamp)}
+                      </p>
                     </div>
-                    <p className="font-medium text-xs">Nenhum treinador encontrado</p>
-                    <p className="text-[10px] mt-1">Tente ajustar sua busca</p>
-                  </div>
-                ) : (
-                  filteredCoaches.map((coach) => (
-                    <button
-                      key={coach.id}
-                      onClick={() => startNewConversation(coach)}
-                      className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
-                          {coach.team_logo ? (
-                            <img
-                              src={coach.team_logo}
-                              alt={coach.team_name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
-                              <User size={12} className="text-white" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-bold text-white text-xs flex items-center gap-1 truncate">
-                            {coach.name}
-                            {coach.role === 'admin' && (
-                              <Crown size={10} className="text-yellow-500 flex-shrink-0" />
-                            )}
-                          </p>
-                          <p className="text-green-400 text-xs font-medium truncate">
-                            {coach.team_name}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  ))
-                )
-              )}
+                  )}
+                </div>
+              ))
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input de mensagem */}
+          <form
+            onSubmit={handleSendMessage}
+            className="p-2 border-t border-white/10 bg-zinc-800/50 shrink-0"
+          >
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={openPlayerSelector}
+                className="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded-lg transition-all duration-300 flex-shrink-0"
+                title="Compartilhar jogador"
+              >
+                <Paperclip size={14} />
+              </button>
+
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Digite sua mensagem..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-transparent placeholder-gray-400 backdrop-blur-xl"
+              />
+              <button
+                type="submit"
+                disabled={!newMessage.trim()}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white p-1 rounded-lg transition-all duration-300 shadow-lg disabled:shadow-none flex-shrink-0"
+              >
+                <Send size={14} />
+              </button>
             </div>
-          </>
-        )}
-      </div>
-
-      {/* Modal de seleção de jogadores */}
-      {showPlayerSelector && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 rounded-xl border border-white/10 w-full max-w-md max-h-[80vh] overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4">
-              <h3 className="font-bold text-sm">Compartilhar Jogador</h3>
-              <p className="text-purple-200 text-xs">Selecione um jogador para compartilhar</p>
-            </div>
-
-            {/* Conteúdo */}
-            <div className="p-4 space-y-4">
-              {/* Seletor de time */}
-              <div>
-                <label className="text-xs text-zinc-400 font-medium mb-1 block">Selecionar Time</label>
-                <select
-                  value={selectedTeam}
-                  onChange={(e) => setSelectedTeam(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
-                >
-                  {availableTeams.map(team => (
-                    <option key={team.id} value={team.id} className="bg-zinc-900 text-white">
-                      {team.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Busca de jogadores */}
+          </form>
+        </>
+      ) : (
+        // Lista de conversas ou treinadores (quando NÃO está em uma conversa OU está na aba de treinadores)
+        <>
+          {activeTab === 'coaches' && (
+            <div className="p-2 border-b border-white/10 bg-zinc-800/50 shrink-0">
               <div className="relative">
-                <Search size={12} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" />
+                <Search size={12} className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Buscar jogador..."
-                  value={playerSearch}
-                  onChange={(e) => setPlayerSearch(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder-zinc-400"
+                  placeholder="Buscar treinadores..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg pl-7 pr-2 py-1 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-transparent placeholder-gray-400 backdrop-blur-xl"
                 />
               </div>
+            </div>
+          )}
 
-              {/* Lista de jogadores */}
-              <div className="max-h-48 overflow-y-auto space-y-2">
-                {filteredPlayers.map(player => (
+          <div className="flex-1 overflow-y-auto">
+            {loading ? (
+              <div className="flex items-center justify-center h-20">
+                <div className="text-gray-500 text-xs font-medium">Carregando...</div>
+              </div>
+            ) : activeTab === 'conversations' ? (
+              renderConversations()
+            ) : (
+              filteredCoaches.length === 0 ? (
+                <div className="text-center text-gray-500 py-6">
+                  <div className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <User size={16} className="text-gray-600" />
+                  </div>
+                  <p className="font-medium text-xs">Nenhum treinador encontrado</p>
+                  <p className="text-[10px] mt-1">Tente ajustar sua busca</p>
+                </div>
+              ) : (
+                filteredCoaches.map((coach) => (
                   <button
-                    key={player.id}
-                    onClick={() => setSelectedPlayer(player)}
-                    className={`w-full p-3 rounded-lg border transition-all ${selectedPlayer?.id === player.id
-                      ? 'bg-purple-600/20 border-purple-500'
-                      : 'bg-white/5 border-white/10 hover:bg-white/10'
-                      }`}
+                    key={coach.id}
+                    onClick={() => startNewConversation(coach)}
+                    className="w-full p-2 border-b border-white/5 hover:bg-white/5 transition-all duration-300 text-left group"
                   >
-                    <div className="flex items-center gap-3">
-                      {player.photo_url ? (
-                        <img
-                          src={player.photo_url}
-                          alt={player.name}
-                          className="w-10 h-10 rounded-full object-cover border border-purple-500/50"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
-                          <span className="text-white text-xs font-bold">{player.position}</span>
-                        </div>
-                      )}
-                      <div className="flex-1 text-left">
-                        <p className="font-bold text-white text-sm truncate">{player.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded">
-                            OVR {player.overall}
-                          </span>
-                          <span className="text-purple-400 text-xs">{player.position}</span>
-                        </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
+                        {coach.team_logo ? (
+                          <img
+                            src={coach.team_logo}
+                            alt={coach.team_name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-green-600 to-emerald-600 rounded-full flex items-center justify-center">
+                            <User size={12} className="text-white" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-white text-xs flex items-center gap-1 truncate">
+                          {coach.name}
+                          {coach.role === 'admin' && (
+                            <Crown size={10} className="text-yellow-500 flex-shrink-0" />
+                          )}
+                        </p>
+                        <p className="text-green-400 text-xs font-medium truncate">
+                          {coach.team_name}
+                        </p>
                       </div>
                     </div>
                   </button>
-                ))}
-              </div>
+                ))
+              )
+            )}
+          </div>
+        </>
+      )}
+    </div>
 
-              {/* Ações */}
-              <div className="flex gap-2 pt-4 border-t border-white/10">
+    {/* Modal de seleção de jogadores */}
+    {showPlayerSelector && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-zinc-900 rounded-xl border border-white/10 w-full max-w-md max-h-[80vh] overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4">
+            <h3 className="font-bold text-sm">Compartilhar Jogador</h3>
+            <p className="text-purple-200 text-xs">Selecione um jogador para compartilhar</p>
+          </div>
+
+          {/* Conteúdo */}
+          <div className="p-4 space-y-4">
+            {/* Seletor de time */}
+            <div>
+              <label className="text-xs text-zinc-400 font-medium mb-1 block">Selecionar Time</label>
+              <select
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+              >
+                {availableTeams.map(team => (
+                  <option key={team.id} value={team.id} className="bg-zinc-900 text-white">
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Busca de jogadores */}
+            <div className="relative">
+              <Search size={12} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                placeholder="Buscar jogador..."
+                value={playerSearch}
+                onChange={(e) => setPlayerSearch(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder-zinc-400"
+              />
+            </div>
+
+            {/* Lista de jogadores */}
+            <div className="max-h-48 overflow-y-auto space-y-2">
+              {filteredPlayers.map(player => (
                 <button
-                  onClick={() => {
-                    setShowPlayerSelector(false);
-                    setSelectedPlayer(null);
-                    setPlayerSearch('');
-                  }}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg transition-all text-xs font-medium"
+                  key={player.id}
+                  onClick={() => setSelectedPlayer(player)}
+                  className={`w-full p-3 rounded-lg border transition-all ${selectedPlayer?.id === player.id
+                    ? 'bg-purple-600/20 border-purple-500'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    }`}
                 >
-                  Cancelar
+                  <div className="flex items-center gap-3">
+                    {player.photo_url ? (
+                      <img
+                        src={player.photo_url}
+                        alt={player.name}
+                        className="w-10 h-10 rounded-full object-cover border border-purple-500/50"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">{player.position}</span>
+                      </div>
+                    )}
+                    <div className="flex-1 text-left">
+                      <p className="font-bold text-white text-sm truncate">{player.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded">
+                          OVR {player.overall}
+                        </span>
+                        <span className="text-purple-400 text-xs">{player.position}</span>
+                      </div>
+                    </div>
+                  </div>
                 </button>
-                <button
-                  onClick={sharePlayer}
-                  disabled={!selectedPlayer}
-                  className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white py-2 rounded-lg transition-all text-xs font-medium disabled:cursor-not-allowed"
-                >
-                  Compartilhar
-                </button>
-              </div>
+              ))}
+            </div>
+
+            {/* Ações */}
+            <div className="flex gap-2 pt-4 border-t border-white/10">
+              <button
+                onClick={() => {
+                  setShowPlayerSelector(false);
+                  setSelectedPlayer(null);
+                  setPlayerSearch('');
+                }}
+                className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg transition-all text-xs font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={sharePlayer}
+                disabled={!selectedPlayer}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-600 disabled:to-gray-600 text-white py-2 rounded-lg transition-all text-xs font-medium disabled:cursor-not-allowed"
+              >
+                Compartilhar
+              </button>
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 }
