@@ -19,23 +19,15 @@ export async function createTeamAction(formData: FormData) {
 
     try {
         // Parse balance (remove currency formatting if needed)
-        // input might be "R$ 150.000.000" or just numbers
-        const numericBalance = Number(balance.replace(/\D/g, '')) / 100 // Assuming input masks it as currency cents? 
-        // Or if raw number input:
-        // Let's assume the UI sends a clean number or we clean it.
-        // User wants "balance em dinheiro formatado para melhor entendimento" in UI, 
-        // but server usually expects numeric or string representation of number.
-        // Let's handle simple parsing: replace R$, dots, etc.
-        // If the user inputs "150.000.000", clean to 150000000.
-
-        const cleanBalance = balance ? parseFloat(balance.replace(/[^\d]/g, '')) : 150000000
+        // input might be "R$ 150.000.000,00" -> Digits 15000000000 -> /100 -> 150000000
+        const cleanBalance = balance ? (parseFloat(balance.replace(/[^\d]/g, '')) / 100) : 150000000
 
         const { data, error } = await supabase
             .from('teams')
             .insert({
                 name,
                 logo_url: logo_url || null,
-                balance: cleanBalance, // DB default is 150000000, but we override if provided
+                balance: cleanBalance, // DB default is 150M
                 divisao,
                 organization_id
             })
@@ -92,7 +84,7 @@ export async function updateTeamAction(formData: FormData) {
     }
 
     try {
-        const cleanBalance = balance ? parseFloat(balance.replace(/[^\d]/g, '')) : 0
+        const cleanBalance = balance ? (parseFloat(balance.replace(/[^\d]/g, '')) / 100) : 0
 
         const { error } = await supabase
             .from('teams')

@@ -88,7 +88,7 @@ export default function TeamsManagementPage() {
         setEditingId(team.id)
         setFormData({
             name: team.name,
-            balance: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(team.balance / 100),
+            balance: new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(team.balance),
             divisao: team.divisao || 'A',
             logo_url: team.logo_url || '',
             owner_id: ''
@@ -138,11 +138,9 @@ export default function TeamsManagementPage() {
     }
 
     const formatCurrency = (value: string) => {
-        // Simple formatter for display input
-        // Allow only numbers
         const numbers = value.replace(/\D/g, '')
-        const formatted = new Intl.NumberFormat('pt-BR').format(Number(numbers))
-        return formatted
+        // Divide por 100 para considerar os centavos
+        return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2 }).format(Number(numbers) / 100)
     }
 
     const handleBalanceChange = (e: React.ChangeEvent<HTMLInputElement>) => {

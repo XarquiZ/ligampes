@@ -13,8 +13,10 @@ import {
     ArrowRightLeft,
     Star,
     Clock,
+    ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PlayerAttributes } from '@/components/jogadores/PlayerAttributes'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Sidebar from '@/components/Sidebar'
@@ -137,6 +139,7 @@ export default function PlayerProfilePage() {
     const [userTeam, setUserTeam] = useState<any>(null)
     const [isChatOpen, setIsChatOpen] = useState(false)
     const [unreadCount, setUnreadCount] = useState(0)
+    const [isAttributesExpanded, setIsAttributesExpanded] = useState(false)
 
 
     useEffect(() => {
@@ -411,6 +414,26 @@ export default function PlayerProfilePage() {
                                 ))}
                             </div>
 
+                            {/* Detailed Attributes (Expanded View - Full Width) */}
+                            {isAttributesExpanded && (
+                                <div className="w-full animate-in fade-in slide-in-from-top-4 duration-500 mb-8 cursor-pointer group" onClick={() => setIsAttributesExpanded(false)}>
+                                    <Card className="bg-zinc-900/50 border-purple-500/30 shadow-lg shadow-purple-500/10 group-hover:border-purple-500/50 transition-all">
+                                        <CardHeader>
+                                            <CardTitle className="text-lg text-white flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Activity className="w-4 h-4 text-purple-400" />
+                                                    Atributos Detalhados
+                                                </div>
+                                                <ChevronDown className="w-5 h-5 text-purple-400 rotate-180" />
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <PlayerAttributes player={player as any} />
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            )}
+
                             {/* Grid do Conteúdo Principal (Matches + Details) */}
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
@@ -580,58 +603,67 @@ export default function PlayerProfilePage() {
                                 {/* Coluna Direita (da grid interna): Detalhes e Transferências */}
                                 <div className="space-y-8">
 
-                                    {/* Detalhes do Jogador (Atributos) */}
-                                    <Card className="bg-zinc-900/50 border-zinc-800">
-                                        <CardHeader>
-                                            <CardTitle className="text-lg text-white flex items-center gap-2">
-                                                <Activity className="w-4 h-4" style={{ color: teamColors.accent }} />
-                                                Atributos
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            {(() => {
-                                                const isGK = player.position === 'GO' || player.position === 'GK';
-
-                                                const getAvg = (...values: (number | undefined)[]) => {
-                                                    const validValues = values.filter(v => typeof v === 'number');
-                                                    if (validValues.length === 0) return 0;
-                                                    const sum = validValues.reduce((a, b) => a + (b as number), 0);
-                                                    return Math.round(sum / validValues.length);
-                                                };
-
-                                                const attributes = isGK ? [
-                                                    { label: 'Talento', value: player.gk_awareness || 0 },
-                                                    { label: 'Firmeza', value: player.gk_catching || 0 },
-                                                    { label: 'Afastamento', value: player.gk_clearing || 0 },
-                                                    { label: 'Reflexos', value: player.gk_reflexes || 0 },
-                                                    { label: 'Alcance', value: player.gk_reach || 0 }
-                                                ] : [
-                                                    { label: 'VEL', value: getAvg(player.speed, player.acceleration) },
-                                                    { label: 'FIN', value: getAvg(player.offensive_talent, player.finishing, player.place_kicking, player.heading, player.curl, player.kicking_power) },
-                                                    { label: 'PAS', value: getAvg(player.low_pass, player.lofted_pass) },
-                                                    { label: 'DRI', value: getAvg(player.ball_control, player.dribbling, player.tight_possession, player.balance) },
-                                                    { label: 'DEF', value: getAvg(player.defensive_awareness, player.ball_winning, player.aggression) },
-                                                    { label: 'FIS', value: getAvg(player.jump, player.physical_contact, player.stamina) }
-                                                ];
-
-                                                return attributes.map((attr) => (
-                                                    <div key={attr.label} className="flex items-center gap-3">
-                                                        <span className="text-sm text-zinc-400 w-24 font-bold">{attr.label}</span>
-                                                        <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full rounded-full"
-                                                                style={{
-                                                                    width: `${Math.min(100, (attr.value / 99) * 100)}%`,
-                                                                    backgroundColor: teamColors.primary
-                                                                }}
-                                                            />
+                                    {/* Detalhes do Jogador (Atributos - Sidebar Collapsed) */}
+                                    {!isAttributesExpanded && (
+                                        <div onClick={() => setIsAttributesExpanded(true)} className="cursor-pointer group">
+                                            <Card className="bg-zinc-900/50 border-zinc-800 group-hover:bg-zinc-900/70 group-hover:border-zinc-700 transition-all duration-300">
+                                                <CardHeader>
+                                                    <CardTitle className="text-lg text-white flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <Activity className="w-4 h-4" style={{ color: teamColors.accent }} />
+                                                            Atributos
                                                         </div>
-                                                        <span className="text-sm font-bold text-white w-8 text-right">{attr.value}</span>
+                                                        <ChevronDown className="w-5 h-5 text-zinc-400 transition-transform duration-300 group-hover:text-purple-400" />
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="space-y-4">
+                                                        {(() => {
+                                                            const isGK = player.position === 'GO' || player.position === 'GK';
+
+                                                            const getAvg = (...values: (number | undefined)[]) => {
+                                                                const validValues = values.filter(v => typeof v === 'number');
+                                                                if (validValues.length === 0) return 0;
+                                                                const sum = validValues.reduce((a, b) => a + (b as number), 0);
+                                                                return Math.round(sum / validValues.length);
+                                                            };
+
+                                                            const attributes = isGK ? [
+                                                                { label: 'Talento', value: player.gk_awareness || 0 },
+                                                                { label: 'Firmeza', value: player.gk_catching || 0 },
+                                                                { label: 'Afastamento', value: player.gk_clearing || 0 },
+                                                                { label: 'Reflexos', value: player.gk_reflexes || 0 },
+                                                                { label: 'Alcance', value: player.gk_reach || 0 }
+                                                            ] : [
+                                                                { label: 'VEL', value: getAvg(player.speed, player.acceleration) },
+                                                                { label: 'FIN', value: getAvg(player.offensive_talent, player.finishing, player.place_kicking, player.heading, player.curl, player.kicking_power) },
+                                                                { label: 'PAS', value: getAvg(player.low_pass, player.lofted_pass) },
+                                                                { label: 'DRI', value: getAvg(player.ball_control, player.dribbling, player.tight_possession, player.balance) },
+                                                                { label: 'DEF', value: getAvg(player.defensive_awareness, player.ball_winning, player.aggression) },
+                                                                { label: 'FIS', value: getAvg(player.jump, player.physical_contact, player.stamina) }
+                                                            ];
+
+                                                            return attributes.map((attr) => (
+                                                                <div key={attr.label} className="flex items-center gap-3">
+                                                                    <span className="text-sm text-zinc-400 w-24 font-bold">{attr.label}</span>
+                                                                    <div className="flex-1 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                                                                        <div
+                                                                            className="h-full rounded-full"
+                                                                            style={{
+                                                                                width: `${Math.min(100, (attr.value / 99) * 100)}%`,
+                                                                                backgroundColor: teamColors.primary
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-sm font-bold text-white w-8 text-right">{attr.value}</span>
+                                                                </div>
+                                                            ));
+                                                        })()}
                                                     </div>
-                                                ));
-                                            })()}
-                                        </CardContent>
-                                    </Card>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    )}
 
                                     {/* Seção de Prêmios Individuais */}
                                     {player.individual_titles && player.individual_titles.length > 0 && (
