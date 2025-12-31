@@ -169,6 +169,7 @@ export default function PaginaSaldo() {
           .from('profiles')
           .select('*, teams(*)')
           .eq('id', user.id)
+          .eq('organization_id', organization?.id)
           .single()
 
         if (!profileError) {
@@ -184,7 +185,7 @@ export default function PaginaSaldo() {
     }
 
     loadUserData()
-  }, [authLoading, user])
+  }, [authLoading, user, organization?.id])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {
@@ -266,6 +267,7 @@ export default function PaginaSaldo() {
         .from('profiles')
         .select('team_id, role')
         .eq('id', session.user.id)
+        .eq('organization_id', organization?.id)
         .single()
 
       setIsAdmin(profile?.role === 'admin')

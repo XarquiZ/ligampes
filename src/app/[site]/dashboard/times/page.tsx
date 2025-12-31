@@ -25,7 +25,6 @@ export default function TeamsManagementPage() {
         name: '',
         balance: '150.000.000',
         divisao: 'A',
-        divisao: 'A',
         logo_url: '',
         owner_id: ''
     })
@@ -53,6 +52,21 @@ export default function TeamsManagementPage() {
                     .order('name')
 
                 setTeams(teamsData || [])
+
+                // Load Users (Potential Owners) - Added missing fetch
+                console.log('[Times] Fetching users for org:', org.id)
+                const { data: usersData, error: usersError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, email, coach_name, team_id')
+                    .eq('organization_id', org.id)
+
+                if (usersError) {
+                    console.error('[Times] Error fetching users:', usersError)
+                } else {
+                    console.log('[Times] Users fetched:', usersData?.length, usersData)
+                }
+
+                setUsers(usersData || [])
             }
         }
         loadData()
@@ -267,10 +281,23 @@ export default function TeamsManagementPage() {
                                         )}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold truncate text-white">{team.name}</h3>
+                                        <h3 className="font-bold truncate text-white mb-0.5">{team.name}</h3>
+                                        <div className="text-xs text-zinc-500 truncate mb-1.5">
+                                            {users.find(u => u.team_id === team.id) ? (
+                                                <span className="text-zinc-400 flex items-center gap-1">
+                                                    <Users className="w-3 h-3" />
+                                                    {users.find(u => u.team_id === team.id)?.coach_name || users.find(u => u.team_id === team.id)?.full_name}
+                                                </span>
+                                            ) : (
+                                                <span className="text-zinc-600 italic">Sem técnico</span>
+                                            )}
+                                        </div>
                                         <div className="flex items-center gap-2 text-xs text-zinc-400">
-                                            <span className="bg-zinc-800 px-1.5 rounded text-white">Série {team.divisao || 'A'}</span>
-                                            <span>R$ {new Intl.NumberFormat('pt-BR', { notation: 'compact' }).format(team.balance || 0)}</span>
+                                            <span className="bg-zinc-800 px-1.5 rounded text-white font-medium">Série {team.divisao || 'A'}</span>
+                                            <span className="flex items-center gap-0.5 text-emerald-400 font-mono">
+                                                <DollarSign className="w-3 h-3" />
+                                                {new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(team.balance || 0)}
+                                            </span>
                                         </div>
                                     </div>
                                     <Button size="icon" variant="ghost" onClick={() => handleEdit(team)} className="text-zinc-400 hover:text-white">

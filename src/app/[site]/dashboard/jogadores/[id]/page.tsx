@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Sidebar from '@/components/Sidebar'
 import ChatPopup from '@/components/Chatpopup'
+import { useOrganization } from '@/contexts/OrganizationContext'
 import FloatingChatButton from '@/components/FloatingChatButton'
 import { TEAM_COLORS, DEFAULT_TEAM_COLOR } from '@/utils/teamColors'
 import { format } from 'date-fns'
@@ -104,8 +105,8 @@ interface TransferHistory {
     date: string
     value: number
     transfer_type: string
-    from_team?: { name: string; logo_url: string | null }
-    to_team?: { name: string; logo_url: string | null }
+    from_team?: { id: string; name: string; logo_url: string | null }
+    to_team?: { id: string; name: string; logo_url: string | null }
 }
 
 interface UpcomingMatch {
@@ -123,6 +124,7 @@ interface UpcomingMatch {
 export default function PlayerProfilePage() {
     const params = useParams()
     const router = useRouter()
+    const { organization } = useOrganization()
     const [loading, setLoading] = useState(true)
     const [player, setPlayer] = useState<PlayerProfile | null>(null)
     const [matches, setMatches] = useState<MatchHistory[]>([])
@@ -150,6 +152,7 @@ export default function PlayerProfilePage() {
                         .from('profiles')
                         .select('*, teams(*)')
                         .eq('id', user.id)
+                        .eq('organization_id', organization?.id)
                         .single()
 
                     if (profile) {
@@ -274,7 +277,7 @@ export default function PlayerProfilePage() {
         }
 
         fetchUserAndPlayer()
-    }, [params.id])
+    }, [params.id, organization?.id])
 
     if (loading) {
         return (

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import {
     ScrollText,
     Gamepad2,
@@ -75,6 +76,7 @@ type SectionType = keyof typeof sectionConfig;
 
 export default function InformacoesPage() {
     const router = useRouter();
+    const { organization } = useOrganization();
     const { user, loading: authLoading } = useAuth();
     const [profile, setProfile] = useState<any>(null);
     const [team, setTeam] = useState<any>(null);
@@ -102,6 +104,7 @@ export default function InformacoesPage() {
                     .from('profiles')
                     .select('*, teams(*)')
                     .eq('id', user.id)
+                    .eq('organization_id', organization?.id)
                     .single();
 
                 if (profileData) {
@@ -125,7 +128,7 @@ export default function InformacoesPage() {
         };
 
         loadData();
-    }, [user, authLoading, router]);
+    }, [user, authLoading, router, organization?.id]);
 
     // Carregar mensagens não lidas
     useEffect(() => {

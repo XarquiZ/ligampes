@@ -13,6 +13,7 @@ interface User {
 interface Team {
   id: string;
   name: string;
+  logo_url?: string | null;
 }
 
 interface FloatingChatButtonProps {
@@ -48,10 +49,10 @@ export default function FloatingChatButton({
       const { totalUnread } = event.detail || {};
       if (typeof totalUnread === 'number' && totalUnread >= 0) {
         console.log('📩 FloatingChatButton - Evento recebido:', totalUnread);
-        
+
         // Atualizar estado interno
         setInternalUnreadCount(totalUnread);
-        
+
         // Notificar componente pai
         if (onUnreadCountChange) {
           console.log('📤 Notificando componente pai:', totalUnread);
@@ -61,7 +62,7 @@ export default function FloatingChatButton({
     };
 
     window.addEventListener('chatUnreadCountUpdated', handleUnreadCountUpdated as EventListener);
-    
+
     console.log('🎯 FloatingChatButton - Listener registrado');
 
     return () => {
@@ -87,14 +88,14 @@ export default function FloatingChatButton({
   // Função para abrir chat
   const handleOpenChat = useCallback(() => {
     console.log('💬 Abrindo chat - unreadCount atual:', internalUnreadCount);
-    
+
     // Disparar evento para indicar que o chat está sendo aberto
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('chatOpening', {
         detail: { unreadCount: internalUnreadCount }
       }));
     }
-    
+
     // Chamar a função do componente pai
     onOpenChat();
   }, [internalUnreadCount, onOpenChat]);
@@ -106,13 +107,12 @@ export default function FloatingChatButton({
       aria-label="Abrir chat"
       title={`Chat - ${internalUnreadCount} mensagens não lidas`}
     >
-      <MessageCircle 
-        size={20} 
-        className={`group-hover:scale-110 transition-transform ${
-          internalUnreadCount > 0 ? 'animate-pulse' : ''
-        }`} 
+      <MessageCircle
+        size={20}
+        className={`group-hover:scale-110 transition-transform ${internalUnreadCount > 0 ? 'animate-pulse' : ''
+          }`}
       />
-      
+
       {/* Badge de notificação */}
       {internalUnreadCount > 0 && (
         <span className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full min-w-[20px] h-5 text-xs flex items-center justify-center font-bold shadow-lg border border-zinc-900">

@@ -310,6 +310,7 @@ export default function ListaJogadores() {
           .from('profiles')
           .select('*, teams(*)')
           .eq('id', user.id)
+          .eq('organization_id', organization?.id)
           .single()
 
         if (!profileError) {
@@ -324,7 +325,7 @@ export default function ListaJogadores() {
     }
 
     loadUserData()
-  }, [authLoading, user])
+  }, [authLoading, user, organization?.id])
 
   // Carregar favoritos quando o usuário mudar
   useEffect(() => {
@@ -467,14 +468,18 @@ export default function ListaJogadores() {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        setUserRole(data?.role || null)
-      }
+      if (!user) return
+      const { data } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .eq('organization_id', organization?.id)
+        .single()
+
+      setUserRole(data?.role || null)
     }
     checkAdmin()
-  }, [])
+  }, [user, organization?.id])
 
   const fetchData = useCallback(async () => {
     setLoading(true)

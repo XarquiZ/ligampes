@@ -10,6 +10,7 @@ import { PlannerSectionProps, Player, POSITION_MAP, POSITIONS } from '../types'
 import { PlayerSelectionModal } from '../modals/PlayerSelectionModal'
 import { PositionSelectionModal } from '../modals/PositionSelectionModal'
 import { supabase } from '@/lib/supabase'
+import { useOrganization } from '@/contexts/OrganizationContext'
 
 interface FieldSlot {
   id: string
@@ -342,6 +343,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
   const [windowWidth, setWindowWidth] = useState(1200) // Default to desktop
   const isMobile = windowWidth < 768
   const isTablet = windowWidth >= 768 && windowWidth < 1024
+  const { organization } = useOrganization()
 
   const [dragging, setDragging] = useState<DraggingState>({
     isDragging: false,
@@ -431,6 +433,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
           .from('profiles')
           .select('team_id')
           .eq('id', user.id)
+          .eq('organization_id', organization?.id)
           .single()
 
         if (profileError) {
@@ -440,6 +443,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
             .from('profiles')
             .select('team_id')
             .eq('id', user.id)
+            .eq('organization_id', organization?.id)
             .maybeSingle()
 
           if (!profilesError && profiles) {
@@ -464,7 +468,7 @@ export const DragAndDropPlanner: React.FC<PlannerSectionProps> = ({ teamPlayers,
     }
 
     loadUserAndTeam()
-  }, [])
+  }, [organization?.id])
 
   // Carregar formações apenas quando o usuário clicar em "Minhas Formações"
   const loadSavedFormations = async () => {

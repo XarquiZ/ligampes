@@ -14,6 +14,7 @@ import CopaParsec from "@/components/tabela/CopaParsec";
 import Calendario from "@/components/tabela/Calendario"; // NOVA IMPORT
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabelas";
 import { useAuth } from "@/hooks/useAuth";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { cn } from "@/lib/utils";
 
 // Interface de usuário
@@ -40,6 +41,7 @@ interface Team {
 }
 
 export default function TabelaPage() {
+  const { organization } = useOrganization();
   const { user, loading: authLoading } = useAuth();
   // Estados do usuário
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -96,6 +98,7 @@ export default function TabelaPage() {
           .from('profiles')
           .select('*, teams(*)')
           .eq('id', user.id)
+          .eq('organization_id', organization?.id)
           .single()
 
         if (!profileError) {
@@ -110,7 +113,7 @@ export default function TabelaPage() {
     }
 
     loadUserData()
-  }, [authLoading, user])
+  }, [authLoading, user, organization?.id])
 
   // Carregar contagem de mensagens não lidas
   useEffect(() => {

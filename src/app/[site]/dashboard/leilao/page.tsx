@@ -316,6 +316,7 @@ export default function PaginaLeilao() {
           teams (*)
         `)
         .eq('id', session.user.id)
+        .eq('organization_id', organization?.id)
         .single()
 
       if (profile) {

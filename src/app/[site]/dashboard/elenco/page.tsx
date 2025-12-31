@@ -111,6 +111,7 @@ export default function ElencoPage() {
           .from('profiles')
           .select('*, teams(*)')
           .eq('id', user.id)
+          .eq('organization_id', organization?.id)
           .single()
 
         if (!profileError) {
@@ -126,7 +127,7 @@ export default function ElencoPage() {
     }
 
     loadUserData()
-  }, [authLoading, user])
+  }, [authLoading, user, organization?.id])
 
   const loadAllPlayers = useCallback(async () => {
     try {
