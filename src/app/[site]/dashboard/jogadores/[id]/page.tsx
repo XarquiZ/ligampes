@@ -17,6 +17,9 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlayerAttributes } from '@/components/jogadores/PlayerAttributes'
+import { PlayerBasicInfo } from '@/components/jogadores/PlayerBasicInfo'
+import { PlayerSkills } from '@/components/jogadores/PlayerSkills'
+import { PlayerInspirational } from '@/components/jogadores/PlayerInspirational'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import Sidebar from '@/components/Sidebar'
@@ -77,6 +80,16 @@ interface PlayerProfile {
     }
     titles?: string[] | null
     individual_titles?: string[] | null
+    // Detalhes extras para componentes expandidos
+    alternative_positions?: string[] | null
+    weak_foot_usage?: number
+    weak_foot_accuracy?: number
+    form?: number
+    injury_resistance?: number
+    inspiring_ball_carry?: number
+    inspiring_low_pass?: number
+    inspiring_lofted_pass?: number
+    skills?: string[]
 }
 
 interface MatchHistory {
@@ -428,7 +441,29 @@ export default function PlayerProfilePage() {
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent>
-                                            <PlayerAttributes player={player as any} />
+                                            <div className="space-y-6">
+                                                <PlayerBasicInfo
+                                                    age={player.age}
+                                                    height={player.height}
+                                                    nationality={player.nationality}
+                                                    preferred_foot={player.preferred_foot}
+                                                    alternative_positions={player.alternative_positions}
+                                                />
+
+                                                <PlayerAttributes player={player as any} />
+
+                                                <PlayerInspirational
+                                                    weak_foot_usage={player.weak_foot_usage}
+                                                    weak_foot_accuracy={player.weak_foot_accuracy}
+                                                    form={player.form}
+                                                    injury_resistance={player.injury_resistance}
+                                                    inspiring_ball_carry={player.inspiring_ball_carry}
+                                                    inspiring_low_pass={player.inspiring_low_pass}
+                                                    inspiring_lofted_pass={player.inspiring_lofted_pass}
+                                                />
+
+                                                <PlayerSkills skills={player.skills} />
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 </div>

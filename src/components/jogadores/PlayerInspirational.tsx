@@ -29,7 +29,7 @@ export function PlayerInspirational({
           <p className="text-zinc-500">Pé Fraco (Uso)</p>
           <div className="flex items-center gap-2 lg:gap-3">
             <LevelBars value={weak_foot_usage ?? 0} max={4} size="sm" />
-            <span className="font-bold">{weak_foot_usage ?? '-'}</span>
+            <span className="font-bold text-zinc-100">{weak_foot_usage ?? '-'}</span>
           </div>
         </div>
 
@@ -37,7 +37,7 @@ export function PlayerInspirational({
           <p className="text-zinc-500">Pé Fraco (Precisão)</p>
           <div className="flex items-center gap-2 lg:gap-3">
             <LevelBars value={weak_foot_accuracy ?? 0} max={4} size="sm" />
-            <span className="font-bold">{weak_foot_accuracy ?? '-'}</span>
+            <span className="font-bold text-zinc-100">{weak_foot_accuracy ?? '-'}</span>
           </div>
         </div>
 
@@ -45,7 +45,7 @@ export function PlayerInspirational({
           <p className="text-zinc-500">Forma Física</p>
           <div className="flex items-center gap-2 lg:gap-3">
             <LevelBars value={form ?? 0} max={8} size="md" />
-            <span className="font-bold">{form ?? '-'}</span>
+            <span className="font-bold text-zinc-100">{form ?? '-'}</span>
           </div>
         </div>
 
@@ -53,7 +53,7 @@ export function PlayerInspirational({
           <p className="text-zinc-500">Resistência a Lesão</p>
           <div className="flex items-center gap-2 lg:gap-3">
             <LevelBars value={injury_resistance ?? 0} max={3} size="sm" />
-            <span className="font-bold">{injury_resistance ?? '-'}</span>
+            <span className="font-bold text-zinc-100">{injury_resistance ?? '-'}</span>
           </div>
         </div>
       </div>
