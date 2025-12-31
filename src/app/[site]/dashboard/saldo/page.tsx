@@ -70,7 +70,8 @@ const fetchPureExchanges = async (teamId: string, orgId: string): Promise<Balanc
       .eq('transfer_type', 'exchange')
       .eq('status', 'approved')
       .eq('exchange_value', 0)
-      .eq('organization_id', orgId)
+      .eq('exchange_value', 0)
+      .or(`organization_id.eq.${orgId},organization_id.is.null`)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -287,14 +288,15 @@ export default function PaginaSaldo() {
         const { data: transactionsData, error: transactionsError } = await supabase
           .from('balance_transactions')
           .select('*')
+          .select('*')
           .eq('team_id', profile.team_id)
-          .eq('organization_id', organization?.id)
+          .or(`organization_id.eq.${organization?.id},organization_id.is.null`)
           .neq('type', 'bid_pending')
           .order('created_at', { ascending: false })
 
         if (transactionsError) throw transactionsError
 
-        const pureExchanges = await fetchPureExchanges(profile.team_id, organization?.id)
+        const pureExchanges = await fetchPureExchanges(profile.team_id, organization?.id || '')
 
         const allTransactions = [
           ...(transactionsData || []),
@@ -347,7 +349,7 @@ export default function PaginaSaldo() {
         .from('balance_transactions')
         .select('*')
         .eq('team_id', teamId)
-        .eq('organization_id', organization?.id)
+        .or(`organization_id.eq.${organization?.id},organization_id.is.null`)
         .neq('type', 'bid_pending')
         .order('created_at', { ascending: false })
 
