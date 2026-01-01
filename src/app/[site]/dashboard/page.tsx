@@ -374,12 +374,6 @@ export default function Dashboard() {
     }
   }, [inboxAnnouncements])
 
-  // Redirecionar se não autenticado
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/login')
-    }
-  }, [authLoading, user, router])
 
   // Carrega dados profile/team
   useEffect(() => {
