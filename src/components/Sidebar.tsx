@@ -48,9 +48,10 @@ interface SidebarProps {
     logo_url?: string
   } | null
   organizationId?: string
+  disableForceRead?: boolean
 }
 
-export default function Sidebar({ user, profile, team, organizationId }: SidebarProps) {
+export default function Sidebar({ user, profile, team, organizationId, disableForceRead = false }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const params = useParams()
@@ -433,12 +434,12 @@ export default function Sidebar({ user, profile, team, organizationId }: Sidebar
       {/* Inbox Modal */}
       {/* Inbox Modal - Force Read Logic */}
       <InboxModal
-        isOpen={isInboxOpen || announcements.some(a => a.priority && !a.read)}
+        isOpen={isInboxOpen || (!disableForceRead && announcements.some(a => a.priority && !a.read))}
         onClose={() => setIsInboxOpen(false)}
         announcements={announcements}
         onMarkAsRead={markAsRead}
         onVote={votePoll}
-        preventClose={announcements.some(a => a.priority && !a.read)}
+        preventClose={!disableForceRead && announcements.some(a => a.priority && !a.read)}
       />
     </>
   )

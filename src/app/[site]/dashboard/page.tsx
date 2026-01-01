@@ -1652,7 +1652,13 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen bg-zinc-950">
       {/* Sidebar */}
-      <Sidebar user={user!} profile={profile} team={team} organizationId={currentOrg?.id} />
+      <Sidebar
+        user={user!}
+        profile={profile}
+        team={team}
+        organizationId={currentOrg?.id}
+        disableForceRead={true}
+      />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 transition-all duration-300 lg:ml-0">
@@ -1917,6 +1923,15 @@ export default function Dashboard() {
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
         organizationId={currentOrg?.id}
+      />
+
+      <InboxModal
+        isOpen={dashboardInboxOpen}
+        onClose={() => setDashboardInboxOpen(false)}
+        announcements={inboxAnnouncements}
+        onMarkAsRead={markAsRead}
+        onVote={votePoll}
+        preventClose={inboxAnnouncements.some(a => a.priority && !a.read)}
       />
 
 
