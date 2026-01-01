@@ -611,7 +611,7 @@ export default function PaginaSaldo() {
   return (
     <div className="flex min-h-screen bg-zinc-950">
       {/* Sidebar - AGORA O COMPONENTE CONTROLADO PELO PRÓPRIO SIDEBAR */}
-      <Sidebar user={user!} profile={profile} team={team as any} />
+      <Sidebar user={user!} profile={profile} team={team as any} organizationId={organization?.id} />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 w-full">

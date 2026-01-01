@@ -236,7 +236,7 @@ export default function TabelaPage() {
   return (
     <div className="flex min-h-screen bg-zinc-950">
       {/* Sidebar */}
-      <Sidebar user={user!} profile={profile} team={team} />
+      <Sidebar user={user!} profile={profile} team={team} organizationId={organization?.id} />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 transition-all duration-300 lg:ml-0">

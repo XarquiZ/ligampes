@@ -107,13 +107,23 @@ export default function InboxModal({
         setShowingResults(prev => ({ ...prev, [announcementId]: true }))
     }
 
-    // Ordenar: Prioridade primeiro, depois puramente por data (mais recente no topo)
+    // Ordenar: puramente por data (mais recente no topo)
     const sortedAnnouncements = [...announcements].sort((a, b) => {
-        if (a.priority !== b.priority) return a.priority ? -1 : 1
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     })
 
     const selectedAnnouncement = announcements.find(a => a.id === selectedId)
+
+    // Auto-mark as read when viewing
+    useEffect(() => {
+        if (selectedAnnouncement && !selectedAnnouncement.read && !selectedAnnouncement.voted_option_id) {
+            // Pequeno delay para garantir que o usuário viu que abriu
+            const timer = setTimeout(() => {
+                onMarkAsRead(selectedAnnouncement.id)
+            }, 500)
+            return () => clearTimeout(timer)
+        }
+    }, [selectedAnnouncement?.id, selectedAnnouncement?.read])
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => {
@@ -143,9 +153,11 @@ export default function InboxModal({
                                     Caixa de Entrada
                                 </h2>
                                 {preventClose && (
-                                    <Badge variant="destructive" className="animate-pulse shadow-sm shadow-red-900/20">
-                                        Ação Obrigatória
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="destructive" className="animate-pulse shadow-sm shadow-red-900/20">
+                                            Leitura Obrigatória
+                                        </Badge>
+                                    </div>
                                 )}
                             </div>
 
@@ -314,27 +326,19 @@ export default function InboxModal({
                                             <div className="p-6 md:p-8">
                                                 {selectedAnnouncement.type === 'announcement' && (
                                                     <div className="flex flex-col items-center gap-6 py-2">
-                                                        {!selectedAnnouncement.read ? (
-                                                            <>
-                                                                <p className="text-zinc-400 text-center max-w-md">
-                                                                    Por favor, confirme que você leu e entendeu este comunicado para continuar utilizando a plataforma.
-                                                                </p>
-                                                                <Button
-                                                                    onClick={() => onMarkAsRead(selectedAnnouncement.id)}
-                                                                    className="w-full md:w-auto min-w-[240px] bg-white text-black hover:bg-zinc-200 font-semibold h-12 text-base shadow-lg shadow-white/10"
-                                                                >
-                                                                    <CheckCircle2 className="w-5 h-5 mr-2" />
-                                                                    Marcar como lida
-                                                                </Button>
-                                                            </>
-                                                        ) : (
-                                                            <div className="flex flex-col items-center gap-2 text-zinc-500">
-                                                                <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500 mb-2">
-                                                                    <CheckCircle2 className="w-6 h-6" />
-                                                                </div>
-                                                                <p>Você marcou esta mensagem como lida em {new Date().toLocaleDateString('pt-BR')}.</p>
+                                                        <div className="flex flex-col items-center gap-2 text-zinc-500 animate-in fade-in zoom-in duration-500">
+                                                            <div className={`
+                                                                w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all
+                                                                ${selectedAnnouncement.read ? 'bg-green-500/10 text-green-500' : 'bg-zinc-800 text-zinc-600'}
+                                                            `}>
+                                                                <CheckCircle2 className="w-6 h-6" />
                                                             </div>
-                                                        )}
+                                                            <p className="font-medium">
+                                                                {selectedAnnouncement.read
+                                                                    ? "Mensagem marcada como lida"
+                                                                    : "Lendo mensagem..."}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 )}
 

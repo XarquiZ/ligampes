@@ -334,6 +334,7 @@ export default function PlayerProfilePage() {
                     user={currentUser}
                     profile={userProfile}
                     team={userTeam}
+                    organizationId={organization?.id}
                 />
             )}
 

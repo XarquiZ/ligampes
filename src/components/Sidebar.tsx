@@ -47,9 +47,10 @@ interface SidebarProps {
     name: string
     logo_url?: string
   } | null
+  organizationId?: string
 }
 
-export default function Sidebar({ user, profile, team }: SidebarProps) {
+export default function Sidebar({ user, profile, team, organizationId }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const params = useParams()
@@ -60,7 +61,7 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
 
   // Inbox State
   const [isInboxOpen, setIsInboxOpen] = useState(false)
-  const { announcements, unreadCount, markAsRead, votePoll } = useInbox(user, team)
+  const { announcements, unreadCount, markAsRead, votePoll } = useInbox(user, team, organizationId)
 
   // Dynamic Navigation Items based on site
   const navigationItems = useMemo(() => {
@@ -430,12 +431,14 @@ export default function Sidebar({ user, profile, team }: SidebarProps) {
       />
 
       {/* Inbox Modal */}
+      {/* Inbox Modal - Force Read Logic */}
       <InboxModal
-        isOpen={isInboxOpen}
+        isOpen={isInboxOpen || announcements.some(a => a.priority && !a.read)}
         onClose={() => setIsInboxOpen(false)}
         announcements={announcements}
         onMarkAsRead={markAsRead}
         onVote={votePoll}
+        preventClose={announcements.some(a => a.priority && !a.read)}
       />
     </>
   )

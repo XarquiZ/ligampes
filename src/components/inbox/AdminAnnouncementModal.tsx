@@ -12,16 +12,17 @@ import { supabase } from '@/lib/supabase'
 interface AdminAnnouncementModalProps {
     isOpen: boolean
     onClose: () => void
+    organizationId?: string
 }
 
-export default function AdminAnnouncementModal({ isOpen, onClose }: AdminAnnouncementModalProps) {
+export default function AdminAnnouncementModal({ isOpen, onClose, organizationId }: AdminAnnouncementModalProps) {
     const [loading, setLoading] = useState(false)
     const [title, setTitle] = useState('')
     const [content, setContent] = useState('')
     const [type, setType] = useState<'announcement' | 'poll'>('announcement')
     const [targetType, setTargetType] = useState<'all' | 'division' | 'team'>('all')
     const [targetValue, setTargetValue] = useState('')
-    const [priority, setPriority] = useState(false)
+    const [priority, setPriority] = useState(true)
 
     // Poll options
     const [pollOptions, setPollOptions] = useState<string[]>(['', ''])
@@ -68,7 +69,8 @@ export default function AdminAnnouncementModal({ isOpen, onClose }: AdminAnnounc
                     type,
                     target_type: targetType,
                     target_value: targetType === 'all' ? null : targetValue,
-                    priority
+                    priority,
+                    organization_id: organizationId
                 })
                 .select()
                 .single()

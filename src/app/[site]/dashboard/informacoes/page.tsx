@@ -186,7 +186,7 @@ export default function InformacoesPage() {
 
     return (
         <div className="flex min-h-screen bg-zinc-950">
-            <Sidebar user={user} profile={profile} team={team} />
+            <Sidebar user={user} profile={profile} team={team} organizationId={organization?.id} />
 
             <div className="flex-1 transition-all duration-300 lg:ml-0 bg-zinc-950/50">
                 <div className="p-4 lg:p-8 space-y-8 max-w-6xl mx-auto">

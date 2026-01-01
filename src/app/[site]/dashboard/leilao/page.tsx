@@ -679,7 +679,7 @@ export default function PaginaLeilao() {
 
   return (
     <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar user={user} team={team} profile={profile} />
+      <Sidebar user={user} team={team} profile={profile} organizationId={organization?.id} />
 
       <div className="flex-1 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-orange-950/20 to-zinc-950 text-white p-4 md:p-8">

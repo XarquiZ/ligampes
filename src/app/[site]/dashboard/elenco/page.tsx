@@ -877,7 +877,7 @@ export default function ElencoPage() {
 
   return (
     <div className="flex min-h-screen bg-zinc-950">
-      <Sidebar user={user!} profile={profile} team={team} />
+      <Sidebar user={user!} profile={profile} team={team as any} organizationId={organization?.id} />
 
       <div className="flex-1 transition-all duration-300 lg:ml-0">
         <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 text-white p-4 lg:p-6">
