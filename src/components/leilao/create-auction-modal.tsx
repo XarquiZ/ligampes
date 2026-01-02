@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useOrganization } from '@/contexts/OrganizationContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -24,6 +25,7 @@ interface CreateAuctionModalProps {
 }
 
 export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuctionModalProps) {
+  const { organization } = useOrganization()
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [startPrice, setStartPrice] = useState('')
   const [auctionDuration, setAuctionDuration] = useState('5')
@@ -58,6 +60,7 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
         .from('players')
         .select('*')
         .is('team_id', null)
+        .eq('organization_id', organization?.id)
         .order('overall', { ascending: false })
 
       const { data: activeAuctionsData } = await supabase
@@ -87,7 +90,7 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
   const formatCurrency = (value: string) => {
     const onlyNumbers = value.replace(/\D/g, '')
     if (onlyNumbers === '') return ''
-    
+
     const number = parseInt(onlyNumbers) / 100
     return number.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
@@ -135,7 +138,7 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
 
       const [year, month, day] = startDate.split('-')
       const [hours, minutes] = startTime.split(':')
-      
+
       const startDateTime = new Date(
         parseInt(year),
         parseInt(month) - 1,
@@ -163,7 +166,8 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
           start_time: startDateTime.toISOString(),
           end_time: endTime.toISOString(),
           created_by: user.id,
-          auction_duration: durationMinutes
+          auction_duration: durationMinutes,
+          organization_id: organization?.id
         }])
 
       if (error) throw error
@@ -171,7 +175,7 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
       toast.success('Leilão agendado com sucesso!')
       onOpenChange(false)
       resetForm()
-      
+
       if (onSuccess) onSuccess()
 
     } catch (error: any) {
@@ -225,8 +229,8 @@ export function CreateAuctionModal({ open, onOpenChange, onSuccess }: CreateAuct
                   <SelectItem key={player.id} value={player.id}>
                     <div className="flex items-center gap-3">
                       {player.photo_url ? (
-                        <img 
-                          src={player.photo_url} 
+                        <img
+                          src={player.photo_url}
                           alt={player.name}
                           className="w-8 h-8 rounded-full object-cover"
                         />
