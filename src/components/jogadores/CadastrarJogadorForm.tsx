@@ -39,6 +39,7 @@ import {
   Target,
 } from 'lucide-react'
 import { supabase } from "@/lib/supabase"
+import { useOrganization } from "@/contexts/OrganizationContext"
 
 const cn = (...classes: string[]) => classes.filter(Boolean).join(' ')
 
@@ -274,6 +275,8 @@ const MultiSelect = ({ control, name, label, options, placeholder, Icon }: any) 
 
 export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded, onCancel }: CadastrarJogadorFormProps) {
 
+  const { organization } = useOrganization()
+
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
@@ -324,10 +327,16 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded, onCancel }: 
   const isGK = position === 'GO'
 
   useEffect(() => {
-    supabase.from('teams').select('id, name, logo_url').order('name').then(({ data }) => {
-      if (data) setTeams(data as Team[])
-    })
-  }, [supabase])
+    if (!organization?.id) return
+
+    supabase.from('teams')
+      .select('id, name, logo_url')
+      .eq('organization_id', organization.id)
+      .order('name')
+      .then(({ data }) => {
+        if (data) setTeams(data as Team[])
+      })
+  }, [organization?.id])
 
   const onSubmit = async (values: PlayerFormValues) => {
     setIsSubmitting(true)
@@ -347,6 +356,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded, onCancel }: 
       height: clean(values.height), // NOVO
       is_penalty_specialist: values.is_penalty_specialist, // NOVO
       base_price: basePrice,
+      organization_id: organization?.id,
     }
 
     try {

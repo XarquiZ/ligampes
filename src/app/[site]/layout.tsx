@@ -73,7 +73,11 @@ export default async function SiteLayout({
             .maybeSingle()
 
         if (!profile) {
-            console.log(`[SiteLayout] Creating missing profile for user ${user.id} in org ${organization.slug}`)
+            // Verify if user is the owner (by email, as IDs might differ in new logins)
+            const isOwner = user.email === organization.owner_email;
+            const initialRole = isOwner ? 'admin' : 'coach';
+
+            console.log(`[SiteLayout] Creating missing profile for user ${user.id} in org ${organization.slug}. Is Owner (by email)? ${isOwner}`)
 
             // Tenta criar o perfil. 
             // Nota: Isso pressupõe que a tabela profiles permite composite PK (id, organization_id) 
@@ -84,7 +88,7 @@ export default async function SiteLayout({
                     id: user.id,
                     organization_id: organization.id,
                     email: user.email,
-                    role: 'coach', // Default role for new members
+                    role: initialRole,
                     created_at: new Date().toISOString()
                 })
 
