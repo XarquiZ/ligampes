@@ -84,12 +84,12 @@ export default async function SiteLayout({
                     id: user.id,
                     organization_id: organization.id,
                     email: user.email,
-                    role: 'user', // Default role for new members
+                    role: 'coach', // Default role for new members
                     created_at: new Date().toISOString()
                 })
 
             if (insertError) {
-                console.error('[SiteLayout] Error creating profile:', insertError)
+                console.error('[SiteLayout] Error creating profile:', JSON.stringify(insertError, null, 2))
             } else {
                 console.log('[SiteLayout] Profile created successfully')
             }
