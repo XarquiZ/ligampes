@@ -60,6 +60,42 @@ export default async function SiteLayout({
         return notFound()
     }
 
+    // --- PROFILE CHECK & CREATION LOGIC ---
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user) {
+        // Verifica se existe perfil para esta organização ESPECÍFICA
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .eq('organization_id', organization.id)
+            .maybeSingle()
+
+        if (!profile) {
+            console.log(`[SiteLayout] Creating missing profile for user ${user.id} in org ${organization.slug}`)
+
+            // Tenta criar o perfil. 
+            // Nota: Isso pressupõe que a tabela profiles permite composite PK (id, organization_id) 
+            // ou que 'id' não é PK única global. Se falhar, é erro de schema.
+            const { error: insertError } = await supabase
+                .from('profiles')
+                .insert({
+                    id: user.id,
+                    organization_id: organization.id,
+                    email: user.email,
+                    role: 'user', // Default role for new members
+                    created_at: new Date().toISOString()
+                })
+
+            if (insertError) {
+                console.error('[SiteLayout] Error creating profile:', insertError)
+            } else {
+                console.log('[SiteLayout] Profile created successfully')
+            }
+        }
+    }
+
     return (
         <div className="min-h-screen bg-zinc-950" data-org-id={organization.id} data-theme={JSON.stringify(organization.theme_config)}>
             <OrganizationProvider organization={organization}>
