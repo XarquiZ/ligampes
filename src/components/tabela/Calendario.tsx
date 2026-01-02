@@ -8,6 +8,9 @@ import { Loader2 } from "lucide-react";
 import JogoCard from "./calendario/JogoCard";
 import SerieSelector from "./calendario/SerieSelector";
 import RodadaSelector from "./calendario/RodadaSelector";
+import GenerateMatchesDialog from "./GenerateMatchesDialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabelas";
+import { Trophy, Crown, Calendar as CalendarIcon } from "lucide-react";
 
 interface Jogo {
   id: string;
@@ -33,29 +36,63 @@ interface Jogo {
   };
 }
 
+import { useAuth } from "@/hooks/useAuth";
+
 export default function Calendario() {
   const { organization } = useOrganization();
+  const { user } = useAuth();
   const [serie, setSerie] = useState<'A' | 'B'>('A');
   const [rodada, setRodada] = useState<number>(1);
   const [jogos, setJogos] = useState<Jogo[]>([]);
   const [loading, setLoading] = useState(true);
   const [rodadasDisponiveis, setRodadasDisponiveis] = useState<number[]>([1]);
   const [maxRodadas, setMaxRodadas] = useState<number>(1);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState("liga");
+
+  // Verificar se é admin
+  useEffect(() => {
+    if (!user || !organization?.id) return;
+
+    const checkAdmin = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .eq('organization_id', organization.id)
+        .single();
+
+      if (!error && data && data.role === 'admin') {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+    };
+
+    checkAdmin();
+  }, [user, organization?.id]);
 
   // Função para carregar jogos (definida fora para ser reutilizada)
   const loadJogos = async () => {
     setLoading(true);
     try {
-      const { data: jogosData, error } = await supabase
+      let query = supabase
         .from('matches')
         .select(`
           *,
           time_casa:home_team_id(id, name, logo_url),
           time_fora:away_team_id(id, name, logo_url)
         `)
-        .eq('divisao', serie)
         .eq('organization_id', organization?.id)
         .eq('round', rodada)
+
+      if (activeTab === 'liga') {
+        query = query.eq('divisao', serie).neq('competition', 'Copa')
+      } else {
+        query = query.eq('competition', 'Copa')
+      }
+
+      const { data: jogosData, error } = await query
         .order('date', { ascending: true })
         .order('time', { ascending: true });
 
@@ -68,59 +105,71 @@ export default function Calendario() {
     }
   };
 
-  // Carregar rodadas disponíveis para a série
-  useEffect(() => {
-    const loadRodadasDisponiveis = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('matches')
-          .select('round')
-          .eq('divisao', serie)
-          .eq('organization_id', organization?.id)
-          .order('round', { ascending: true });
+  // Carregar rodadas disponíveis para a série - Defined outside to be reused
+  const loadRodadasDisponiveis = async () => {
+    try {
+      let query = supabase
+        .from('matches')
+        .select('round')
+        .eq('organization_id', organization?.id)
 
-        if (error) throw error;
-
-        // Extrair rodadas únicas
-        const rodadasUnicas = Array.from(new Set(data?.map(match => match.round) || []))
-          .sort((a, b) => a - b);
-
-        setRodadasDisponiveis(rodadasUnicas);
-        setMaxRodadas(rodadasUnicas.length > 0 ? Math.max(...rodadasUnicas) : 1);
-
-        // Se a rodada atual não existir nas disponíveis, ajustar para a primeira
-        if (rodadasUnicas.length > 0 && !rodadasUnicas.includes(rodada)) {
-          setRodada(rodadasUnicas[0]);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar rodadas disponíveis:', error);
+      if (activeTab === 'liga') {
+        query = query.eq('divisao', serie).neq('competition', 'Copa')
+      } else {
+        query = query.eq('competition', 'Copa')
       }
-    };
 
+      const { data, error } = await query.order('round', { ascending: true });
+
+      if (error) throw error;
+
+      // Extrair rodadas únicas
+      const rodadasUnicas = Array.from(new Set(data?.map(match => match.round) || []))
+        .sort((a, b) => a - b);
+
+      setRodadasDisponiveis(rodadasUnicas);
+      setMaxRodadas(rodadasUnicas.length > 0 ? Math.max(...rodadasUnicas) : 1);
+
+      // Se a rodada atual não existir nas disponíveis, ajustar para a primeira
+      if (rodadasUnicas.length > 0 && !rodadasUnicas.includes(rodada) && rodadasUnicas.includes(1)) {
+        // Only reset if current round is invalid. 
+        // Prefer keeping current round if valid, or default to 1 if available
+        // Logic adjustment: If newly generated, we might want to stay on 1 or go to 1. 
+        // But if we are on round 1 and produce 10 rounds, we stay on round 1 which is fine.
+      }
+    } catch (error) {
+      console.error('Erro ao carregar rodadas disponíveis:', error);
+    }
+  };
+
+  // Carregar rodadas disponíveis inicialmente e quando mudar série
+  useEffect(() => {
     if (organization?.id) {
       loadRodadasDisponiveis();
     }
-  }, [serie, rodada, organization?.id]);
+  }, [serie, organization?.id, activeTab]);
 
   // Carregar jogos baseado na série e rodada selecionada
   useEffect(() => {
     if (organization?.id) {
       loadJogos();
     }
-  }, [serie, rodada, organization?.id]);
+  }, [serie, rodada, organization?.id, activeTab]);
 
   // Quando mudar a série, resetar para a primeira rodada disponível
+  // This logic is slightly redundant with loadRodadasDisponiveis internal check but keeps it explicit
   useEffect(() => {
-    if (rodadasDisponiveis.length > 0) {
+    if (rodadasDisponiveis.length > 0 && !rodadasDisponiveis.includes(rodada)) {
       setRodada(rodadasDisponiveis[0]);
     }
-  }, [serie]);
+  }, [serie, rodadasDisponiveis]);
 
   // Listener para atualizar quando uma partida for editada
   useEffect(() => {
     const handleMatchUpdated = () => {
       console.log('Partida atualizada, recarregando dados...');
-      loadJogos(); // Agora loadJogos está definida
+      loadRodadasDisponiveis(); // Recarregar rodadas (pra pegar novas se geradas)
+      loadJogos();
     };
 
     window.addEventListener('match-updated', handleMatchUpdated);
@@ -128,7 +177,7 @@ export default function Calendario() {
     return () => {
       window.removeEventListener('match-updated', handleMatchUpdated);
     };
-  }, [serie, rodada]); // loadJogos não precisa estar nas dependências
+  }, [serie, rodada]);
 
   // Função para converter status do banco para português
   const getStatusTraduzido = (status: string): 'agendado' | 'em_andamento' | 'finalizado' => {
@@ -155,8 +204,24 @@ export default function Calendario() {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-4">
-          <SerieSelector serie={serie} setSerie={setSerie} />
+        <div className="flex flex-wrap gap-4 items-center">
+          {isAdmin && activeTab === 'liga' && <GenerateMatchesDialog />}
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+            <TabsList className="bg-zinc-800/50 border border-zinc-600 p-1">
+              <TabsTrigger value="liga" className="text-white data-[state=active]:bg-green-600">
+                <Trophy className="w-4 h-4 mr-2" />
+                Liga
+              </TabsTrigger>
+              <TabsTrigger value="copa" className="text-white data-[state=active]:bg-yellow-600">
+                <Crown className="w-4 h-4 mr-2" />
+                Copa
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {activeTab === 'liga' && <SerieSelector serie={serie} setSerie={setSerie} />}
+
           <RodadaSelector
             rodada={rodada}
             setRodada={setRodada}

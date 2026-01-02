@@ -36,7 +36,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Sidebar from '@/components/Sidebar';
 import FloatingChatButton from '@/components/FloatingChatButton';
 import ChatPopup from '@/components/Chatpopup';
+import { RulesEditorModal } from '@/components/informacoes/RulesEditorModal';
 import { cn } from '@/lib/utils';
+import { Edit } from 'lucide-react';
 
 // Configuração das Seções
 const sectionConfig = {
@@ -88,6 +90,7 @@ export default function InformacoesPage() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isImageOpen, setIsImageOpen] = useState(false);
     const [allTeams, setAllTeams] = useState<any[]>([]);
+    const [isRulesEditorOpen, setIsRulesEditorOpen] = useState(false);
 
     // Carregar dados user/profile/team
     useEffect(() => {
@@ -116,6 +119,7 @@ export default function InformacoesPage() {
                 const { data: teamsData } = await supabase
                     .from('teams')
                     .select('*, profiles(coach_name)')
+                    .eq('organization_id', organization?.id)
                     .order('name');
 
                 if (teamsData) {
@@ -202,10 +206,19 @@ export default function InformacoesPage() {
                                     Central de Informações
                                 </h1>
                                 <p className="text-zinc-400">
-                                    Regras, manuais e suporte da Liga MPES
+                                    Regras, manuais e suporte da {organization?.name || 'Liga'}
                                 </p>
                             </div>
                         </div>
+                        {activeSection === 'regras' && profile?.role === 'admin' && (
+                            <Button
+                                onClick={() => setIsRulesEditorOpen(true)}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                            >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Editar Regras
+                            </Button>
+                        )}
                     </div>
 
                     {/* CUSTOM SECTION SWITCH */}
@@ -240,7 +253,13 @@ export default function InformacoesPage() {
                                         onClick={() => setIsDropdownOpen(false)}
                                     />
                                     <div className="absolute top-full left-0 right-0 mt-2 z-50 bg-zinc-900 border border-zinc-700 rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2">
-                                        {Object.entries(sectionConfig).map(([key, config]) => {
+                                        {Object.entries(sectionConfig).filter(([key]) => {
+                                            // Se não for mpes, esconde manual, tutoriais e atributos
+                                            if (organization?.slug !== 'mpes' && (key === 'manual' || key === 'tutoriais' || key === 'atributos')) {
+                                                return false;
+                                            }
+                                            return true;
+                                        }).map(([key, config]) => {
                                             if (key === activeSection) return null;
                                             const Icon = config.icon;
                                             return (
@@ -266,7 +285,13 @@ export default function InformacoesPage() {
 
                         {/* Desktop View */}
                         <div className="hidden sm:flex bg-zinc-900/70 rounded-xl p-1 border border-zinc-700 w-fit mx-auto">
-                            {Object.entries(sectionConfig).map(([key, config]) => {
+                            {Object.entries(sectionConfig).filter(([key]) => {
+                                // Se não for mpes, esconde manual, tutoriais e atributos
+                                if (organization?.slug !== 'mpes' && (key === 'manual' || key === 'tutoriais' || key === 'atributos')) {
+                                    return false;
+                                }
+                                return true;
+                            }).map(([key, config]) => {
                                 const Icon = config.icon;
                                 const isActive = activeSection === key;
                                 return (
@@ -300,7 +325,7 @@ export default function InformacoesPage() {
                                     <CardHeader>
                                         <CardTitle className="flex items-center gap-2 text-indigo-400 text-xl">
                                             <ScrollText className="w-5 h-5" />
-                                            Regras Oficiais – Liga MPES (Controles Manuais)
+                                            Regras Oficiais – {organization?.name || 'Liga'}
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="text-zinc-300 leading-relaxed">
@@ -311,107 +336,55 @@ export default function InformacoesPage() {
                                     </CardContent>
                                 </Card>
 
-                                <div className="grid md:grid-cols-2 gap-6">
-                                    <Card className="bg-gradient-to-br from-zinc-900 to-zinc-900/50 border-zinc-800 hover:border-green-500/30 transition-colors group">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-3 text-white group-hover:text-green-400 transition-colors">
-                                                <div className="p-2 bg-green-500/10 rounded-lg group-hover:bg-green-500/20 transition-colors">
-                                                    <Gamepad2 className="w-6 h-6 text-green-500" />
-                                                </div>
-                                                1. Jogue sempre com seriedade
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="text-zinc-400 space-y-4">
-                                            <p>
-                                                Se estiver perdendo de goleada, <span className="text-white font-semibold">mantenha a calma e continue jogando</span>.
-                                                O campeonato pode ser decidido por saldo de gols, então não é permitido largar o controle, entregar gols ou "sacanear" a partida.
-                                            </p>
-                                            <div className="bg-red-500/10 p-4 rounded-lg border border-red-500/20 text-sm text-red-300">
-                                                <span className="flex items-center gap-2 font-bold mb-1">
-                                                    <AlertTriangle className="w-4 h-4" /> Atenção
-                                                </span>
-                                                Se for detectado comportamento antidesportivo proposital, o jogador poderá receber advertência e banimento.
-                                                <br />
-                                                <br />
-                                                <span className="font-bold underline">NÃO É PERMITIDO QUITAR DO JOGO.</span>
-                                                <br />
-                                                Pauses são permitidos, mas usem com prudência.
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                {(!organization?.rules || organization.rules.length === 0) ? (
+                                    <div className="text-center py-12 bg-zinc-900/30 rounded-xl border border-dashed border-zinc-800">
+                                        <p className="text-zinc-500">Nenhuma regra definida para esta liga ainda.</p>
+                                        {profile?.role === 'admin' && (
+                                            <Button variant="link" onClick={() => setIsRulesEditorOpen(true)} className="text-indigo-400 mt-2">
+                                                Adicionar Regras
+                                            </Button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        {organization.rules.map((rule: any, index: number) => {
+                                            // Map string icon name to component (fallback to ScrollText)
+                                            // Since we can't easily dynamically import, we'll try to use the ones imported
+                                            // Map for dynamic icons used in rules
+                                            const iconMap: any = {
+                                                ScrollText,
+                                                AlertTriangle,
+                                                Ban,
+                                                Gamepad2,
+                                                MessageCircle,
+                                                Clock,
+                                                Target,
+                                                Users,
+                                                CheckCircle: Users // Fallback since CheckCircle isn't imported
+                                            };
 
-                                    <Card className="bg-gradient-to-br from-zinc-900 to-zinc-900/50 border-zinc-800 hover:border-yellow-500/30 transition-colors group">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-3 text-white group-hover:text-yellow-400 transition-colors">
-                                                <div className="p-2 bg-yellow-500/10 rounded-lg group-hover:bg-yellow-500/20 transition-colors">
-                                                    <MessageCircle className="w-6 h-6 text-yellow-500" />
-                                                </div>
-                                                2. Zoação e xingamentos
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="text-zinc-400">
-                                            <p className="text-lg">
-                                                Zoar e xingar é permitido <span className="text-white font-semibold">somente quando houver liberdade entre as partes</span>.
-                                            </p>
-                                            <p className="mt-4 text-sm bg-zinc-800/50 p-3 rounded border border-zinc-700">
-                                                Respeito acima de tudo. Se a brincadeira não for recíproca, pare imediatamente.
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                </div>
+                                            // Extended map with fallbacks
+                                            const IconComp = iconMap[rule.icon] || ScrollText;
+                                            const color = rule.color || 'indigo';
 
-                                <Card className="bg-gradient-to-br from-zinc-900 to-zinc-900/50 border-zinc-800 hover:border-blue-500/30 transition-colors group">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-3 text-white group-hover:text-blue-400 transition-colors">
-                                            <div className="p-2 bg-blue-500/10 rounded-lg group-hover:bg-blue-500/20 transition-colors">
-                                                <Clock className="w-6 h-6 text-blue-500" />
-                                            </div>
-                                            3. Cumprimento de Horários
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="text-zinc-400">
-                                        <div className="flex flex-col md:flex-row gap-6">
-                                            <div className="flex-1 space-y-2">
-                                                <p>
-                                                    Combine partidas com antecedência. Vocês terão <span className="text-blue-400 font-bold text-xl">10 dias</span> para marcar o jogo e estabelecer o host.
-                                                </p>
-                                            </div>
-                                            <div className="flex-1 bg-zinc-800/50 p-4 rounded-lg border border-zinc-700">
-                                                <h4 className="text-white font-semibold mb-2">Regra do W.O.</h4>
-                                                <p className="text-sm">
-                                                    Em casos de PASSAR esse tempo de 10 dias, <span className="text-red-400 font-bold">SEM JUSTIFICATIVA</span>, a parte que não se justificou tomará W.O.
-                                                </p>
-                                                <p className="text-sm mt-2 italic text-zinc-500">
-                                                    Seremos razoáveis na medida do possível, mas o ideal é ter o jogo em até 10 dias.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                <Card className="bg-gradient-to-br from-zinc-900 to-zinc-900/50 border-zinc-800 hover:border-red-500/30 transition-colors group">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-3 text-white group-hover:text-red-400 transition-colors">
-                                            <div className="p-2 bg-red-500/10 rounded-lg group-hover:bg-red-500/20 transition-colors">
-                                                <Ban className="w-6 h-6 text-red-500" />
-                                            </div>
-                                            4. Conteúdos Proibidos
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <ul className="grid md:grid-cols-3 gap-3">
-                                            <li className="bg-red-500/5 text-red-300 p-3 rounded border border-red-500/10 flex items-center justify-center font-medium">
-                                                🔞 Pornografia
-                                            </li>
-                                            <li className="bg-red-500/5 text-red-300 p-3 rounded border border-red-500/10 flex items-center justify-center font-medium">
-                                                🚫 Spam ou flood
-                                            </li>
-                                            <li className="bg-red-500/5 text-red-300 p-3 rounded border border-red-500/10 flex items-center justify-center font-medium">
-                                                🦠 Links suspeitos/Vírus
-                                            </li>
-                                        </ul>
-                                    </CardContent>
-                                </Card>
+                                            return (
+                                                <Card key={rule.id} className={`bg-gradient-to-br from-zinc-900 to-zinc-900/50 border-zinc-800 hover:border-${color}-500/30 transition-colors group`}>
+                                                    <CardHeader>
+                                                        <CardTitle className={`flex items-center gap-3 text-white group-hover:text-${color}-400 transition-colors`}>
+                                                            <div className={`p-2 bg-${color}-500/10 rounded-lg group-hover:bg-${color}-500/20 transition-colors`}>
+                                                                <IconComp className={`w-6 h-6 text-${color}-500`} />
+                                                            </div>
+                                                            {index + 1}. {rule.title}
+                                                        </CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="text-zinc-400 space-y-4">
+                                                        <div className="whitespace-pre-wrap">{rule.content}</div>
+                                                    </CardContent>
+                                                </Card>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -798,6 +771,12 @@ export default function InformacoesPage() {
                             </div>
                         )}
 
+                        <RulesEditorModal
+                            isOpen={isRulesEditorOpen}
+                            onClose={() => setIsRulesEditorOpen(false)}
+                            currentRules={organization?.rules || []}
+                        />
+
                         {/* TAB: ATRIBUTOS */}
                         {activeSection === 'atributos' && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -933,44 +912,48 @@ export default function InformacoesPage() {
             </div>
 
             {/* Chat Components */}
-            {user && team && (
-                <>
-                    <FloatingChatButton
-                        currentUser={chatUser}
-                        currentTeam={chatTeam}
-                        unreadCount={unreadCount}
-                        onOpenChat={() => setIsChatOpen(true)}
-                    />
-
-                    <ChatPopup
-                        isOpen={isChatOpen}
-                        onClose={() => setIsChatOpen(false)}
-                        currentUser={chatUser}
-                        currentTeam={chatTeam}
-                    />
-                </>
-            )}
-            {isImageOpen && (
-                <div className="fixed inset-0 z-[60] bg-black/90 p-4 flex items-center justify-center animate-in fade-in duration-200">
-                    <Button
-                        className="absolute top-4 right-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full p-2 h-10 w-10 z-10"
-                        onClick={() => setIsImageOpen(false)}
-                    >
-                        <X className="w-6 h-6" />
-                    </Button>
-
-                    <div className="relative w-full h-full max-w-5xl max-h-[90vh]">
-                        <Image
-                            src="/config-controle.png"
-                            alt="Configuração Fullscreen"
-                            fill
-                            className="object-contain"
-                            quality={100}
+            {
+                user && (
+                    <>
+                        <FloatingChatButton
+                            currentUser={chatUser}
+                            currentTeam={chatTeam}
+                            unreadCount={unreadCount}
+                            onOpenChat={() => setIsChatOpen(true)}
                         />
+
+                        <ChatPopup
+                            isOpen={isChatOpen}
+                            onClose={() => setIsChatOpen(false)}
+                            currentUser={chatUser}
+                            currentTeam={chatTeam}
+                        />
+                    </>
+                )
+            }
+            {
+                isImageOpen && (
+                    <div className="fixed inset-0 z-[60] bg-black/90 p-4 flex items-center justify-center animate-in fade-in duration-200">
+                        <Button
+                            className="absolute top-4 right-4 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full p-2 h-10 w-10 z-10"
+                            onClick={() => setIsImageOpen(false)}
+                        >
+                            <X className="w-6 h-6" />
+                        </Button>
+
+                        <div className="relative w-full h-full max-w-5xl max-h-[90vh]">
+                            <Image
+                                src="/config-controle.png"
+                                alt="Configuração Fullscreen"
+                                fill
+                                className="object-contain"
+                                quality={100}
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
 

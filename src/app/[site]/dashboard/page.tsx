@@ -392,7 +392,6 @@ export default function Dashboard() {
         if (profileError) {
           console.log('[Dashboard] Criando novo profile...')
 
-          const isAdmin = user.email === 'wellinton.sbatista@gmail.com'
           const defaultName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Técnico'
 
           const { data: newProfile, error: createError } = await supabase
@@ -403,7 +402,7 @@ export default function Dashboard() {
               email: user.email!,
               full_name: user.user_metadata?.full_name || user.email,
               coach_name: defaultName,
-              role: isAdmin ? 'admin' : 'coach',
+              role: 'coach', // Default to coach, admin must be set manually or via another process
             })
             .select('*, teams(*)')
             .single()
@@ -417,7 +416,7 @@ export default function Dashboard() {
               .insert({
                 organization_id: currentOrg.id,
                 user_id: user.id,
-                role: isAdmin ? 'admin' : 'member'
+                role: 'member'
               })
 
             if (memberError) console.warn('[Dashboard] Aviso ao vincular membro:', memberError)
@@ -1092,7 +1091,7 @@ export default function Dashboard() {
     )
   }
 
-  const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
+  const isAdmin = profile?.role === 'admin'
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
 
   // Criar objeto user compatível com os componentes de chat
@@ -1884,7 +1883,7 @@ export default function Dashboard() {
 
 
         {/* Chat Components */}
-        {user && team && (
+        {user && (
           <>
             <FloatingChatButton
               currentUser={chatUser}

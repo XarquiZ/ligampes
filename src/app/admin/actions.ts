@@ -15,8 +15,8 @@ export async function approveLeagueAction(orgId: string, plan: string, userEmail
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, message: 'Não autorizado.' }
 
-    // TODO: Add strict admin check here
-    // if (user.email !== 'seu@email.com') return { success: false, message: 'Acesso negado.' }
+    // 🔒 Security Check
+    if (user.email !== 'wellinton.sbatista@gmail.com') return { success: false, message: 'Acesso negado. Apenas Super Admin.' }
 
     try {
         const resend = new Resend(process.env.RESEND_API_KEY)

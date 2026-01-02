@@ -37,11 +37,14 @@ interface JogoCardProps {
   };
 }
 
+import { useOrganization } from "@/contexts/OrganizationContext";
+
 // Cache global para evitar N requisições (uma por card)
 const adminCheckCache = new Map<string, Promise<boolean>>();
 
 export default function JogoCard({ jogo }: JogoCardProps) {
   const { user } = useAuth();
+  const { organization } = useOrganization();
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
@@ -49,15 +52,17 @@ export default function JogoCard({ jogo }: JogoCardProps) {
 
   // Verificar se o usuário é admin com CACHE
   useEffect(() => {
-    if (!user) {
+    if (!user || !organization?.id) {
       setIsAdmin(false);
       return;
     }
 
+    const cacheKey = `${user.id}-${organization.id}`;
+
     const verifyAdmin = async () => {
       // Se já temos o resultado para este usuário em memória, usamos imediatamente
-      if (adminCheckCache.has(user.id)) {
-        const cachedPromise = adminCheckCache.get(user.id);
+      if (adminCheckCache.has(cacheKey)) {
+        const cachedPromise = adminCheckCache.get(cacheKey);
         if (cachedPromise) {
           const isUserAdmin = await cachedPromise;
           setIsAdmin(isUserAdmin);
@@ -72,6 +77,7 @@ export default function JogoCard({ jogo }: JogoCardProps) {
             .from('profiles')
             .select('role')
             .eq('id', user.id)
+            .eq('organization_id', organization.id)
             .single();
 
           if (!error && data) {
@@ -83,14 +89,14 @@ export default function JogoCard({ jogo }: JogoCardProps) {
         }
       })();
 
-      adminCheckCache.set(user.id, checkPromise);
+      adminCheckCache.set(cacheKey, checkPromise);
 
       const result = await checkPromise;
       setIsAdmin(result);
     };
 
     verifyAdmin();
-  }, [user]);
+  }, [user, organization?.id]);
 
   const getStatusColor = () => {
     switch (jogo.status) {

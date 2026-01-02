@@ -167,7 +167,7 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
     return () => window.removeEventListener('resize', handleResize)
   }, [isMobileOpen])
 
-  const isAdmin = user?.email === 'wellinton.sbatista@gmail.com'
+  const isAdmin = profile?.role === 'admin'
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
 
   const handleSignOut = async () => {
@@ -308,7 +308,7 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
                 className="bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-xl font-black text-transparent cursor-pointer hover:opacity-90 transition-opacity"
                 onClick={handleLogoClick}
               >
-                LIGA MPES
+                LIGA {site?.toUpperCase() || 'MPES'}
               </h1>
             )}
           </div>

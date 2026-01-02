@@ -7,6 +7,7 @@ interface Organization {
     name: string;
     slug: string;
     theme_config?: any;
+    rules?: any;
     // Adicione outros campos conforme necessário
 }
 

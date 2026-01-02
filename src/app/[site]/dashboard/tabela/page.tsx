@@ -10,7 +10,7 @@ import FloatingChatButton from "@/components/FloatingChatButton";
 import ChatPopup from "@/components/Chatpopup";
 import Classificacao from "@/components/tabela/Classificacao";
 import Estatisticas from "@/components/tabela/Estatisticas";
-import CopaParsec from "@/components/tabela/CopaParsec";
+import CopaBracket from "@/components/tabela/CopaBracket";
 import Calendario from "@/components/tabela/Calendario"; // NOVA IMPORT
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/Tabelas";
 import { useAuth } from "@/hooks/useAuth";
@@ -80,7 +80,7 @@ export default function TabelaPage() {
       textColor: "text-black"
     },
     copa: {
-      label: "Copa Parsec",
+      label: "Copa",
       icon: Crown,
       color: "yellow-500",
       bgColor: "bg-yellow-500",
@@ -349,7 +349,7 @@ export default function TabelaPage() {
                   >
                     <div className="flex items-center gap-2">
                       <Crown className="w-4 h-4" />
-                      Copa Parsec
+                      Copa
                     </div>
                   </TabsTrigger>
                 </TabsList>
@@ -367,7 +367,7 @@ export default function TabelaPage() {
                 </TabsContent>
 
                 <TabsContent value="copa">
-                  <CopaParsec />
+                  <CopaBracket />
                 </TabsContent>
               </Tabs>
             </Card>

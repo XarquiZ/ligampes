@@ -8,9 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { createTeamAction, updateTeamAction } from './actions'
+import { createTeamAction, updateTeamAction, deleteTeamAction } from './actions'
 import { toast } from 'sonner'
-import { Loader2, Plus, Users, Shield, DollarSign, Image as ImageIcon, Edit2, X, Save } from 'lucide-react'
+import { Loader2, Plus, Users, Shield, DollarSign, Image as ImageIcon, Edit2, X, Save, Trash2 } from 'lucide-react'
 import Image from 'next/image'
 
 export default function TeamsManagementPage() {
@@ -137,6 +137,24 @@ export default function TeamsManagementPage() {
         setLoading(false)
     }
 
+    const handleDelete = async (team: any) => {
+        if (!confirm(`Tem certeza que deseja excluir o time "${team.name}"? Esta ação não pode ser desfeita.`)) return
+
+        if (!currentOrg) return
+
+        // 🔒 Simple Optimistic UI or Loading state could be added here
+        try {
+            const result = await deleteTeamAction(team.id, currentOrg.id, site)
+            if (result.success) {
+                toast.success(result.message)
+            } else {
+                toast.error(result.message)
+            }
+        } catch (err) {
+            toast.error('Erro ao excluir time')
+        }
+    }
+
     const formatCurrency = (value: string) => {
         const numbers = value.replace(/\D/g, '')
         // Divide por 100 para considerar os centavos
@@ -157,7 +175,7 @@ export default function TeamsManagementPage() {
                     </h1>
                     <p className="text-zinc-400">Adicione e edite os clubes do campeonato {currentOrg?.name}</p>
                 </div>
-                <Button variant="outline" onClick={() => router.back()}>Voltar</Button>
+                <Button variant="outline" onClick={() => router.back()} className="bg-white text-black hover:bg-zinc-200 border-zinc-200">Voltar</Button>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8">
@@ -170,7 +188,7 @@ export default function TeamsManagementPage() {
                                 {editingId ? 'Editar Time' : 'Novo Time'}
                             </div>
                             {editingId && (
-                                <Button size="sm" variant="ghost" onClick={handleCancelEdit}>
+                                <Button size="sm" variant="ghost" onClick={handleCancelEdit} className="text-black hover:text-black/80">
                                     <X className="w-4 h-4" />
                                 </Button>
                             )}
@@ -300,6 +318,9 @@ export default function TeamsManagementPage() {
                                     </div>
                                     <Button size="icon" variant="ghost" onClick={() => handleEdit(team)} className="text-zinc-400 hover:text-white">
                                         <Edit2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" onClick={() => handleDelete(team)} className="text-red-500 hover:text-red-400 hover:bg-red-500/10">
+                                        <Trash2 className="w-4 h-4" />
                                     </Button>
                                 </CardContent>
                             </Card>

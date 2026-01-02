@@ -9,6 +9,11 @@ export default async function AdminDashboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) redirect('/login')
 
+    // 🔒 Security Check
+    if (user.email !== 'wellinton.sbatista@gmail.com') {
+        redirect('/')
+    }
+
     // 2. Fetch Pending Leagues
     // Accessing 'organizations' and joining with 'profiles' (users) requires correct foreign key.
     // Assuming 'owner_id' links to 'auth.users' or public 'profiles'.

@@ -36,7 +36,7 @@ export async function createTeamAction(formData: FormData) {
 
         if (error) {
             if (error.code === '23505') {
-                return { success: false, message: 'Já existe um time com este nome.' }
+                return { success: false, message: 'Já existe um time com este nome nesta liga.' }
             }
             throw error
         }
@@ -98,7 +98,7 @@ export async function updateTeamAction(formData: FormData) {
 
         if (error) {
             if (error.code === '23505') {
-                return { success: false, message: 'Já existe um time com este nome.' }
+                return { success: false, message: 'Já existe um time com este nome nesta liga.' }
             }
             throw error
         }
@@ -117,5 +117,29 @@ export async function updateTeamAction(formData: FormData) {
     } catch (error: any) {
         console.error('Error updating team:', error)
         return { success: false, message: 'Erro ao atualizar time: ' + error.message }
+    }
+}
+
+export async function deleteTeamAction(teamId: string, organizationId: string, site: string) {
+    const supabase = await createClient()
+
+    if (!teamId || !organizationId) {
+        return { success: false, message: 'ID do time ou organização inválidos.' }
+    }
+
+    try {
+        const { error } = await supabase
+            .from('teams')
+            .delete()
+            .eq('id', teamId)
+            .eq('organization_id', organizationId)
+
+        if (error) throw error
+
+        revalidatePath(`/${site}/dashboard/times`)
+        return { success: true, message: 'Time excluído com sucesso!' }
+    } catch (error: any) {
+        console.error('Error deleting team:', error)
+        return { success: false, message: 'Erro ao excluir time: ' + error.message }
     }
 }

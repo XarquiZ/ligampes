@@ -273,6 +273,7 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
       .select('home_team_id, away_team_id, home_score, away_score, status, shots_home, shots_away, possession_home, possession_away')
       .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
       .eq('status', 'finished')
+      .neq('competition', 'Copa') // Exclude Copa from stats/form
       .order('date', { ascending: false });
 
     if (!matches) return;
@@ -515,18 +516,24 @@ export default function AdminMatchModal({ isOpen, onClose, match, currentUser }:
           >
             Estatísticas da Partida
           </button>
-          <button
-            onClick={() => setActiveTab('home_players')}
-            className={`py-4 border-b-2 transition-all duration-200 ${activeTab === 'home_players' ? 'border-yellow-500 text-yellow-500 font-bold' : 'border-transparent text-zinc-400 hover:text-white'}`}
-          >
-            Jogadores {match.time_casa.name}
-          </button>
-          <button
-            onClick={() => setActiveTab('away_players')}
-            className={`py-4 border-b-2 transition-all duration-200 ${activeTab === 'away_players' ? 'border-yellow-500 text-yellow-500 font-bold' : 'border-transparent text-zinc-400 hover:text-white'}`}
-          >
-            Jogadores {match.time_fora.name}
-          </button>
+
+          {homePlayers.length > 0 && (
+            <button
+              onClick={() => setActiveTab('home_players')}
+              className={`py-4 border-b-2 transition-all duration-200 ${activeTab === 'home_players' ? 'border-yellow-500 text-yellow-500 font-bold' : 'border-transparent text-zinc-400 hover:text-white'}`}
+            >
+              Jogadores {match.time_casa.name}
+            </button>
+          )}
+
+          {awayPlayers.length > 0 && (
+            <button
+              onClick={() => setActiveTab('away_players')}
+              className={`py-4 border-b-2 transition-all duration-200 ${activeTab === 'away_players' ? 'border-yellow-500 text-yellow-500 font-bold' : 'border-transparent text-zinc-400 hover:text-white'}`}
+            >
+              Jogadores {match.time_fora.name}
+            </button>
+          )}
         </div>
 
         {/* CONTEÚDO SCROLLABLE */}

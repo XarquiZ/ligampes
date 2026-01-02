@@ -300,7 +300,7 @@ export default function ElencoPage() {
   }, [user])
 
   const loadPlayers = useCallback(async () => {
-    if (!teamId) { setPlayers([]); setFilteredPlayers([]); return }
+    if (!teamId) { setPlayers([]); setFilteredPlayers([]); setLoading(false); return }
     setLoading(true)
     try {
       // Buscar jogadores com suas estatísticas da tabela player_stats
@@ -1081,11 +1081,11 @@ export default function ElencoPage() {
                     <div className="inline-block bg-zinc-900/80 rounded-2xl lg:rounded-3xl p-8 lg:p-12 border border-zinc-800">
                       <AlertCircle className="w-10 h-10 lg:w-12 lg:h-12 text-red-500 mx-auto mb-3 lg:mb-4" />
                       <h3 className="text-xl lg:text-2xl font-bold">
-                        {activeSection === 'elenco' ? 'Nenhum jogador no elenco' : 'Nenhum jogador favorito'}
+                        {activeSection === 'elenco' ? 'Você não possui jogadores em seu time' : 'Nenhum jogador favorito'}
                       </h3>
                       <p className="text-zinc-400 text-sm lg:text-base">
                         {activeSection === 'elenco'
-                          ? 'Verifique se seu perfil está associado a um time.'
+                          ? 'Contrate jogadores no mercado, participe dos leilões ou peça para o administrador da sua liga registrar os jogadores.'
                           : 'Adicione jogadores de outros times aos favoritos na página de jogadores.'
                         }
                       </p>
