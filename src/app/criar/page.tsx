@@ -20,7 +20,6 @@ import { supabase } from '@/lib/supabase'
 
 // --- Schemas & Types ---
 const schema = z.object({
-    gameType: z.enum(['EAFC', 'PES', 'NBA', 'REAL_SPORTS']),
     leagueName: z.string().min(3, "O nome da liga deve ter pelo menos 3 caracteres"),
     slug: z.string().min(3, "O endereço deve ter pelo menos 3 caracteres").regex(/^[a-z0-9-]+$/, "Apenas letras minúsculas, números e hífens"),
 })
@@ -267,24 +266,6 @@ export default function RegisterWizardPage() {
 
                             <form action={formAction} className="space-y-6">
                                 <input type="hidden" name="plan" value={selectedPlan} />
-
-                                <div className="space-y-3">
-                                    <Label>Jogo</Label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input type="hidden" name="gameType" value={watch('gameType') || ''} />
-                                        {[
-                                            { id: 'EAFC', label: 'EAFC' },
-                                            { id: 'PES', label: 'eFootball' },
-                                            { id: 'NBA', label: 'NBA 2K' },
-                                            { id: 'REAL_SPORTS', label: 'Real' }
-                                        ].map(g => (
-                                            <div key={g.id} onClick={() => setValue('gameType', g.id as any)} className={cn("p-3 rounded-lg border cursor-pointer hover:bg-zinc-900 transition-colors text-center text-sm font-medium", watch('gameType') === g.id ? "bg-green-500/10 border-green-500 text-white" : "border-zinc-800 text-zinc-400")}>
-                                                {g.label}
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {errors.gameType && <p className="text-red-500 text-xs">{errors.gameType.message}</p>}
-                                </div>
 
                                 <div className="space-y-2">
                                     <Label>Nome da Liga</Label>

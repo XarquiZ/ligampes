@@ -64,7 +64,7 @@ export function Hero() {
                             </Link>
                         </Button>
                         <span className="text-xs text-zinc-500 font-medium tracking-wide">
-                            SEM CARTÃO • RÁPIDO • GRATUITO PARA COMEÇAR
+                            Gratuito para começar • Sem cartão
                         </span>
                     </div>
 

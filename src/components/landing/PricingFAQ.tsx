@@ -36,10 +36,11 @@ export function PricingFAQ() {
                                 <li className="flex items-center gap-3 text-zinc-300"><Check className="w-5 h-5 text-green-500" /> Link para compartilhar</li>
                             </ul>
                         </CardContent>
-                        <CardFooter>
+                        <CardFooter className="flex flex-col gap-2">
                             <Button asChild className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-bold">
                                 <Link href="/criar">Começar Grátis</Link>
                             </Button>
+                            <span className="text-xs text-zinc-500 font-medium">Gratuito para começar • Sem cartão</span>
                         </CardFooter>
                     </Card>
 
@@ -61,10 +62,11 @@ export function PricingFAQ() {
                                 <li className="flex items-center gap-3 text-white"><Check className="w-5 h-5 text-green-500" /> Sem Anúncios</li>
                             </ul>
                         </CardContent>
-                        <CardFooter>
+                        <CardFooter className="flex flex-col gap-2">
                             <Button asChild className="w-full bg-green-500 hover:bg-green-600 text-zinc-950 font-bold">
                                 <Link href="/criar">Criar Liga Profissional</Link>
                             </Button>
+                            <span className="text-xs text-zinc-500 font-medium">7 dias de garantia • Cancele quando quiser</span>
                         </CardFooter>
                     </Card>
 

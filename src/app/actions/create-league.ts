@@ -8,7 +8,6 @@ import { sendWelcomeEmail } from '@/lib/email'
 const schema = z.object({
     leagueName: z.string().min(3, "O nome da liga deve ter pelo menos 3 caracteres"),
     slug: z.string().min(3, "O endereço deve ter pelo menos 3 caracteres").regex(/^[a-z0-9-]+$/, "Slug inválido. Use apenas letras minúsculas, números e hífens."),
-    gameType: z.enum(['EAFC', 'PES', 'NBA', 'REAL_SPORTS']),
     plan: z.enum(['free', 'mensal', 'anual']).default('free'),
 })
 
@@ -22,7 +21,6 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
     const data = {
         leagueName: formData.get('leagueName'),
         slug: formData.get('slug'),
-        gameType: formData.get('gameType'),
         plan: formData.get('plan'),
     }
 
@@ -35,7 +33,7 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
         }
     }
 
-    const { leagueName, slug, gameType, plan } = validatedFields.data
+    const { leagueName, slug, plan } = validatedFields.data
 
     if (RESERVED_SLUGS.includes(slug)) {
         return {
@@ -75,8 +73,7 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
         price_id: priceId,
         status: 'pending_setup',
         settings: {
-            max_teams: 8,
-            game_type: gameType
+            max_teams: 8
         }
     })
 
@@ -104,7 +101,7 @@ export async function createLeagueAction(prevState: any, formData: FormData) {
         console.warn('⚠️ Sem email de usuário para enviar confirmação.');
     }
 
-    redirect('/acompanhar')
+    redirect(`/${slug}/dashboard`)
 }
 
 

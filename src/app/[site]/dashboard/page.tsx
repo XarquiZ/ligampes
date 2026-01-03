@@ -12,7 +12,7 @@ import {
   DollarSign, Shirt, Calendar, Crown, ArrowRight, ArrowLeftRight,
   Users, ChevronDown, ChevronUp, Edit, TrendingUp, TrendingDown,
   Building2, Target, Footprints, Clock, AlertTriangle, X,
-  Trophy, BarChart2, CalendarDays, ScrollText, Shield
+  Trophy, BarChart2, CalendarDays, ScrollText, Shield, Gavel, Loader2
 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -337,24 +337,55 @@ export default function Dashboard() {
   const [teamPosition, setTeamPosition] = useState<number | null>(null)
 
   // Carregar Organização Atual baseada na URL
-  useEffect(() => {
+  const loadOrg = async () => {
     if (!site) return
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('slug', site)
+      .single()
 
-    const loadOrg = async () => {
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('slug', site)
-        .single()
-
-      if (data) {
-        setCurrentOrg(data)
-      } else {
-        console.error('Organização não encontrada:', error)
-      }
+    if (data) {
+      setCurrentOrg(data)
+    } else {
+      console.error('Organização não encontrada:', error)
     }
+  }
+
+  useEffect(() => {
     loadOrg()
   }, [site])
+
+  // Realtime subscription for settings updates (using ID for reliability)
+  useEffect(() => {
+    if (!currentOrg?.id) return
+
+    console.log('[Dashboard] Subscribing to realtime updates for org:', currentOrg.id)
+
+    const subscription = supabase
+      .channel(`org_settings_${currentOrg.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'organizations',
+          filter: `id=eq.${currentOrg.id}`
+        },
+        (payload) => {
+          console.log('[Dashboard] Settings updated via realtime', payload)
+          setCurrentOrg((prev: any) => ({
+            ...prev,
+            ...payload.new
+          }))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [currentOrg?.id])
 
   // Inbox System
   const [dashboardInboxOpen, setDashboardInboxOpen] = useState(false)
@@ -1144,99 +1175,92 @@ export default function Dashboard() {
     return `${playerCount}/28`
   }
 
-  const allTiles = [
-    {
-      title: 'SALDO',
-      icon: DollarSign,
-      color: 'green',
-      value: formatBalance(team?.balance || 0),
-      subtitle: 'disponível para gastar',
-      link: `/${site}/dashboard/saldo`,
-      buttonText: 'Ver saldo',
-      preview: 'saldo'
-    },
+  // Calcular top5 fora do renderPreview para usar no tile
+  const top5Table = leagueTable.slice(0, 5)
+
+  // --- Tiles Data ---
+  const tilesData = [
     {
       title: 'MEU ELENCO',
+      value: `${players?.length || 0}/28`,
+      subtitle: `${team?.name || 'Seu Time'}`,
       icon: Shirt,
-      color: 'blue',
-      value: getPlayerCountValue(),
-      subtitle: 'jogadores no elenco',
+      color: 'blue' as const,
+      key: 'elenco',
       link: `/${site}/dashboard/elenco`,
-      buttonText: 'Ver elenco',
-      preview: 'elenco'
+      buttonText: 'Ver elenco'
     },
     {
       title: 'JOGADORES',
+      value: `${playersStats?.totalPlayers || 0}`,
+      subtitle: 'Disponíveis no Mercado',
       icon: Users,
-      color: 'pink',
-      value: 'Pool',
-      subtitle: 'todos os atletas',
+      color: 'pink' as const,
+      key: 'jogadores',
       link: `/${site}/dashboard/jogadores`,
-      buttonText: 'Ver jogadores',
-      preview: 'jogadores'
-    },
-    {
-      title: 'TRANSFERÊNCIAS',
-      icon: ArrowLeftRight,
-      color: 'purple',
-      value: 'Mercado',
-      subtitle: 'negociações ativas',
-      link: `/${site}/dashboard/transferencias`,
-      buttonText: 'Ver mercado',
-      preview: 'transferencias'
-    },
-    {
-      title: 'LEILÃO',
-      icon: Calendar,
-      color: 'red',
-      value: activeAuctions.length > 0 ? 'AO VIVO' : 'EM BREVE',
-      subtitle: activeAuctions.length > 0 ? 'leilão ativo' : 'próximo evento',
-      link: `/${site}/dashboard/leilao`,
-      buttonText: 'Ver leilão',
-      preview: 'leilao'
+      buttonText: 'Ver jogadores'
     },
     {
       title: 'TABELA',
+      value: `${leagueTable.find(t => t.team_id === team?.id)?.position || '-'}º`,
+      subtitle: 'Sua Posição',
       icon: Trophy,
-      color: 'yellow',
-      value: teamPosition ? `${teamPosition}º` : 'N/A',
-      subtitle: 'classificação atual',
+      color: 'yellow' as const,
+      key: 'tabela',
       link: `/${site}/dashboard/tabela`,
-      buttonText: 'Ver classificação',
-      preview: 'tabela'
+      buttonText: 'Ver tabela'
     },
     {
-      title: 'INFORMAÇÕES',
-      icon: ScrollText,
-      color: 'indigo',
-      value: 'Avisos',
-      subtitle: 'regulamento oficial',
-      link: `/${site}/dashboard/informacoes`,
-      buttonText: 'Ler regras',
-      preview: 'regras'
+      title: 'FINANCEIRO',
+      value: formatBalance(team?.balance || 0),
+      subtitle: 'Saldo em Caixa',
+      icon: DollarSign,
+      color: 'green' as const,
+      key: 'financeiro',
+      link: `/${site}/dashboard/saldo`,
+      buttonText: 'Ver saldo'
     },
-    ...(isAdmin ? [{
-      title: 'GERENCIAR TIMES',
-      icon: Shield,
-      color: 'emerald',
-      value: 'Admin',
-      subtitle: 'adicionar/editar times',
-      link: `/${site}/dashboard/times`,
-      buttonText: 'Acessar',
-      preview: 'times'
-    }] : [])
+    {
+      title: 'LEILÃO',
+      value: activeAuctions.length > 0 ? 'AO VIVO' : 'EM BREVE',
+      subtitle: activeAuctions.length > 0 ? 'leilão ativo' : 'próximo evento',
+      icon: Gavel,
+      color: 'red' as const,
+      key: 'leilao',
+      link: `/${site}/dashboard/leilao`,
+      buttonText: 'Ver leilão'
+    },
+    {
+      title: 'TRANSFERÊNCIAS',
+      value: 'Mercado',
+      subtitle: 'Negociações',
+      icon: ArrowLeftRight,
+      color: 'purple' as const,
+      key: 'transferencias',
+      link: `/${site}/dashboard/transferencias`,
+      buttonText: 'Ver mercado'
+    }
   ]
 
-  // Filter tiles based on Game Type
-  // Se for NBA, mostra apenas: Elenco, Jogadores, Times (Admin), Tabela
-  const tiles = (currentOrg?.settings?.game_type === 'nba' || currentOrg?.settings?.game_type === 'NBA')
-    ? allTiles.filter(t => ['elenco', 'jogadores', 'times', 'tabela'].includes(t.preview))
-    : allTiles
+  // Filter tiles based on settings
+  const tiles = tilesData.filter(tile => {
+    // Default visible tiles
+    const defaultVisible = ['elenco', 'jogadores', 'tabela'].includes(tile.key)
+
+    // Check settings if available
+    const settings = currentOrg?.settings?.dashboard_tiles
+
+    if (settings && settings[tile.key] !== undefined) {
+      return settings[tile.key]
+    }
+
+    return defaultVisible
+  })
 
   // Função para renderizar o preview baseado no tile
   const renderPreview = (tileTitle: string) => {
     switch (tileTitle) {
-      case 'SALDO':
+      case 'FINANCEIRO':
         const recentTransactions = balanceTransactions.slice(0, 3)
         const totalCredits = balanceTransactions
           .filter(t => t.type === 'credit')
@@ -1382,7 +1406,7 @@ export default function Dashboard() {
 
       case 'TABELA':
         const teamInTable = leagueTable.find(t => t.team_id === team?.id)
-        const top5Table = leagueTable.slice(0, 5)
+        // const top5Table = leagueTable.slice(0, 5) // Defined at component scope now
         const nextMatches = matchSchedule.slice(0, 3)
 
         return (
@@ -1649,11 +1673,20 @@ export default function Dashboard() {
         team={team}
         organizationId={currentOrg?.id}
         disableForceRead={true}
+        onSettingsUpdated={loadOrg}
       />
 
       {/* Conteúdo Principal */}
       <div className="flex-1 transition-all duration-300 lg:ml-0">
-        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-4 lg:p-6">
+        {currentOrg?.status === 'pending_setup' && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-center text-center">
+            <p className="text-amber-400 text-sm flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Estamos finalizando a configuração da sua liga. Algumas funcionalidades podem levar alguns minutos para estar completas.
+            </p>
+          </div>
+        )}
+        <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-purple-950/20 to-zinc-950 p-4 lg:p-6 lg:pl-10">
           <div className="mx-auto space-y-6 lg:space-y-8 max-w-7xl">
             {/* Header do conteúdo */}
             <div className="flex flex-col md:flex-row items-center gap-4 lg:gap-6 pt-4 lg:pt-6">

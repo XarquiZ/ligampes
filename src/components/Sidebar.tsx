@@ -22,10 +22,12 @@ import {
   ScrollText,
   Inbox,
   Shield,
-  Megaphone
+  Megaphone,
+  Settings
 } from 'lucide-react'
 import InboxModal from './inbox/InboxModal'
 import AdminAnnouncementModal from './inbox/AdminAnnouncementModal'
+import DashboardSettingsModal from './DashboardSettingsModal'
 import { useInbox } from '@/hooks/useInbox'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -52,9 +54,10 @@ interface SidebarProps {
   } | null
   organizationId?: string
   disableForceRead?: boolean
+  onSettingsUpdated?: () => void
 }
 
-export default function Sidebar({ user, profile, team, organizationId, disableForceRead = false }: SidebarProps) {
+export default function Sidebar({ user, profile, team, organizationId, disableForceRead = false, onSettingsUpdated }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const params = useParams()
@@ -63,58 +66,140 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState<boolean | null>(null)
 
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  // const [isAdmin, setIsAdmin] = useState(profile?.role === 'admin' || profile?.role === 'owner')
+  /* eslint-enable @typescript-eslint/no-unused-vars */
+
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  // const [isAdmin, setIsAdmin] = useState(profile?.role === 'admin' || profile?.role === 'owner')
+  /* eslint-enable @typescript-eslint/no-unused-vars */
+
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
+
   // Inbox State
   const [isInboxOpen, setIsInboxOpen] = useState(false)
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false)
   const [adminModalOpen, setAdminModalOpen] = useState(false)
+  const [dashboardSettings, setDashboardSettings] = useState<Record<string, boolean> | null>(null) // null means loading/use defaults
+
   const { announcements, unreadCount, markAsRead, votePoll } = useInbox(user, team, organizationId)
+
+  // Fetch Settings & Realtime
+  useEffect(() => {
+    if (!organizationId) return
+
+    const fetchSettings = async () => {
+      const { data } = await supabase
+        .from('organizations')
+        .select('settings')
+        .eq('id', organizationId)
+        .single()
+
+      if (data?.settings?.dashboard_tiles) {
+        setDashboardSettings(data.settings.dashboard_tiles)
+      }
+    }
+
+    fetchSettings()
+
+    const subscription = supabase
+      .channel(`sidebar_settings_${organizationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'organizations',
+          filter: `id=eq.${organizationId}`
+        },
+        (payload) => {
+          const newSettings = payload.new.settings?.dashboard_tiles
+          if (newSettings) {
+            setDashboardSettings(newSettings)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(subscription)
+    }
+  }, [organizationId])
 
   // Dynamic Navigation Items based on site
   const navigationItems = useMemo(() => {
     const baseUrl = `/${site}/dashboard`
-    return [
+
+    // Default visibility mapping
+    const defaults: Record<string, boolean> = {
+      'elenco': true,
+      'jogadores': true,
+      'tabela': true,
+      'financeiro': false,
+      'leilao': false,
+      'transferencias': false
+    }
+
+    const isVisible = (key: string) => {
+      // If settings loaded, use them. Else use defaults.
+      if (dashboardSettings) {
+        return dashboardSettings[key] !== undefined ? dashboardSettings[key] : defaults[key]
+      }
+      return defaults[key]
+    }
+
+    const items = [
       {
         name: 'Inbox',
         href: '#inbox', // Special case
         icon: Inbox,
-        color: 'text-orange-400'
+        color: 'text-orange-400',
+        alwaysShow: true
       },
       {
         name: 'Dashboard',
         href: baseUrl,
         icon: Home,
-        color: 'text-blue-400'
+        color: 'text-blue-400',
+        alwaysShow: true
       },
       {
+        key: 'financeiro',
         name: 'Saldo',
         href: `${baseUrl}/saldo`,
         icon: DollarSign,
         color: 'text-green-400'
       },
       {
+        key: 'elenco',
         name: 'Meu Elenco',
         href: `${baseUrl}/elenco`,
         icon: Shirt,
         color: 'text-blue-400'
       },
       {
+        key: 'jogadores',
         name: 'Jogadores',
         href: `${baseUrl}/jogadores`,
         icon: Users,
         color: 'text-pink-400'
       },
       {
+        key: 'transferencias',
         name: 'Transferências',
         href: `${baseUrl}/transferencias`,
         icon: ArrowLeftRight,
         color: 'text-purple-400'
       },
       {
+        key: 'leilao',
         name: 'Leilão',
         href: `${baseUrl}/leilao`,
         icon: Calendar,
         color: 'text-red-400'
       },
       {
+        key: 'tabela',
         name: 'Tabela',
         href: `${baseUrl}/tabela`,
         icon: Trophy,
@@ -124,10 +209,17 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
         name: 'Informações',
         href: `${baseUrl}/informacoes`,
         icon: ScrollText,
-        color: 'text-indigo-400'
+        color: 'text-indigo-400',
+        alwaysShow: true
       },
     ]
-  }, [site])
+
+    return items.filter(item => {
+      if (item.alwaysShow) return true
+      if (item.key) return isVisible(item.key)
+      return true
+    })
+  }, [site, dashboardSettings])
 
   // Efeito para carregar o estado salvo do localStorage
   useEffect(() => {
@@ -171,7 +263,6 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
     return () => window.removeEventListener('resize', handleResize)
   }, [isMobileOpen])
 
-  const isAdmin = profile?.role === 'admin'
   const displayName = profile?.coach_name || user?.user_metadata?.full_name || user?.email || 'Técnico'
 
   const handleSignOut = async () => {
@@ -475,6 +566,19 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
 
           {/* Footer */}
           <div className="p-2 border-t border-white/10">
+            <Link
+              href="#"
+              onClick={(e) => {
+                e.preventDefault()
+                if (isAdmin) setSettingsModalOpen(true)
+              }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group relative overflow-hidden ${isAdmin ? 'text-zinc-400 hover:text-white hover:bg-white/5' : 'opacity-50 cursor-not-allowed hidden'}`}
+            >
+              <div className={`absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+              <Settings className="h-5 w-5 relative z-10 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-90" />
+              {!isCollapsed && <span className="font-medium relative z-10">Configurações</span>}
+            </Link>
+
             <Button
               onClick={handleSignOut}
               variant="ghost"
@@ -500,13 +604,22 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
         )}
       />
 
-      {/* Inbox Modal */}
       {/* Admin Announcement Modal */}
       <AdminAnnouncementModal
         isOpen={adminModalOpen}
         onClose={() => setAdminModalOpen(false)}
-        organizationId={organizationId}
+        organizationId={organizationId || ''}
       />
+
+      {/* Modal de Configurações */}
+      {isAdmin && organizationId && (
+        <DashboardSettingsModal
+          isOpen={settingsModalOpen}
+          onClose={() => setSettingsModalOpen(false)}
+          organizationId={organizationId || ''}
+          onSettingsUpdated={onSettingsUpdated}
+        />
+      )}
 
       {/* Inbox Modal - Force Read Logic */}
       <InboxModal

@@ -44,7 +44,7 @@ export function FinalCTA() {
                             Crie sua liga amadora agora <Rocket className="ml-3 w-6 h-6" />
                         </Link>
                     </Button>
-                    <p className="mt-4 text-sm text-zinc-500">Leva menos de 2 minutos • Sem cartão de crédito</p>
+                    <p className="mt-4 text-sm text-zinc-500">Gratuito para começar • Sem cartão</p>
                 </motion.div>
 
             </div>
