@@ -37,6 +37,9 @@ export const metadata: Metadata = {
     ],
   },
   manifest: "/manifest.json", // Se você tiver um manifest
+  verification: {
+    google: "FNBOxFJAOCp22RMAOpa65_G98QIqORoiVsIFVbwNuZQ",
+  },
 };
 
 // CONFIGURAÇÃO PARA PWA (opcional mas recomendado)
