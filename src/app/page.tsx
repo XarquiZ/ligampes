@@ -4,12 +4,13 @@ import React from 'react'
 import { LandingHeader } from '@/components/landing/LandingHeader'
 import { Hero } from '@/components/landing/Hero'
 import { HowItWorks } from '@/components/landing/HowItWorks'
-import { ProductShowcase } from '@/components/landing/ProductShowcase'
-import { BentoGrid } from '@/components/landing/BentoGrid'
-import { WaitTimeExplanation } from '@/components/landing/WaitTimeExplanation'
 import { PricingFAQ } from '@/components/landing/PricingFAQ'
 import { LandingFooter } from '@/components/landing/LandingFooter'
-import { ComparisonSection } from '@/components/landing/ComparisonSection'
+import { PainSection } from '@/components/landing/PainSection'
+import { SolutionSection } from '@/components/landing/SolutionSection'
+import { TargetAudience } from '@/components/landing/TargetAudience'
+import { FinalCTA } from '@/components/landing/FinalCTA'
+import { SocialProof } from '@/components/landing/SocialProof'
 
 export default function LandingPage() {
 
@@ -31,12 +32,13 @@ export default function LandingPage() {
 
       <main>
         <Hero />
+        <SocialProof />
+        <PainSection />
+        <SolutionSection />
         <HowItWorks />
-        <ProductShowcase />
-        <BentoGrid />
-        <WaitTimeExplanation />
-        <ComparisonSection />
+        <TargetAudience />
         <PricingFAQ />
+        <FinalCTA />
       </main>
 
       <LandingFooter />

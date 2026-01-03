@@ -26,7 +26,7 @@ export function Hero() {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                     </span>
-                    Infraestrutura Dedicada para sua Liga
+                    A plataforma oficial do futebol amador
                 </motion.div>
 
                 {/* Heading */}
@@ -36,8 +36,8 @@ export function Hero() {
                     transition={{ duration: 0.5, delay: 0.2 }}
                     className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.1]"
                 >
-                    Leve seu campeonato<br />
-                    para o <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">Próximo Nível</span>.
+                    Crie sua liga amadora<br />
+                    em <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600">Minutos</span>.
                 </motion.h1>
 
                 {/* Subtitle */}
@@ -47,7 +47,7 @@ export function Hero() {
                     transition={{ duration: 0.5, delay: 0.4 }}
                     className="text-xl text-zinc-400 max-w-3xl mx-auto mb-12 leading-relaxed"
                 >
-                    A única plataforma que cria um servidor exclusivo para você. Gestão profissional, zero travamentos e suporte 24h.
+                    Tabela, jogos, artilharia e estatísticas em um só lugar. Profissionalize seu campeonato sem dor de cabeça.
                 </motion.p>
 
                 {/* CTA Buttons */}
@@ -55,16 +55,25 @@ export function Hero() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.6 }}
-                    className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mb-12"
+                    className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto mb-12"
                 >
-                    <Button asChild size="lg" className="w-full sm:w-auto h-14 px-8 text-lg font-bold bg-green-500 hover:bg-green-600 text-zinc-950 shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_30px_rgba(34,197,94,0.6)] transition-all">
-                        <Link href="/criar">
-                            Reservar meu Servidor Agora <Rocket className="ml-2 w-5 h-5" />
-                        </Link>
-                    </Button>
-                    <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg border-zinc-800 bg-zinc-950/50 hover:bg-zinc-900 text-zinc-300 hover:text-white backdrop-blur-sm">
-                        <PlayCircle className="mr-2 w-5 h-5 text-purple-500" /> Ver Exemplo ao Vivo
-                    </Button>
+                    <div className="flex flex-col items-center gap-2">
+                        <Button asChild size="lg" className="w-full sm:w-auto h-14 px-8 text-lg font-bold bg-green-500 hover:bg-green-600 text-zinc-950 shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:shadow-[0_0_30px_rgba(34,197,94,0.6)] transition-all">
+                            <Link href="/criar">
+                                Criar minha liga agora <Rocket className="ml-2 w-5 h-5" />
+                            </Link>
+                        </Button>
+                        <span className="text-xs text-zinc-500 font-medium tracking-wide">
+                            SEM CARTÃO • RÁPIDO • GRATUITO PARA COMEÇAR
+                        </span>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-2 sm:mt-[-24px]">
+                        <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-lg border-zinc-800 bg-zinc-950/50 hover:bg-zinc-900 text-zinc-300 hover:text-white backdrop-blur-sm">
+                            <PlayCircle className="mr-2 w-5 h-5 text-purple-500" /> Ver Exemplo
+                        </Button>
+                    </div>
+
                 </motion.div>
 
 
