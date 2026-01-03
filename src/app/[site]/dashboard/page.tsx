@@ -21,7 +21,6 @@ import ChatPopup from '@/components/Chatpopup'
 
 import FloatingChatButton from '@/components/FloatingChatButton'
 // Inbox Imports
-import AdminAnnouncementModal from '@/components/inbox/AdminAnnouncementModal'
 import InboxModal from '@/components/inbox/InboxModal'
 import { useInbox } from '@/hooks/useInbox'
 import { PlusCircle } from 'lucide-react'
@@ -358,7 +357,6 @@ export default function Dashboard() {
   }, [site])
 
   // Inbox System
-  const [adminModalOpen, setAdminModalOpen] = useState(false)
   const [dashboardInboxOpen, setDashboardInboxOpen] = useState(false)
   const { announcements: inboxAnnouncements, unreadCount: inboxUnread, markAsRead, votePoll } = useInbox(user, team, currentOrg?.id) // Reuse logic
 
@@ -1740,18 +1738,6 @@ export default function Dashboard() {
                   </p>
                 )}
               </div>
-
-              {isAdmin && (
-                <div className="w-full md:w-auto mt-4 md:mt-0 md:ml-auto flex justify-center md:justify-end animate-in fade-in slide-in-from-right-4 duration-500">
-                  <Button
-                    onClick={() => setAdminModalOpen(true)}
-                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white gap-2 shadow-lg shadow-purple-500/20 px-6 transition-all hover:scale-105"
-                  >
-                    <PlusCircle size={20} />
-                    Novo Comunicado
-                  </Button>
-                </div>
-              )}
             </div>
 
             {/* Grid de Tiles */}
@@ -1910,12 +1896,6 @@ export default function Dashboard() {
         onClose={() => setWarningModalOpen(false)}
         type={playerCountWarning.type}
         site={site}
-      />
-
-      <AdminAnnouncementModal
-        isOpen={adminModalOpen}
-        onClose={() => setAdminModalOpen(false)}
-        organizationId={currentOrg?.id}
       />
 
       <InboxModal

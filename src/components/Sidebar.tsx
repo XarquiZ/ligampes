@@ -20,9 +20,12 @@ import {
   ChevronRight as ChevronRightIcon,
   Trophy,
   ScrollText,
-  Inbox
+  Inbox,
+  Shield,
+  Megaphone
 } from 'lucide-react'
 import InboxModal from './inbox/InboxModal'
+import AdminAnnouncementModal from './inbox/AdminAnnouncementModal'
 import { useInbox } from '@/hooks/useInbox'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -62,6 +65,7 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
 
   // Inbox State
   const [isInboxOpen, setIsInboxOpen] = useState(false)
+  const [adminModalOpen, setAdminModalOpen] = useState(false)
   const { announcements, unreadCount, markAsRead, votePoll } = useInbox(user, team, organizationId)
 
   // Dynamic Navigation Items based on site
@@ -402,6 +406,71 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
                 </Link>
               )
             })}
+
+            {/* Admin Section */}
+            {isAdmin && (
+              <div className="mt-6 pt-6 border-t border-white/10">
+                {!isCollapsed && (
+                  <h3 className="px-3 mb-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+                    Administrador
+                  </h3>
+                )}
+
+                <Link
+                  href={`/${site}/dashboard/times`}
+                  onClick={(e) => {
+                    if (window.innerWidth < 1024) {
+                      setIsMobileOpen(false)
+                      setIsCollapsed(true)
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center rounded-lg transition-all duration-200 group relative",
+                    "hover:bg-white/5 hover:text-white text-zinc-400",
+                    isCollapsed ? 'justify-center p-2' : 'p-3 gap-3'
+                  )}
+                  title={isCollapsed ? 'Gerenciar Times' : ''}
+                >
+                  <Shield className={cn(
+                    "flex-shrink-0 h-5 w-5 text-emerald-500",
+                  )} />
+
+                  {!isCollapsed && (
+                    <>
+                      <span className="font-medium text-sm flex-1 truncate">Gerenciar Times</span>
+                      <ChevronRight className="h-3 w-3 flex-shrink-0 transition-transform duration-200 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 translate-x-1" />
+                    </>
+                  )}
+                </Link>
+
+                <div
+                  onClick={() => {
+                    setAdminModalOpen(true)
+                    if (window.innerWidth < 1024) {
+                      setIsMobileOpen(false)
+                      setIsCollapsed(true)
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center rounded-lg transition-all duration-200 group relative cursor-pointer",
+                    "hover:bg-white/5 hover:text-white text-zinc-400",
+                    isCollapsed ? 'justify-center p-2' : 'p-3 gap-3'
+                  )}
+                  title={isCollapsed ? 'Novo Comunicado' : ''}
+                >
+                  <Megaphone className={cn(
+                    "flex-shrink-0 h-5 w-5 text-amber-500",
+                  )} />
+
+                  {!isCollapsed && (
+                    <>
+                      <span className="font-medium text-sm flex-1 truncate">Novo Comunicado</span>
+                      <ChevronRight className="h-3 w-3 flex-shrink-0 transition-transform duration-200 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 translate-x-1" />
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </nav>
 
           {/* Footer */}
@@ -432,6 +501,13 @@ export default function Sidebar({ user, profile, team, organizationId, disableFo
       />
 
       {/* Inbox Modal */}
+      {/* Admin Announcement Modal */}
+      <AdminAnnouncementModal
+        isOpen={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+        organizationId={organizationId}
+      />
+
       {/* Inbox Modal - Force Read Logic */}
       <InboxModal
         isOpen={isInboxOpen || (!disableForceRead && announcements.some(a => a.priority && !a.read))}
