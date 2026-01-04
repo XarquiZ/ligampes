@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import {
   Form,
   FormControl,
@@ -282,6 +284,7 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded, onCancel }: 
   const [teams, setTeams] = useState<Team[]>([])
 
   const isEditMode = !!playerToEdit
+  const [showPesAttributes, setShowPesAttributes] = useState(isEditMode)
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(formSchema),
@@ -389,117 +392,145 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded, onCancel }: 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-12">
 
-          <Tabs defaultValue="general" className="w-full">
-            <TabsList className="flex flex-col sm:grid sm:grid-cols-3 w-full h-auto sm:h-14 bg-zinc-900/80 rounded-xl border border-zinc-800 p-1 sm:p-0 gap-1 sm:gap-0">
-              <TabsTrigger value="general" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none sm:rounded-l-xl py-3 sm:py-0">Gerais</TabsTrigger>
-              <TabsTrigger value="attributes" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none py-3 sm:py-0">Atributos</TabsTrigger>
-              <TabsTrigger value="details" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none sm:rounded-r-xl py-3 sm:py-0">Detalhes</TabsTrigger>
-            </TabsList>
+          {/* TOP SECTION: NOME & POSIÇÃO & TOGGLE */}
+          <div className="space-y-6 p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-xl font-bold text-white">
+                  Nome Completo <Badge className="bg-red-600">Obrigatório</Badge>
+                </FormLabel>
+                <FormControl>
+                  <Input placeholder="Vinícius Júnior" className="h-14 text-lg bg-zinc-800/70 border-zinc-700 text-white" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-            {/* GERAIS */}
-            <TabsContent value="general" className="space-y-8 mt-8">
-              <FormField control={form.control} name="name" render={({ field }) => (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FormField control={form.control} name="position" render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-xl font-bold text-white">
-                    Nome Completo <Badge className="bg-red-600">Obrigatório</Badge>
+                  <FormLabel className="text-lg font-semibold text-white">
+                    Posição <Badge className="bg-red-600">Obrigatório</Badge>
                   </FormLabel>
-                  <FormControl>
-                    <Input placeholder="Vinícius Júnior" className="h-14 text-lg bg-zinc-800/70 border-zinc-700 text-white" {...field} />
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {POSITIONS.map(p => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )} />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <FormField control={form.control} name="position" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">
-                      Posição <Badge className="bg-red-600">Obrigatório</Badge>
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+              <FormField control={form.control} name="age" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-lg font-semibold text-white">Idade</FormLabel>
+                  <FormControl>
+                    <Input type="number" placeholder="25" className="h-12 bg-zinc-800/70 border-zinc-700 text-white"
+                      {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
+                  </FormControl>
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="team_id" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-lg font-semibold text-white">Clube Atual</FormLabel>
+                  <Select onValueChange={v => field.onChange(v === 'none' ? null : v)} value={field.value ?? 'none'}>
+                    <FormControl><SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white"><SelectValue placeholder="Sem clube" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Sem Clube</SelectItem>
+                      {teams.map(t => (
+                        <SelectItem key={t.id} value={t.id}>
+                          <div className="flex items-center gap-3">
+                            {t.logo_url && <img src={t.logo_url} alt="" className="w-6 h-6 rounded" onError={e => (e.target as any).style.display = 'none'} />}
+                            {t.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
+            </div>
+
+            <FormField control={form.control} name="photo_url" render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-lg font-semibold text-white">URL da Foto (opcional)</FormLabel>
+                <FormControl>
+                  <Input placeholder="https://..." className="h-12 bg-zinc-800/70 border-zinc-700 text-white" {...field} value={field.value || ''} />
+                </FormControl>
+              </FormItem>
+            )} />
+
+            <div className="flex items-center space-x-3 h-12 bg-zinc-800/30 px-4 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
+              <Checkbox
+                id="showPesAttributes"
+                checked={showPesAttributes}
+                onCheckedChange={(c) => setShowPesAttributes(!!c)}
+                className="w-5 h-5 border-zinc-500 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+              />
+              <Label htmlFor="showPesAttributes" className="text-white font-medium cursor-pointer flex-1">
+                Atributos do PES (Detalhes, Overall e Stats)
+              </Label>
+            </div>
+          </div>
+
+          {showPesAttributes && (
+            <Tabs defaultValue="general" className="w-full animate-in fade-in slide-in-from-top-4 duration-500">
+              <TabsList className="flex flex-col sm:grid sm:grid-cols-3 w-full h-auto sm:h-14 bg-zinc-900/80 rounded-xl border border-zinc-800 p-1 sm:p-0 gap-1 sm:gap-0">
+                <TabsTrigger value="general" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none sm:rounded-l-xl py-3 sm:py-0">Detalhes Gerais</TabsTrigger>
+                <TabsTrigger value="attributes" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none py-3 sm:py-0">Atributos</TabsTrigger>
+                <TabsTrigger value="details" className="data-[state=active]:bg-purple-600 data-[state=active]:text-white rounded-xl sm:rounded-none sm:rounded-r-xl py-3 sm:py-0">Habilidades & Info</TabsTrigger>
+              </TabsList>
+
+              {/* GERAIS */}
+              <TabsContent value="general" className="space-y-8 mt-8">
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* NOVO CAMPO - ALTURA */}
+                  <FormField control={form.control} name="height" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Ruler className="w-5 h-5 text-purple-400" />
+                        Altura
+                      </FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(value ? Number(value) : null)}
+                        value={field.value ? String(field.value) : ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white">
+                            <SelectValue placeholder="Selecione a altura" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="max-h-60">
+                          {HEIGHT_OPTIONS.map(({ value, label }) => (
+                            <SelectItem key={value} value={String(value)}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="overall" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold text-white">Overall</FormLabel>
                       <FormControl>
-                        <SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white">
-                          <SelectValue placeholder="Selecione uma posição" />
-                        </SelectTrigger>
+                        <Input type="number" min={0} max={99} className="h-12 text-3xl font-bold text-center bg-zinc-800/70 border-zinc-700 text-white"
+                          {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : 0)} />
                       </FormControl>
-                      <SelectContent>
-                        {POSITIONS.map(p => (
-                          <SelectItem key={p} value={p}>{p}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                    </FormItem>
+                  )} />
+                </div>
 
-                {/* NOVO CAMPO - ALTURA */}
-                <FormField control={form.control} name="height" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white flex items-center gap-2">
-                      <Ruler className="w-5 h-5 text-purple-400" />
-                      Altura
-                    </FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(value ? Number(value) : null)}
-                      value={field.value ? String(field.value) : ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white">
-                          <SelectValue placeholder="Selecione a altura" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent className="max-h-60">
-                        {HEIGHT_OPTIONS.map(({ value, label }) => (
-                          <SelectItem key={value} value={String(value)}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="overall" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Overall</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={0} max={99} className="h-12 text-3xl font-bold text-center bg-zinc-800/70 border-zinc-700 text-white"
-                        {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : 0)} />
-                    </FormControl>
-                  </FormItem>
-                )} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <FormField control={form.control} name="age" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Idade</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="25" className="h-12 bg-zinc-800/70 border-zinc-700 text-white"
-                        {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
-                    </FormControl>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="team_id" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Clube Atual</FormLabel>
-                    <Select onValueChange={v => field.onChange(v === 'none' ? null : v)} value={field.value ?? 'none'}>
-                      <FormControl><SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white"><SelectValue placeholder="Sem clube" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Sem Clube</SelectItem>
-                        {teams.map(t => (
-                          <SelectItem key={t.id} value={t.id}>
-                            <div className="flex items-center gap-3">
-                              {t.logo_url && <img src={t.logo_url} alt="" className="w-6 h-6 rounded" onError={e => (e.target as any).style.display = 'none'} />}
-                              {t.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
 
                 <FormField control={form.control} name="nationality" render={({ field }) => (
                   <FormItem>
@@ -510,174 +541,167 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded, onCancel }: 
                     </Select>
                   </FormItem>
                 )} />
-              </div>
 
-              <div className="p-6 bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-2xl border border-purple-700 text-center">
-                <p className="text-purple-300 text-lg">Valor Base Calculado</p>
-                <p className="text-4xl font-black text-white mt-2">R$ {basePrice.toLocaleString('pt-BR')}</p>
-                {isGK && (
-                  <p className="text-yellow-300 text-sm mt-2">
-                    <Target className="w-4 h-4 inline mr-1" />
-                    Goleiro - Valor fixo de R$ 1.000.000
-                  </p>
-                )}
-                {!isGK && (
-                  <p className="text-zinc-300 text-sm mt-2">
-                    Baseado no Overall ({overall}) e posição ({position})
-                  </p>
-                )}
-              </div>
-
-              <FormField control={form.control} name="photo_url" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-lg font-semibold text-white">URL da Foto (opcional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://..." className="h-12 bg-zinc-800/70 border-zinc-700 text-white" {...field} value={field.value || ''} />
-                  </FormControl>
-                </FormItem>
-              )} />
-            </TabsContent>
-
-            {/* ATRIBUTOS */}
-            <TabsContent value="attributes" className="space-y-12 mt-8">
-              <section>
-                <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Goal className="w-10 h-10" /> Ataque & Técnica</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                  <Attr control={form.control} name="offensive_talent" label="Talento Ofensivo" />
-                  <Attr control={form.control} name="ball_control" label="Controle de Bola" />
-                  <Attr control={form.control} name="dribbling" label="Drible" />
-                  <Attr control={form.control} name="tight_possession" label="Condução Firme" />
-                  <Attr control={form.control} name="finishing" label="Finalização" />
-                  <Attr control={form.control} name="heading" label="Cabeceio" />
-                  <Attr control={form.control} name="place_kicking" label="Chute Colocado" />
-                  <Attr control={form.control} name="curl" label="Curva" />
+                <div className="p-6 bg-gradient-to-r from-purple-900/40 to-pink-900/40 rounded-2xl border border-purple-700 text-center">
+                  <p className="text-purple-300 text-lg">Valor Base Calculado</p>
+                  <p className="text-4xl font-black text-white mt-2">R$ {basePrice.toLocaleString('pt-BR')}</p>
+                  {isGK && (
+                    <p className="text-yellow-300 text-sm mt-2">
+                      <Target className="w-4 h-4 inline mr-1" />
+                      Goleiro - Valor fixo de R$ 1.000.000
+                    </p>
+                  )}
+                  {!isGK && (
+                    <p className="text-zinc-300 text-sm mt-2">
+                      Baseado no Overall ({overall}) e posição ({position})
+                    </p>
+                  )}
                 </div>
-              </section>
 
-              <section>
-                <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Zap className="w-10 h-10" /> Passes & Força</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <Attr control={form.control} name="low_pass" label="Passe Rasteiro" />
-                  <Attr control={form.control} name="lofted_pass" label="Passe Alto" />
-                  <Attr control={form.control} name="kicking_power" label="Força do Chute" />
+
+              </TabsContent>
+
+              {/* ATRIBUTOS */}
+              <TabsContent value="attributes" className="space-y-12 mt-8">
+                <section>
+                  <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Goal className="w-10 h-10" /> Ataque & Técnica</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                    <Attr control={form.control} name="offensive_talent" label="Talento Ofensivo" />
+                    <Attr control={form.control} name="ball_control" label="Controle de Bola" />
+                    <Attr control={form.control} name="dribbling" label="Drible" />
+                    <Attr control={form.control} name="tight_possession" label="Condução Firme" />
+                    <Attr control={form.control} name="finishing" label="Finalização" />
+                    <Attr control={form.control} name="heading" label="Cabeceio" />
+                    <Attr control={form.control} name="place_kicking" label="Chute Colocado" />
+                    <Attr control={form.control} name="curl" label="Curva" />
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Zap className="w-10 h-10" /> Passes & Força</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <Attr control={form.control} name="low_pass" label="Passe Rasteiro" />
+                    <Attr control={form.control} name="lofted_pass" label="Passe Alto" />
+                    <Attr control={form.control} name="kicking_power" label="Força do Chute" />
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Scale className="w-10 h-10" /> Físico</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <Attr control={form.control} name="speed" label="Velocidade" />
+                    <Attr control={form.control} name="acceleration" label="Aceleração" />
+                    <Attr control={form.control} name="stamina" label="Resistência" />
+                    <Attr control={form.control} name="jump" label="Impulsão" />
+                    <Attr control={form.control} name="physical_contact" label="Contato Físico" />
+                    <Attr control={form.control} name="balance" label="Equilíbrio" />
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Shield className="w-10 h-10" /> Defesa</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <Attr control={form.control} name="defensive_awareness" label="Talento Defensivo" />
+                    <Attr control={form.control} name="ball_winning" label="Desarme" />
+                    <Attr control={form.control} name="aggression" label="Agressividade" />
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8">
+                    <Circle className="w-10 h-10" /> Goleiro {isGK && <span className="text-yellow-400 text-lg">(apenas GO)</span>}
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
+                    <Attr control={form.control} name="gk_awareness" label="Talento de GO" />
+                    <Attr control={form.control} name="gk_catching" label="Firmeza de GO" />
+                    <Attr control={form.control} name="gk_clearing" label="Afast. de bola de GO" />
+                    <Attr control={form.control} name="gk_reflexes" label="Reflexos de GO" />
+                    <Attr control={form.control} name="gk_reach" label="Alcance de GO" />
+                  </div>
+                </section>
+              </TabsContent>
+
+              {/* DETALHES & SKILLS */}
+              <TabsContent value="details" className="space-y-12 mt-8">
+
+                <div className="grid grid-cols-1 min-[450px]:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                  <FormField control={form.control} name="preferred_foot" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold text-white">Pé Preferido</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? "Nenhum"}>
+                        <FormControl><SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white"><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>{PREFERRED_FOOT.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="playstyle" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold text-white">Estilo de Jogo</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? "Nenhum"}>
+                        <FormControl><SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white"><SelectValue placeholder="Nenhum" /></SelectTrigger></FormControl>
+                        <SelectContent className="max-h-64">{PLAYSTYLES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="weak_foot_usage" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold text-white">Pior pé (Frequência)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} max={4} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
+                          {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="weak_foot_accuracy" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold text-white">Pior pé (Precisão)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} max={4} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
+                          {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="form" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold text-white">Forma Física</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} max={8} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
+                          {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
+                      </FormControl>
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="injury_resistance" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-lg font-semibold text-white">Res. Lesão</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} max={3} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
+                          {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
+                      </FormControl>
+                    </FormItem>
+                  )} />
                 </div>
-              </section>
 
-              <section>
-                <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Scale className="w-10 h-10" /> Físico</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <Attr control={form.control} name="speed" label="Velocidade" />
-                  <Attr control={form.control} name="acceleration" label="Aceleração" />
-                  <Attr control={form.control} name="stamina" label="Resistência" />
-                  <Attr control={form.control} name="jump" label="Impulsão" />
-                  <Attr control={form.control} name="physical_contact" label="Contato Físico" />
-                  <Attr control={form.control} name="balance" label="Equilíbrio" />
-                </div>
-              </section>
+                <section>
+                  <h3 className="text-3xl font-black text-yellow-400 flex items-center gap-4 mb-8"><Star className="w-12 h-12 fill-yellow-400" /> Inspirador</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <Insp control={form.control} name="inspiring_ball_carry" label="Carregando a Bola" />
+                    <Insp control={form.control} name="inspiring_low_pass" label="Passe Rasteiro" />
+                    <Insp control={form.control} name="inspiring_lofted_pass" label="Passe Alto" />
+                  </div>
+                </section>
 
-              <section>
-                <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8"><Shield className="w-10 h-10" /> Defesa</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                  <Attr control={form.control} name="defensive_awareness" label="Talento Defensivo" />
-                  <Attr control={form.control} name="ball_winning" label="Desarme" />
-                  <Attr control={form.control} name="aggression" label="Agressividade" />
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-3xl font-black text-purple-400 flex items-center gap-4 mb-8">
-                  <Circle className="w-10 h-10" /> Goleiro {isGK && <span className="text-yellow-400 text-lg">(apenas GO)</span>}
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
-                  <Attr control={form.control} name="gk_awareness" label="Talento de GO" />
-                  <Attr control={form.control} name="gk_catching" label="Firmeza de GO" />
-                  <Attr control={form.control} name="gk_clearing" label="Afast. de bola de GO" />
-                  <Attr control={form.control} name="gk_reflexes" label="Reflexos de GO" />
-                  <Attr control={form.control} name="gk_reach" label="Alcance de GO" />
-                </div>
-              </section>
-            </TabsContent>
-
-            {/* DETALHES & SKILLS */}
-            <TabsContent value="details" className="space-y-12 mt-8">
-
-              <div className="grid grid-cols-1 min-[450px]:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                <FormField control={form.control} name="preferred_foot" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Pé Preferido</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? "Nenhum"}>
-                      <FormControl><SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white"><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>{PREFERRED_FOOT.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="playstyle" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Estilo de Jogo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? "Nenhum"}>
-                      <FormControl><SelectTrigger className="h-12 bg-zinc-800/70 border-zinc-700 text-white"><SelectValue placeholder="Nenhum" /></SelectTrigger></FormControl>
-                      <SelectContent className="max-h-64">{PLAYSTYLES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="weak_foot_usage" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Pior pé (Frequência)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} max={4} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
-                        {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
-                    </FormControl>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="weak_foot_accuracy" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Pior pé (Precisão)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} max={4} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
-                        {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
-                    </FormControl>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="form" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Forma Física</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} max={8} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
-                        {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
-                    </FormControl>
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="injury_resistance" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-lg font-semibold text-white">Res. Lesão</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={1} max={3} className="h-12 text-center bg-zinc-800/70 border-zinc-700 text-white"
-                        {...field} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : null)} value={field.value ?? ''} />
-                    </FormControl>
-                  </FormItem>
-                )} />
-              </div>
-
-              <section>
-                <h3 className="text-3xl font-black text-yellow-400 flex items-center gap-4 mb-8"><Star className="w-12 h-12 fill-yellow-400" /> Inspirador</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                  <Insp control={form.control} name="inspiring_ball_carry" label="Carregando a Bola" />
-                  <Insp control={form.control} name="inspiring_low_pass" label="Passe Rasteiro" />
-                  <Insp control={form.control} name="inspiring_lofted_pass" label="Passe Alto" />
-                </div>
-              </section>
-
-              <section className="space-y-8">
-                <MultiSelect control={form.control} name="alternative_positions" label="Posições Alternativas" options={ALT_POS} placeholder="Nenhuma selecionada" Icon={ChevronsUpDown} />
-                <MultiSelect control={form.control} name="skills" label="Habilidades Especiais" options={SKILLS} placeholder="Nenhuma habilidade" Icon={ListChecks} />
-              </section>
-            </TabsContent>
-          </Tabs>
+                <section className="space-y-8">
+                  <MultiSelect control={form.control} name="alternative_positions" label="Posições Alternativas" options={ALT_POS} placeholder="Nenhuma selecionada" Icon={ChevronsUpDown} />
+                  <MultiSelect control={form.control} name="skills" label="Habilidades Especiais" options={SKILLS} placeholder="Nenhuma habilidade" Icon={ListChecks} />
+                </section>
+              </TabsContent>
+            </Tabs>
+          )}
 
           {/* BOTÃO LINDO E PADRONIZADO */}
           <div className="pt-8 border-t border-zinc-800">
@@ -714,6 +738,6 @@ export function CadastrarJogadorForm({ playerToEdit, onPlayerAdded, onCancel }: 
           </div>
         </form>
       </Form>
-    </div>
+    </div >
   )
 }

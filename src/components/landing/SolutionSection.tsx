@@ -4,6 +4,7 @@ import { motion } from 'framer-motion'
 import { Trophy, Users, Calendar, BarChart3, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import Image from 'next/image'
 
 const features = [
     {
@@ -80,34 +81,12 @@ export function SolutionSection() {
                         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-2xl skew-y-1 transform hover:skew-y-0 transition-transform duration-500">
                             {/* Abstract representation of the dashboard */}
                             <div className="aspect-video bg-zinc-950 rounded-lg overflow-hidden relative border border-zinc-800">
-                                <div className="absolute top-0 left-0 right-0 h-12 bg-zinc-900 border-b border-zinc-800 flex items-center px-4 gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-red-500/20"></div>
-                                    <div className="w-3 h-3 rounded-full bg-yellow-500/20"></div>
-                                    <div className="w-3 h-3 rounded-full bg-green-500/20"></div>
-                                </div>
-                                <div className="p-6 mt-12 space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <div className="h-8 w-1/3 bg-zinc-800 rounded animate-pulse"></div>
-                                        <div className="h-8 w-1/4 bg-green-500/20 rounded animate-pulse"></div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="h-12 w-full bg-zinc-900 border border-zinc-800 rounded flex items-center px-4 justify-between">
-                                            <div className="w-8 h-8 rounded-full bg-zinc-800"></div>
-                                            <div className="h-4 w-12 bg-zinc-800 rounded"></div>
-                                            <div className="w-8 h-8 rounded-full bg-zinc-800"></div>
-                                        </div>
-                                        <div className="h-12 w-full bg-zinc-900 border border-zinc-800 rounded flex items-center px-4 justify-between">
-                                            <div className="w-8 h-8 rounded-full bg-zinc-800"></div>
-                                            <div className="h-4 w-12 bg-zinc-800 rounded"></div>
-                                            <div className="w-8 h-8 rounded-full bg-zinc-800"></div>
-                                        </div>
-                                        <div className="h-12 w-full bg-zinc-900 border border-zinc-800 rounded flex items-center px-4 justify-between">
-                                            <div className="w-8 h-8 rounded-full bg-zinc-800"></div>
-                                            <div className="h-4 w-12 bg-zinc-800 rounded"></div>
-                                            <div className="w-8 h-8 rounded-full bg-zinc-800"></div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <Image
+                                    src="/screens/tabela.png"
+                                    alt="Tabela do Campeonato, Jogos e Classificação do LigaOn"
+                                    fill
+                                    className="object-cover"
+                                />
                             </div>
                         </div>
                     </div>
