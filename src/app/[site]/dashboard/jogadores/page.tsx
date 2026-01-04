@@ -17,6 +17,14 @@ import {
   SheetDescription,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { CadastrarJogadorForm } from '@/components/jogadores/CadastrarJogadorForm'
 import {
@@ -40,6 +48,7 @@ import { useAuth } from '@/hooks/useAuth'
 import FloatingChatButton from '@/components/FloatingChatButton'
 import ChatPopup from '@/components/Chatpopup'
 import { useOrganization } from '@/contexts/OrganizationContext'
+import { toast } from 'sonner'
 
 // Importando componentes modulares
 import { PlayerHeader } from '@/components/jogadores/PlayerHeader'
@@ -166,6 +175,41 @@ export default function ListaJogadores() {
     ball_winning: null, aggression: null, gk_awareness: null, gk_catching: null,
     gk_clearing: null, gk_reflexes: null, gk_reach: null,
   })
+
+  // Estado para exclusão
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [playerToDelete, setPlayerToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleDeleteClick = (playerId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPlayerToDelete(playerId)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const confirmDeletePlayer = async () => {
+    if (!playerToDelete) return
+
+    try {
+      setIsDeleting(true)
+      const { error } = await supabase
+        .from('players')
+        .delete()
+        .eq('id', playerToDelete)
+
+      if (error) throw error
+
+      toast.success('Jogador excluído com sucesso!')
+      fetchData()
+      setIsDeleteDialogOpen(false)
+      setPlayerToDelete(null)
+    } catch (error) {
+      console.error('Erro ao excluir jogador:', error)
+      toast.error('Erro ao excluir jogador.')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   // Funções para manipular checkboxes de posições
   const togglePosition = (position: string) => {
@@ -748,6 +792,7 @@ export default function ListaJogadores() {
                     favoritePlayers={favoritePlayers}
                     onGridClick={handleGridCardClick}
                     onEditClick={openEditPlayer}
+                    onDeleteClick={handleDeleteClick}
                     onToggleFavorite={toggleFavorite}
                     formatBasePrice={formatBasePrice}
                   />
@@ -793,6 +838,42 @@ export default function ListaJogadores() {
                 </div>
               </SheetContent>
             </Sheet>
+
+            {/* Dialog de Confirmação de Exclusão */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
+                <DialogHeader>
+                  <DialogTitle>Confirmar Exclusão</DialogTitle>
+                  <DialogDescription className="text-zinc-400">
+                    Tem certeza que deseja excluir este jogador? Esta ação não pode ser desfeita.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="flex gap-2 justify-end">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setIsDeleteDialogOpen(false)}
+                    disabled={isDeleting}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={confirmDeletePlayer}
+                    disabled={isDeleting}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Excluindo...
+                      </>
+                    ) : (
+                      'Excluir'
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* Sheet de Edição */}
             <Sheet open={isEdicaoOpen} onOpenChange={setIsEdicaoOpen}>

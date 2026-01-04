@@ -1,0 +1,13 @@
+{
+	"servers": {
+		"supabase": {
+			"command": "C:\\Program Files\\nodejs\\npx.cmd",
+			"args": [
+				"-y",
+				"@supabase/mcp-server-supabase",
+				"--access-token",
+				"sbp_2e7a6ea6e67eadd991447f433e5a9893a71320d5"
+			]
+		}
+	}
+}

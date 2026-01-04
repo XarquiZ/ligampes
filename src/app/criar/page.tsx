@@ -16,7 +16,7 @@ import Image from 'next/image'
 import { toast } from 'sonner'
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { cn } from '@/lib/utils'
-import { supabase } from '@/lib/supabase'
+import { supabasePlatform as supabase } from '@/lib/supabase-platform'
 
 // --- Schemas & Types ---
 const schema = z.object({
@@ -77,16 +77,28 @@ export default function RegisterWizardPage() {
     // --- Handlers ---
     // --- Handlers ---
     const handleLogin = async () => {
-        // Set fallback redirect cookie to bypass strict URL whitelisting issues with query params
-        document.cookie = `auth_redirect=/criar; path=/; max-age=300` // 5 minutes
+        try {
+            // Force logout to clear any stale sessions/cookies before starting new flow
+            await supabase.auth.signOut()
 
-        await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: `${window.location.origin}/api/auth/callback`, // Clean URL (must be whitelisted exactly)
-                queryParams: { access_type: 'offline', prompt: 'consent' },
-            },
-        })
+            // Set fallback redirect cookie
+            document.cookie = `auth_redirect=/criar; path=/; max-age=300`
+
+            const origin = window.location.origin
+            const next = encodeURIComponent('/criar')
+            const authType = 'platform'
+
+            await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${origin}/api/auth/callback?next=${next}&auth_type=${authType}`,
+                    queryParams: { access_type: 'offline', prompt: 'consent' },
+                },
+            })
+        } catch (error) {
+            console.error('Login error:', error)
+            toast.error('Erro ao iniciar login')
+        }
     }
 
     const handlePlanSelect = (plan: 'free' | 'mensal' | 'anual') => {

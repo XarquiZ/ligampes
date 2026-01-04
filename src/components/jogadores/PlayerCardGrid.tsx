@@ -1,4 +1,4 @@
-import { Pencil, Target, Footprints, Square } from 'lucide-react'
+import { Pencil, Target, Footprints, Square, Trash2 } from 'lucide-react'
 import { useRouter, useParams } from 'next/navigation'
 import { StatItem } from '../elenco/StatItem'
 import { Badge } from '@/components/ui/badge'
@@ -14,6 +14,7 @@ interface PlayerCardGridProps {
   favoritePlayers: string[]
   onGridClick: (playerId: string) => void
   onEditClick: (player: any, e: React.MouseEvent) => void
+  onDeleteClick: (playerId: string, e: React.MouseEvent) => void
   onToggleFavorite: (playerId: string, e: React.MouseEvent) => void
   formatBasePrice: (price: number) => string
 }
@@ -25,6 +26,7 @@ export function PlayerCardGrid({
   favoritePlayers,
   onGridClick,
   onEditClick,
+  onDeleteClick,
   onToggleFavorite,
   formatBasePrice
 }: PlayerCardGridProps) {
@@ -60,12 +62,22 @@ export function PlayerCardGrid({
       />
 
       {userRole === 'admin' && (
-        <button
-          onClick={(e) => onEditClick(player, e)}
-          className="absolute top-2 lg:top-3 left-2 lg:left-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800/90 hover:bg-purple-600 p-1.5 rounded-full backdrop-blur"
-        >
-          <Pencil className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
-        </button>
+        <div className="absolute top-2 lg:top-3 left-2 lg:left-3 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => onEditClick(player, e)}
+            className="bg-zinc-800/90 hover:bg-purple-600 p-1.5 rounded-full backdrop-blur transition-colors"
+            title="Editar jogador"
+          >
+            <Pencil className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+          </button>
+          <button
+            onClick={(e) => onDeleteClick(player.id, e)}
+            className="bg-zinc-800/90 hover:bg-red-600 p-1.5 rounded-full backdrop-blur transition-colors"
+            title="Excluir jogador"
+          >
+            <Trash2 className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+          </button>
+        </div>
       )}
 
       <div className="relative h-32 sm:h-40 lg:h-52 bg-zinc-800">

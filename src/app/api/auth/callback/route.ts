@@ -45,7 +45,8 @@ export async function GET(request: Request) {
       const allCookies = debugCookieStore.getAll().map(c => c.name).join(', ')
       console.log('[Callback] Available Cookies:', allCookies)
 
-      const supabase = await createClient()
+      const cookieName = authType === 'platform' ? 'sb-platform-auth' : undefined
+      const supabase = await createClient(cookieName)
       const { data: { session }, error: authError } = await supabase.auth.exchangeCodeForSession(code)
 
       if (authError || !session) {

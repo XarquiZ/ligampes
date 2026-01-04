@@ -2,13 +2,13 @@ import { createClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Clock, CheckCircle2, ArrowRight, ExternalLink, LogOut, Mail, Trophy } from 'lucide-react'
+import { Clock, CheckCircle2, ArrowRight, ExternalLink, LogOut, Mail, Trophy, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import PlatformSignOutButton from '@/components/PlatformSignOutButton'
+// import PlatformSignOutButton from '@/components/PlatformSignOutButton'
 import { PayButton } from '@/components/dashboard/BillingActions'
 
 export default async function TrackerPage() {
-    const supabase = await createClient()
+    const supabase = await createClient('sb-platform-auth')
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
@@ -28,11 +28,24 @@ export default async function TrackerPage() {
 
                 {/* Header */}
                 <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">Minhas Ligas</h1>
-                        <p className="text-zinc-400">Acompanhe o status e acesse seus campeonatos.</p>
-                    </div>
-                    <PlatformSignOutButton />
+                    <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                        <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-700 rounded-lg flex items-center justify-center shadow-lg shadow-green-500/20">
+                            <Trophy className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="font-bold text-xl tracking-tight text-white">LIGA.ON</span>
+                    </Link>
+
+                    <Button variant="outline" asChild className="border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-white">
+                        <Link href="/">
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Voltar
+                        </Link>
+                    </Button>
+                </div>
+
+                <div className="border-b border-zinc-800 pb-6">
+                    <h1 className="text-2xl font-bold">Minhas Ligas</h1>
+                    <p className="text-zinc-400">Acompanhe o status e acesse seus campeonatos.</p>
                 </div>
 
                 {/* List */}

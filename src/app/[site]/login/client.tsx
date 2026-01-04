@@ -48,7 +48,7 @@ export function CentralLoginClient({ organization }: { organization: Organizatio
             // 2. Also pass 'next' param as backup
             // Explicitly construct the full URL with the next parameter
             const nextParam = encodeURIComponent(targetPath)
-            const redirectTo = `${origin}/api/auth/callback?next=${targetPath}`
+            const redirectTo = `${origin}/api/auth/callback?next=${nextParam}`
 
             console.log("Login targeting:", organization.slug, "Redirect:", redirectTo)
 

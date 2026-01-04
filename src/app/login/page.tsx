@@ -24,8 +24,8 @@ export default function CentralLoginPage() {
         const checkSession = async () => {
             const { data: { session } } = await supabasePlatform.auth.getSession()
             if (session) {
-                setCurrentUser(session.user)
-                setLoading(false)
+                // Auto-redirect if already logged in (skip welcome screen)
+                router.push('/acompanhar')
             } else {
                 setLoading(false)
             }

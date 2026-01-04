@@ -1,4 +1,4 @@
-import { ChevronDown, Pencil, GitCompare } from 'lucide-react'
+import { ChevronDown, Pencil, GitCompare, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -19,6 +19,7 @@ interface PlayerCardListProps {
   favoritePlayers: string[]
   onToggle: (playerId: string) => void
   onEditClick: (player: any, e: React.MouseEvent) => void
+  onDeleteClick: (playerId: string, e: React.MouseEvent) => void
   onToggleFavorite: (playerId: string, e: React.MouseEvent) => void
   formatBasePrice: (price: number) => string
   renderClubLogo: (url: string | null, name: string) => React.ReactNode
@@ -32,6 +33,7 @@ export function PlayerCardList({
   favoritePlayers,
   onToggle,
   onEditClick,
+  onDeleteClick,
   onToggleFavorite,
   formatBasePrice,
   renderClubLogo
@@ -174,16 +176,26 @@ export function PlayerCardList({
                   />
                 </div>
 
-                {/* Botão de Edição (admin) */}
+                {/* Botão de Edição e Exclusão (admin) */}
                 {userRole === 'admin' && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={(e) => handleActionClick(e, () => onEditClick(player, e))}
-                    className="hover:bg-purple-600/20 p-1.5 h-7 w-7 sm:h-8 sm:w-8 min-w-0"
-                  >
-                    <Pencil className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => handleActionClick(e, () => onEditClick(player, e))}
+                      className="hover:bg-purple-600/20 p-1.5 h-7 w-7 sm:h-8 sm:w-8 min-w-0"
+                    >
+                      <Pencil className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => handleActionClick(e, () => onDeleteClick(player.id, e))}
+                      className="hover:bg-red-600/20 p-1.5 h-7 w-7 sm:h-8 sm:w-8 min-w-0 group"
+                    >
+                      <Trash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-zinc-400 group-hover:text-red-400" />
+                    </Button>
+                  </>
                 )}
 
                 {/* Seta para expandir */}
@@ -279,15 +291,28 @@ export function PlayerCardList({
 
             {/* Botão de Edição e Seta */}
             <div className="flex items-center justify-end gap-2 lg:gap-2" onClick={(e) => e.stopPropagation()}>
+              {/* Botão de Edição e Exclusão (admin) */}
               {userRole === 'admin' && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={(e) => handleActionClick(e, () => onEditClick(player, e))}
-                  className="hover:bg-purple-600/20 p-1.5 h-7 w-7 min-w-0"
-                >
-                  <Pencil className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => handleActionClick(e, () => onEditClick(player, e))}
+                    className="hover:bg-purple-600/20 p-1.5 h-7 w-7 min-w-0"
+                    title="Editar jogador"
+                  >
+                    <Pencil className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => handleActionClick(e, () => onDeleteClick(player.id, e))}
+                    className="hover:bg-red-600/20 p-1.5 h-7 w-7 min-w-0 group"
+                    title="Excluir jogador"
+                  >
+                    <Trash2 className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-zinc-400 group-hover:text-red-400" />
+                  </Button>
+                </>
               )}
 
               <div

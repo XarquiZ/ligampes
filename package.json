@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "clean": "rm -rf .next node_modules/.cache || del /s /q .next node_modules\\.cache",
-    "fresh": "npm run clean && npm install && npm run dev"
+    "fresh": "npm run clean && npm install && npm run dev",
+    "update-types": "npx supabase gen types typescript --project-id vyldjzzjgqlpkgebbgai > src/database.types.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
