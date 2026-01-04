@@ -137,7 +137,12 @@ export default function ElencoPage() {
         .eq('organization_id', organization?.id)
         .order('overall', { ascending: false })
 
-      setAllPlayers(data || [])
+      const validPlayers: Player[] = (data || []).map((p: any) => ({
+        ...p,
+        logo_url: p.logo_url || null,
+        club: p.club || 'Sem Time'
+      }))
+      setAllPlayers(validPlayers)
     } catch (error) {
       console.error('Erro ao carregar todos os jogadores:', error)
     }
@@ -1107,13 +1112,14 @@ export default function ElencoPage() {
                           player={player}
                           activeSection={activeSection}
                           showProposeButton={activeSection === 'favoritos'}
-                          onSellClick={handleSellPlayer}
-                          onDismissClick={handleDismissPlayer}
+
                           onShareClick={handleSharePlayer}
                           onRemoveFavorite={handleRemoveFromFavorites}
                           onCardClick={activeSection === 'favoritos'
                             ? navigateToPlayerInPlayersPage
                             : handleGridCardClick}
+                          onSellClick={organization?.settings?.dashboard_tiles?.transferencias !== false ? handleSellPlayer : undefined}
+                          onDismissClick={organization?.settings?.dashboard_tiles?.transferencias !== false ? handleDismissPlayer : undefined}
                         />
                       </div>
                     ))}
@@ -1129,8 +1135,8 @@ export default function ElencoPage() {
                         isOpen={openedPlayers.includes(player.id)}
                         activeSection={activeSection}
                         onToggle={() => togglePlayer(player.id)}
-                        onSellClick={handleSellPlayer}
-                        onDismissClick={handleDismissPlayer}
+                        onSellClick={organization?.settings?.dashboard_tiles?.transferencias !== false ? handleSellPlayer : undefined}
+                        onDismissClick={organization?.settings?.dashboard_tiles?.transferencias !== false ? handleDismissPlayer : undefined}
                         onShareClick={handleSharePlayer}
                         onRemoveFavorite={handleRemoveFromFavorites}
                         onCardClick={activeSection === 'favoritos'

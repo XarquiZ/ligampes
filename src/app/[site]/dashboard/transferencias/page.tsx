@@ -146,13 +146,13 @@ export default function PaginaTransferencias() {
         const { data, error } = await supabase
           .from('teams')
           .select('id, name, logo_url, balance')
-          .eq('organization_id', organization?.id)
+          .eq('organization_id', organization?.id || '')
           .order('name')
 
         if (error) {
           console.error('Erro ao carregar times:', error)
         } else {
-          setTeams(data || [])
+          setTeams((data || []).map(t => ({ ...t, balance: t.balance || 0, logo_url: t.logo_url || null })))
         }
       } catch (error) {
         console.error('Erro:', error)
@@ -343,7 +343,7 @@ export default function PaginaTransferencias() {
         setIsAdmin(profile?.role === 'admin')
 
         if (profile.teams) {
-          setTeam(profile.teams)
+          setTeam({ ...profile.teams, balance: profile.teams.balance || 0 })
         } else {
           setTeam(null)
         }
@@ -395,10 +395,26 @@ export default function PaginaTransferencias() {
 
       const safeTransferData = transferData?.map(transfer => ({
         ...transfer,
-        from_team: transfer.from_team || { id: '', name: 'Time Desconhecido', logo_url: null, balance: 0 },
-        to_team: transfer.to_team || { id: '', name: 'Time Desconhecido', logo_url: null, balance: 0 },
-        player: transfer.player || { id: '', name: 'Jogador Desconhecido', photo_url: null, position: 'N/A' }
-      })) || []
+        from_team_id: transfer.from_team_id || '',
+        to_team_id: transfer.to_team_id || '',
+        status: (transfer.status || 'pending') as 'pending' | 'approved' | 'rejected',
+        approved_by_seller: transfer.approved_by_seller || false,
+        approved_by_buyer: transfer.approved_by_buyer || false,
+        approved_by_admin: transfer.approved_by_admin || false,
+        processed_by_admin: transfer.processed_by_admin || false,
+        created_at: transfer.created_at || new Date().toISOString(),
+        transfer_type: transfer.transfer_type || 'sell',
+        transfer_players: transfer.transfer_players || undefined,
+        player_names: transfer.player_names || undefined,
+        player_values: transfer.player_values || undefined,
+        is_exchange: transfer.is_exchange || false,
+        exchange_players: transfer.exchange_players || [],
+        exchange_value: transfer.exchange_value || 0,
+        money_direction: (transfer.money_direction as 'send' | 'receive') || undefined,
+        from_team: transfer.from_team ? { ...transfer.from_team, balance: transfer.from_team.balance || 0 } : { id: '', name: 'Time Desconhecido', logo_url: null, balance: 0 },
+        to_team: transfer.to_team ? { ...transfer.to_team, balance: transfer.to_team.balance || 0 } : { id: '', name: 'Time Desconhecido', logo_url: null, balance: 0 },
+        player: transfer.player ? { ...transfer.player, position: transfer.player.position || 'N/A' } : { id: '', name: 'Jogador Desconhecido', photo_url: null, position: 'N/A' }
+      } as Transfer)) || []
 
       const { data: auctionsData } = await supabase
         .from('auctions')
@@ -414,6 +430,7 @@ export default function PaginaTransferencias() {
       const mappedAuctions = (auctionsData || []).map((auction: any) => ({
         id: auction.id,
         player_id: auction.player_id,
+        player_name: auction.player?.name || 'Jogador Desconhecido',
         from_team_id: 'auction', // Placeholder
         to_team_id: auction.current_bidder,
         value: auction.current_bid,
@@ -423,17 +440,18 @@ export default function PaginaTransferencias() {
         is_exchange: false,
         exchange_players: [],
         exchange_value: 0,
-        money_direction: null,
+        money_direction: undefined,
         player: auction.player || { id: '', name: 'Jogador Desconhecido', photo_url: null, position: 'N/A' },
         from_team: { id: 'auction', name: 'Leilão', logo_url: null, balance: 0 },
         to_team: auction.winner_team || { id: '', name: 'Time Desconhecido', logo_url: null, balance: 0 },
         approved_by_seller: true,
         approved_by_buyer: true,
-        approved_by_admin: true
+        approved_by_admin: true,
+        processed_by_admin: true
       })) as Transfer[]
 
       const combinedTransfers = [...safeTransferData, ...mappedAuctions].sort((a, b) => {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
       })
 
       setAllTransfers(combinedTransfers)
@@ -470,6 +488,153 @@ export default function PaginaTransferencias() {
     }
   }
 
+  // FUNÇÃO ATUALIZADA: Processar transferência completa usando RPC unificada
+  const processCompleteTransfer = async (transfer: Transfer) => {
+    try {
+      // VERIFICAÇÃO DE SALDO PARA TROCAS COM DINHEIRO
+      if (transfer.is_exchange && transfer.exchange_value && transfer.exchange_value > 0) {
+        // Carregar dados da transferência completa
+        const { data: fullTransferData } = await supabase
+          .from('player_transfers')
+          .select(`
+            *,
+            from_team:teams!from_team_id(*),
+            to_team:teams!to_team_id(*)
+          `)
+          .eq('id', transfer.id)
+          .single()
+
+        if (!fullTransferData) {
+          throw new Error('Dados da transferência não encontrados')
+        }
+
+        const exchangeData = fullTransferData
+        const exchangeValue = exchangeData.exchange_value || 0
+        const moneyDirection = exchangeData.money_direction || 'send'
+        const fromTeam = exchangeData.from_team
+        const toTeam = exchangeData.to_team
+
+        if (!fromTeam || !toTeam) {
+          throw new Error('Times não encontrados na troca')
+        }
+
+        const fromBalance = fromTeam.balance || 0
+        const toBalance = toTeam.balance || 0
+
+        // SE HÁ DINHEIRO ENVOLVIDO NA TROCA
+        if (exchangeValue > 0) {
+          // VERIFICAR SALDO QUANDO O TIME DE ORIGEM PRECISA MANDAR DINHEIRO
+          if (moneyDirection === 'send') {
+            // Time de origem (quem está dando o jogador) está mandando dinheiro
+            if (fromBalance < exchangeValue) {
+              throw new Error(`${fromTeam.name} não tem saldo suficiente para mandar R$ ${exchangeValue.toLocaleString('pt-BR')}. Saldo atual: R$ ${fromBalance.toLocaleString('pt-BR')}`)
+            }
+          }
+          // VERIFICAR SALDO QUANDO O TIME DESTINO PRECISA MANDAR DINHEIRO
+          else if (moneyDirection === 'receive') {
+            // Time destino (quem está recebendo o jogador) está mandando dinheiro
+            if (toBalance < exchangeValue) {
+              throw new Error(`${toTeam.name} não tem saldo suficiente para mandar R$ ${exchangeValue.toLocaleString('pt-BR')}. Saldo atual: R$ ${toBalance.toLocaleString('pt-BR')}`)
+            }
+          }
+        }
+      }
+
+      // Usar a RPC unificada para processar a transferência
+      const { data, error } = await supabase.rpc('processar_transferencia', {
+        p_transfer_id: transfer.id,
+        p_player_id: transfer.player_id,
+        p_from_team_id: transfer.from_team_id || '',
+        p_to_team_id: transfer.to_team_id || '',
+        p_value: transfer.value,
+        p_transfer_type: transfer.transfer_type || 'sell',
+        p_transfer_players: transfer.transfer_players || [],
+        p_is_exchange: transfer.is_exchange || false,
+        p_exchange_players: transfer.exchange_players || []
+      })
+
+      if (error) {
+        throw new Error(`Erro na função RPC: ${error.message}`)
+      }
+
+      const rpcResponse = data as { success: boolean; message: string; transferred_count?: number } | null;
+
+      if (rpcResponse && !rpcResponse.success) {
+        return { success: false, message: rpcResponse.message }
+      }
+
+      // APÓS A TRANSFERÊNCIA PRINCIPAL, PROCESSAR DINHEIRO DA TROCA (SE HOUVER)
+      // Usando a função específica para isso
+      if (transfer.is_exchange && transfer.exchange_value && transfer.exchange_value > 0) {
+        // Carregar dados atualizados dos times
+        const { data: updatedTeams } = await supabase
+          .from('teams')
+          .select('id, balance, name')
+          .in('id', [transfer.from_team_id || '', transfer.to_team_id || ''])
+
+        const fromTeamUpdated = updatedTeams?.find(t => t.id === transfer.from_team_id)
+        const toTeamUpdated = updatedTeams?.find(t => t.id === transfer.to_team_id)
+
+
+        if (!fromTeamUpdated || !toTeamUpdated) {
+          throw new Error('Não foi possível carregar os saldos atualizados dos times')
+        }
+
+        // Identificar quem paga e quem recebe
+        const exchangeValue = transfer.exchange_value;
+        const moneyDirection = transfer.money_direction || 'send';
+
+        let payerTeamId, receiverTeamId, payerName, receiverName;
+
+        if (moneyDirection === 'receive') {
+          // Quem abriu o modal vai RECEBER → o outro paga
+          payerTeamId = transfer.to_team_id || '';
+          receiverTeamId = transfer.from_team_id || '';
+          payerName = toTeamUpdated.name;
+          receiverName = fromTeamUpdated.name;
+        } else {
+          // Quem abriu o modal vai PAGAR
+          payerTeamId = transfer.from_team_id || '';
+          receiverTeamId = transfer.to_team_id || '';
+          payerName = fromTeamUpdated.name;
+          receiverName = toTeamUpdated.name;
+        }
+
+        // ✅ Chamar a função específica para dinheiro de trocas
+        const { error: rpcError } = await supabase.rpc('registrar_dinheiro_troca', {
+          p_payer_team_id: payerTeamId,
+          p_receiver_team_id: receiverTeamId,
+          p_amount: exchangeValue,
+          p_player_name: transfer.player_name,
+          p_payer_name: payerName,
+          p_receiver_name: receiverName
+        });
+
+        if (rpcError) {
+          console.error('Erro ao registrar dinheiro da troca via RPC:', rpcError);
+          throw rpcError;
+        }
+
+        console.log(`Dinheiro da troca registrado: ${payerName} → ${receiverName} | R$ ${exchangeValue.toLocaleString('pt-BR')}`);
+      }
+
+      const transferredCount = (data as any)?.transferred_count || 1;
+
+      return {
+        success: true,
+        message: (data as any)?.message || 'Transferência concluída com sucesso',
+        transferredCount: transferredCount
+      }
+
+    } catch (error: any) {
+      console.error('Erro ao processar transferência completa:', error)
+      return {
+        success: false,
+        message: error.message || 'Erro desconhecido ao processar transferência'
+      }
+    }
+  }
+
   const checkAndExecuteTransfer = async (transfer: Transfer) => {
     try {
       if (transfer.approved_by_seller && transfer.approved_by_buyer && transfer.approved_by_admin) {
@@ -499,7 +664,9 @@ export default function PaginaTransferencias() {
             .eq('id', teamToCheckId)
             .single()
 
-          if (teamData && teamData.balance < transfer.exchange_value) {
+          const currentBalance = teamData?.balance || 0
+
+          if (teamData && currentBalance < transfer.exchange_value) {
             const { error: rejectError } = await supabase
               .from('player_transfers')
               .update({
@@ -544,12 +711,14 @@ export default function PaginaTransferencias() {
           const { data: buyerTeam, error: balanceError } = await supabase
             .from('teams')
             .select('balance, name')
-            .eq('id', transfer.to_team_id)
+            .eq('id', transfer.to_team_id || '')
             .single()
 
-          if (balanceError) return
+          if (balanceError || !buyerTeam) return
 
-          if (buyerTeam.balance < transfer.value) {
+          const buyerBalance = buyerTeam.balance || 0
+
+          if (buyerBalance < transfer.value) {
             const { error: rejectError } = await supabase
               .from('player_transfers')
               .update({
@@ -590,142 +759,7 @@ export default function PaginaTransferencias() {
     }
   }
 
-  // FUNÇÃO ATUALIZADA: Processar transferência completa usando RPC unificada
-  const processCompleteTransfer = async (transfer: Transfer) => {
-    try {
-      // VERIFICAÇÃO DE SALDO PARA TROCAS COM DINHEIRO
-      if (transfer.is_exchange && transfer.exchange_value && transfer.exchange_value > 0) {
-        // Carregar dados da transferência completa
-        const { data: fullTransferData } = await supabase
-          .from('player_transfers')
-          .select(`
-            *,
-            from_team:teams!from_team_id(*),
-            to_team:teams!to_team_id(*)
-          `)
-          .eq('id', transfer.id)
-          .single()
 
-        if (!fullTransferData) {
-          throw new Error('Dados da transferência não encontrados')
-        }
-
-        const exchangeData = fullTransferData
-        const exchangeValue = exchangeData.exchange_value || 0
-        const moneyDirection = exchangeData.money_direction || 'send'
-        const fromTeam = exchangeData.from_team
-        const toTeam = exchangeData.to_team
-
-        // SE HÁ DINHEIRO ENVOLVIDO NA TROCA
-        if (exchangeValue > 0) {
-          // VERIFICAR SALDO QUANDO O TIME DE ORIGEM PRECISA MANDAR DINHEIRO
-          if (moneyDirection === 'send') {
-            // Time de origem (quem está dando o jogador) está mandando dinheiro
-            if (fromTeam.balance < exchangeValue) {
-              throw new Error(`${fromTeam.name} não tem saldo suficiente para mandar R$ ${exchangeValue.toLocaleString('pt-BR')}. Saldo atual: R$ ${fromTeam.balance.toLocaleString('pt-BR')}`)
-            }
-          }
-          // VERIFICAR SALDO QUANDO O TIME DESTINO PRECISA MANDAR DINHEIRO
-          else if (moneyDirection === 'receive') {
-            // Time destino (quem está recebendo o jogador) está mandando dinheiro
-            if (toTeam.balance < exchangeValue) {
-              throw new Error(`${toTeam.name} não tem saldo suficiente para mandar R$ ${exchangeValue.toLocaleString('pt-BR')}. Saldo atual: R$ ${toTeam.balance.toLocaleString('pt-BR')}`)
-            }
-          }
-        }
-      }
-
-      // Usar a RPC unificada para processar a transferência
-      const { data, error } = await supabase.rpc('processar_transferencia', {
-        p_transfer_id: transfer.id,
-        p_player_id: transfer.player_id,
-        p_from_team_id: transfer.from_team_id,
-        p_to_team_id: transfer.to_team_id,
-        p_value: transfer.value,
-        p_transfer_type: transfer.transfer_type || 'sell',
-        p_transfer_players: transfer.transfer_players || null,
-        p_is_exchange: transfer.is_exchange || false,
-        p_exchange_players: transfer.exchange_players || null
-      })
-
-      if (error) {
-        throw new Error(`Erro na função RPC: ${error.message}`)
-      }
-
-      if (data && !data.success) {
-        return { success: false, message: data.message }
-      }
-
-      // APÓS A TRANSFERÊNCIA PRINCIPAL, PROCESSAR DINHEIRO DA TROCA (SE HOUVER)
-      // Usando a função específica para isso
-      if (transfer.is_exchange && transfer.exchange_value && transfer.exchange_value > 0) {
-        // Carregar dados atualizados dos times
-        const { data: updatedTeams } = await supabase
-          .from('teams')
-          .select('id, balance, name')
-          .in('id', [transfer.from_team_id, transfer.to_team_id])
-
-        const fromTeamUpdated = updatedTeams?.find(t => t.id === transfer.from_team_id)
-        const toTeamUpdated = updatedTeams?.find(t => t.id === transfer.to_team_id)
-
-        if (!fromTeamUpdated || !toTeamUpdated) {
-          throw new Error('Não foi possível carregar os saldos atualizados dos times')
-        }
-
-        // Identificar quem paga e quem recebe
-        const exchangeValue = transfer.exchange_value;
-        const moneyDirection = transfer.money_direction || 'send';
-
-        let payerTeamId, receiverTeamId, payerName, receiverName;
-
-        if (moneyDirection === 'receive') {
-          // Quem abriu o modal vai RECEBER → o outro paga
-          payerTeamId = transfer.to_team_id;
-          receiverTeamId = transfer.from_team_id;
-          payerName = toTeamUpdated.name;
-          receiverName = fromTeamUpdated.name;
-        } else {
-          // Quem abriu o modal vai PAGAR
-          payerTeamId = transfer.from_team_id;
-          receiverTeamId = transfer.to_team_id;
-          payerName = fromTeamUpdated.name;
-          receiverName = toTeamUpdated.name;
-        }
-
-        // ✅ Chamar a função específica para dinheiro de trocas
-        const { error: rpcError } = await supabase.rpc('registrar_dinheiro_troca', {
-          p_payer_team_id: payerTeamId,
-          p_receiver_team_id: receiverTeamId,
-          p_amount: exchangeValue,
-          p_player_name: transfer.player_name,
-          p_payer_name: payerName,
-          p_receiver_name: receiverName
-        });
-
-        if (rpcError) {
-          console.error('Erro ao registrar dinheiro da troca via RPC:', rpcError);
-          throw rpcError;
-        }
-
-        console.log(`Dinheiro da troca registrado: ${payerName} → ${receiverName} | R$ ${exchangeValue.toLocaleString('pt-BR')}`);
-      }
-
-      const transferredCount = data?.transferred_count || 1;
-
-      return {
-        success: true,
-        message: data?.message || 'Transferência concluída com sucesso',
-        transferredCount: transferredCount
-      }
-
-    } catch (error: any) {
-      console.error('Erro ao processar transferência completa:', error)
-      return {
-        success: false,
-        message: error.message || 'Erro desconhecido ao processar transferência'
-      }
-    }
-  }
 
   const aprovar = async (transferId: string, type: 'seller' | 'buyer' | 'admin') => {
     const field = `approved_by_${type}`
@@ -762,7 +796,7 @@ export default function PaginaTransferencias() {
         (type === 'admin' || updatedTransfer.approved_by_admin)
 
       if (allApproved) {
-        await checkAndExecuteTransfer(updatedTransfer)
+        await checkAndExecuteTransfer(updatedTransfer as unknown as Transfer)
       } else {
         alert('✅ Aprovação registrada! Aguardando outras aprovações.')
       }
@@ -833,10 +867,18 @@ export default function PaginaTransferencias() {
         ...item,
         team_name: item.team?.name || 'Time desconhecido',
         team_logo: item.team?.logo_url || null,
-        player: item.player || undefined
+        player: item.player ? {
+          ...item.player,
+          position: item.player.position || 'N/A',
+          overall: item.player.overall || 0,
+          base_price: item.player.base_price || 0
+        } : undefined,
+        sale_type: 'fixed_price' as const,
+        is_active: item.is_active || false,
+        created_at: item.created_at || new Date().toISOString(),
+        updated_at: item.updated_at || new Date().toISOString()
       }))
 
-      setMarketPlayers(formattedData)
       setMarketPlayers(formattedData)
     } catch (error) {
       console.error('Erro ao carregar mercado:', error)
@@ -856,7 +898,11 @@ export default function PaginaTransferencias() {
         .eq('team_id', team.id)
         .order('overall', { ascending: false })
 
-      setAvailablePlayers(playersData || [])
+      const validPlayers = (playersData || []).map(p => ({
+        ...p,
+        position: p.position || 'N/A'
+      })) as Player[]
+      setAvailablePlayers(validPlayers)
 
       const { data: marketData } = await supabase
         .from('market_listings')
@@ -885,7 +931,16 @@ export default function PaginaTransferencias() {
         ...item,
         team_name: item.team?.name || team?.name || 'Meu Time',
         team_logo: item.team?.logo_url || team?.logo_url || null,
-        player: item.player || undefined
+        player: item.player ? {
+          ...item.player,
+          position: item.player.position || 'N/A',
+          overall: item.player.overall || 0,
+          base_price: item.player.base_price || 0
+        } : undefined,
+        sale_type: 'fixed_price' as const,
+        is_active: item.is_active || false,
+        created_at: item.created_at || new Date().toISOString(),
+        updated_at: item.updated_at || new Date().toISOString()
       }))
 
       setMyMarketPlayers(formattedMarketData)
@@ -1121,8 +1176,10 @@ export default function PaginaTransferencias() {
 
       if (balanceError) throw balanceError
 
-      if (buyerTeam.balance < listing.price) {
-        alert(`❌ Saldo insuficiente! Seu time precisa de R$ ${listing.price.toLocaleString('pt-BR')} e tem apenas R$ ${buyerTeam.balance.toLocaleString('pt-BR')}`)
+      const buyerBalance = buyerTeam.balance || 0
+
+      if (buyerBalance < listing.price) {
+        alert(`❌ Saldo insuficiente! Seu time precisa de R$ ${listing.price.toLocaleString('pt-BR')} e tem apenas R$ ${buyerBalance.toLocaleString('pt-BR')}`)
         return
       }
 
@@ -1220,7 +1277,7 @@ export default function PaginaTransferencias() {
       <Sidebar
         user={user!}
         profile={profile}
-        team={team}
+        team={team ? { ...team, logo_url: team.logo_url || undefined } : null}
       />
 
       <div className="flex-1 lg:ml-0">
