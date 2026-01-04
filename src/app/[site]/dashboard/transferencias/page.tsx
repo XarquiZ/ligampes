@@ -400,7 +400,43 @@ export default function PaginaTransferencias() {
         player: transfer.player || { id: '', name: 'Jogador Desconhecido', photo_url: null, position: 'N/A' }
       })) || []
 
-      setAllTransfers(safeTransferData)
+      const { data: auctionsData } = await supabase
+        .from('auctions')
+        .select(`
+          *,
+          player:players (id, name, photo_url, position),
+          winner_team:teams!current_bidder (id, name, logo_url, balance)
+        `)
+        .eq('organization_id', organization?.id)
+        .eq('status', 'ended')
+        .order('end_time', { ascending: false })
+
+      const mappedAuctions = (auctionsData || []).map((auction: any) => ({
+        id: auction.id,
+        player_id: auction.player_id,
+        from_team_id: 'auction', // Placeholder
+        to_team_id: auction.current_bidder,
+        value: auction.current_bid,
+        status: 'approved',
+        created_at: auction.created_at || auction.end_time,
+        transfer_type: 'auction', // Custom type
+        is_exchange: false,
+        exchange_players: [],
+        exchange_value: 0,
+        money_direction: null,
+        player: auction.player || { id: '', name: 'Jogador Desconhecido', photo_url: null, position: 'N/A' },
+        from_team: { id: 'auction', name: 'Leilão', logo_url: null, balance: 0 },
+        to_team: auction.winner_team || { id: '', name: 'Time Desconhecido', logo_url: null, balance: 0 },
+        approved_by_seller: true,
+        approved_by_buyer: true,
+        approved_by_admin: true
+      })) as Transfer[]
+
+      const combinedTransfers = [...safeTransferData, ...mappedAuctions].sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+
+      setAllTransfers(combinedTransfers)
 
       const exchangeDetails: { [key: string]: any[] } = {}
       if (safeTransferData) {
@@ -413,8 +449,8 @@ export default function PaginaTransferencias() {
       setExchangePlayersDetails(exchangeDetails)
 
       let filtered = activeTab === 'pending'
-        ? safeTransferData.filter(t => t.status === 'pending')
-        : safeTransferData.filter(t => t.status === 'approved')
+        ? combinedTransfers.filter(t => t.status === 'pending')
+        : combinedTransfers.filter(t => t.status === 'approved')
 
       // Aplicar filtro de time apenas na aba "completed"
       if (activeTab === 'completed' && selectedTeamFilter) {
